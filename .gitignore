@@ -1,0 +1,14 @@
+.Rhistory
+.RData
+.Rproj.user/
+docs/
+*.tar.gz
+*.tar.gz.sha256
+*.Rcheck/
+/coverage*
+.idea/
+lib/
+build/
+
+/man/*
+!/man/.gitkeep

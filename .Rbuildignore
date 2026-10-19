@@ -1,0 +1,16 @@
+^\.git.*$
+^\.Rproj\.user$
+^.*\.Rproj$
+^README\.Rmd$
+^LICENSE$
+^_pkgdown\.yml$
+^docs$
+^tools$
+^coverage.*$
+^.*\.tar\.gz.*$
+^.*\.Rcheck$
+^lib$
+^README\.html$
+^\.idea$
+^build$
+^vignettes/articles$

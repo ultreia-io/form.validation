@@ -19,7 +19,7 @@ Depends: R (>= 4.1.0)
 Imports: cellranger, model.form (>= 0.1.0), readxl, yaml (>= 2.3.10)
 Suggests: covr, htmltools, knitr, openxlsx, pkgdown,
     rmarkdown, testthat (>= 3.0.0), xml2
-Remotes: ultreia-io/model.form
+Remotes: ultreia-io/model.form@v0.1.0
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 Config/testthat/edition: 3

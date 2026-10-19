@@ -7,7 +7,7 @@ Authors@R:
 Description: Generates and executes structural and field checks from explicit
     form models. Validates supplied worksheet data and reference values,
     supports custom rules, and returns findings with source coordinates and
-    execution status. Provides an optional Excel input adapter and exports
+    execution status. Provides an Excel input adapter and exports
     single-input CSV and HTML reports. The engine accepts supplied data without
     workbook readers or databases.
 License: LGPL-2.1
@@ -16,8 +16,8 @@ URL: https://ultreia-io.github.io/model.validation/,
 BugReports: https://github.com/ultreia-io/model.validation/issues
 Encoding: UTF-8
 Depends: R (>= 4.1.0)
-Imports: model.form (>= 0.1.0), yaml (>= 2.3.10)
-Suggests: cellranger, covr, htmltools, knitr, openxlsx, pkgdown, readxl,
+Imports: cellranger, model.form (>= 0.1.0), readxl, yaml (>= 2.3.10)
+Suggests: covr, htmltools, knitr, openxlsx, pkgdown,
     rmarkdown, testthat (>= 3.0.0), xml2
 Remotes: ultreia-io/model.form
 VignetteBuilder: knitr

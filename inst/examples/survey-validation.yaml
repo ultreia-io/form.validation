@@ -1,0 +1,8 @@
+schema_version: 1.0.0
+rules_version: '1'
+model: {id: survey, version: '2026.1'}
+rulesets:
+  structure: survey-structure-validation.yaml
+  content:
+  - survey-generated-validation.yaml
+  - survey-business-validation.yaml

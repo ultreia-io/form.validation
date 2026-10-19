@@ -1,0 +1,6 @@
+schema_version: 1.0.0
+rules_version: '1'
+model: {id: survey, version: '2026.1'}
+stage: business
+rules:
+  business/total_count: {severity: warning, description: Check the total count across observations., maximum: 1000}

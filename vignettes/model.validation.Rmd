@@ -1,0 +1,119 @@
+---
+title: "Getting started"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(model.validation)
+```
+
+`model.form` checks the form definition. `model.validation` checks submitted data against it.
+
+This walkthrough uses the survey supplied by `model.form` and this package's example validation rules.
+
+## Load the validation plan
+
+Load the form, register the business callback, and read the process that lists the rules to execute.
+
+```{r}
+model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
+directory <- system.file("examples", package = "model.validation")
+callbacks <- new.env(parent = baseenv())
+sys.source(file.path(directory, "business.R"), callbacks)
+plan <- read_validation_process(
+  file.path(directory, "survey-validation.yaml"), model,
+  checks = list(total_count = callbacks$total_count)
+)
+```
+
+Structure checks run first. Content checks run only when structure passes.
+
+For your own form, use `write_validation_rules()` to generate its structure and field rules.
+
+Keep handwritten business rules separate; regeneration preserves them.
+
+## Supply data and references
+
+Provide named worksheet grids with physical row and column positions intact.
+
+List matrices preserve mixed cell types, including header text above numeric values.
+
+```{r}
+metadata <- matrix(list(NULL), nrow = 5, ncol = 3)
+metadata[2:4, 3] <- list("001", "2026-10-03", "alice@example.org")
+observations <- matrix(list(NULL), nrow = 7, ncol = 11)
+observations[5, ] <- as.list(c(
+  "STATION", "COUNT", "LENGTH", "UNIT", "ACTIVE", "OBSERVED_AT",
+  "LATITUDE", "LONGITUDE", "OBSERVATION_ID", "QUALITY", "OBSERVER"
+))
+observations[6, ] <- list(
+  "001", 2, 12.5, "cm", TRUE, "2026-10-03T12:00:00Z",
+  -20.5, 55.5, "OBS-001", 1L, "ALICE"
+)
+observations[7, ] <- list(
+  "002", 3, NA_real_, NA_character_, FALSE, "2026-10-03T13:00:00Z",
+  -21, 56, "OBS-002", 2L, "ALICE"
+)
+data <- list(Metadata = metadata, Observations = observations)
+references <- list(
+  observers = list(values = "ALICE"),
+  stations = list(values = c("001", "002"))
+)
+```
+
+Reference values are supplied explicitly. The engine does not fetch code lists or registries.
+
+For Excel files, `read_validation_workbook()` reads grids while preserving cell types and positions.
+
+## Validate and inspect findings
+
+```{r}
+result <- validate_data(plan, data, references, source = "submission.xlsx")
+result$status
+result$complete
+result$valid
+```
+
+Before accepting a submission, require `result$complete` and `isTRUE(result$valid)`.
+
+Now submit a negative count and inspect the resulting finding:
+
+```{r}
+data$Observations[6, 2] <- list(-1)
+result <- validate_data(plan, data, references, source = "submission.xlsx")
+result$findings[c("sheet", "field", "row", "column", "message")]
+```
+
+Findings identify the rule, severity, physical location, submitted value, and expected value.
+
+Missing prerequisites make validation incomplete. Check `result$execution` when a rule cannot finish.
+
+## Export a report
+
+Prepare report data once, then write the CSV files and HTML page into one directory.
+
+```{r}
+output <- tempfile("survey-report-")
+report <- validation_report_data(result, model)
+write_validation_results(report, output)
+write_validation_report(report, file.path(output, "report.html"))
+```
+
+`summary.csv` records status and counts. `findings.csv` records problems and their locations.
+
+Both files include metadata used by the HTML report, such as stages, sheet order, and field labels.
+
+Serve the directory over HTTP. The HTML loads its CSV files and local `report-assets`; keep them together.
+
+Use `assets_directory` to share assets across reports. Optional `stylesheet` and `logo` paths customize presentation.
+
+See `?validate_data`, `?write_validation_results`, and `?write_validation_report` for the full contracts.
+
+```{r cleanup, include=FALSE}
+unlink(output, recursive = TRUE)
+```

@@ -1,0 +1,38 @@
+schema_version: 1.0.0
+rules_version: '1'
+model:
+  id: survey
+  version: '2026.1'
+stage: fields
+rules:
+  field/Metadata.submission/mandatory: true
+  field/Metadata.submission/type: "string"
+  field/Metadata.submission/pattern: "^[0-9]{3}$"
+  field/Metadata.date/mandatory: true
+  field/Metadata.date/type: "date"
+  field/Metadata.contact_email/type: "email"
+  field/Metadata.comment/type: "string"
+  field/Observations.station/mandatory: true
+  field/Observations.station/type: "string"
+  field/Observations.station/reference: "stations"
+  field/Observations.count/mandatory: true
+  field/Observations.count/type: "integer"
+  field/Observations.count/minimum: 0
+  field/Observations.count/maximum: 1000
+  field/Observations.length/type: "number"
+  field/Observations.length/minimum: 0
+  field/Observations.unit/required_field: "length"
+  field/Observations.unit/type: "string"
+  field/Observations.unit/enum: ["cm", "m"]
+  field/Observations.active/mandatory: true
+  field/Observations.active/type: "boolean"
+  field/Observations.observed_at/type: "datetime"
+  field/Observations.latitude/type: "latitude"
+  field/Observations.longitude/type: "longitude"
+  field/Observations.observation_id/type: "string"
+  field/Observations.observation_id/pattern: "^OBS-[0-9]{3}$"
+  field/Observations.observation_id/unique: true
+  field/Observations.quality/type: "integer"
+  field/Observations.quality/enum: [1, 2, 3]
+  field/Observations.observer/type: "string"
+  field/Observations.observer/reference: {value: "observers", severity: warning}

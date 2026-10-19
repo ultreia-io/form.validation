@@ -1,0 +1,35 @@
+url: https://ultreia-io.github.io/model.validation/
+template:
+  bootstrap: 5
+  light-switch: true
+reference:
+  - title: Generate and execute
+    contents: [validation_plan, validate_data, prepare_validation_data, print.validation_result]
+  - title: Excel input
+    contents: [read_validation_workbook]
+  - title: YAML rules and CSV results
+    contents: [generate_validation_rules, load_validation_plan, validation_schema, write_validation_rules, read_validation_rules, read_validation_process, write_validation_results]
+  - title: Single-input reports
+    contents: [validation_report_data, write_validation_report]
+  - title: Reference and registry matching
+    contents: [normalized_name_key, registry_index, registry_match_counts, prepare_validation_references]
+  - title: Custom rules
+    contents: [validation_rule, validation_finding, validation_findings, validation_incomplete]
+articles:
+  - title: Getting started
+    navbar: Guides
+    contents: [model.validation]
+  - title: Development
+    contents: [articles/coverage]
+home:
+  sidebar: false
+news:
+  cran_dates: false
+navbar:
+  structure:
+    left: [intro, reference, articles, news, coverage]
+    right: [search, github, lightswitch]
+  components:
+    coverage:
+      text: Coverage
+      href: articles/coverage.html

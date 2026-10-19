@@ -1,0 +1,124 @@
+---
+title: "Validation specification"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Validation specification}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+Look up the validation file format, execution rules and reference matching behavior here.
+
+## Validation files
+
+Its validation files describe the process, structure, generated checks, and business rules:
+
+| File                               | Purpose                        |
+| ---------------------------------- | ------------------------------ |
+| `survey-validation.yaml`           | Complete execution process     |
+| `survey-structure-validation.yaml` | Sheet order and dimensions     |
+| `survey-generated-validation.yaml` | Explicit generated field rules |
+| `survey-business-validation.yaml`  | Handwritten callback rules     |
+
+```yaml
+rulesets:
+  structure: survey-structure-validation.yaml
+  content:
+  - survey-generated-validation.yaml
+  - survey-business-validation.yaml
+```
+
+All structural checks finish first. Errors or unfinished structural checks block the entire content ruleset.
+
+Content merges generated checks followed by business checks. Only structure gates execution.
+
+The process receives the authoritative form explicitly. Its listed files supply the two ordered rulesets.
+
+Generated rules are written one per line, using the value shortcut whenever possible.
+
+A scalar or sequence is shorthand for `{value: ...}`. Both forms are accepted; severity defaults to error.
+
+```yaml
+rules:
+  field/Observations.count/mandatory: true
+  field/Observations.count/type: integer
+  field/Observations.count/minimum: 0
+  field/Observations.unit/enum: [cm, m]
+  field/Observations.station/reference: {value: stations, severity: warning}
+```
+
+Use a mapping when adding properties such as `severity`. Quote strings that YAML could read as numbers or booleans.
+
+Business rules accept the same shortcut: `business/check_total: 1000` passes `config$rule$value = 1000`.
+
+A mapping-valued parameter needs `{value: {key: data}}`; `{}` still means a rule without parameters.
+
+The ID identifies the field and check. Edit the form, then regenerate; stale rules fail to load.
+
+## Custom rules
+
+Rule IDs use `namespace/[field/]callback`. The optional field must exist in the form.
+
+Callbacks are supplied explicitly; YAML never loads R code. Severity defaults to `error`, description to the rule ID.
+
+Additional rule properties reach the callback through `config$rule`.
+
+A structure file may also contain custom rules. They run before content, using the same callback format.
+
+## Results and execution
+
+- `result$findings` records validation findings and their physical locations.
+- `result$execution` records check completion, including failures and missing prerequisites.
+- `result$complete` indicates whether validation finished.
+- Accept data only when `result$complete` and `isTRUE(result$valid)` are both true.
+
+Structural errors or unfinished structural checks block all content checks.
+
+Content checks continue after findings or execution failures; business checks follow generated field checks.
+
+## Alternate reference codes
+
+Reference snapshots may supply explicit aliases alongside canonical values:
+
+```r
+references <- list(units = list(values = c("cm", "kg"), aliases = c(CM = "cm")))
+```
+
+Membership accepts canonical codes or alias names. Comparisons remain exact and case-sensitive.
+
+Alias targets must exist in `values`; malformed mappings fail execution. Missing snapshots remain incomplete.
+
+Submitted values are never rewritten. Duplicate aliases are allowed: this checks membership, not unique identity.
+
+Accepted keys are cached per validation, or shared across submissions with `prepare_validation_references()`.
+
+The caller supplies all mappings; no data is fetched.
+
+## Registry name matching
+
+Prepare a lookup once from supplied registry values, then reuse it across submissions:
+
+```r
+index <- registry_index(c("MARTIN Emile", "Jane Smith"), matching = "name",
+  aliases = c("J. Smith" = "Jane Smith"))
+registry_match_counts(index, c("Emile Martin", "J. Smith", "Unknown"))
+# 1 1 0
+```
+
+Lookup tries exact values, explicit aliases, then normalized names. Exactly one registry row must match.
+
+Name keys ignore case, accents, selected punctuation and word order; this is not fuzzy matching.
+
+Exact duplicates and normalized collisions remain ambiguous. Missing alias targets remain unmatched.
+
+Alias chains are supported; cycles fail preparation. Input values and duplicate registry rows are preserved.
+
+`matching = "exact"` is the default. Name matching and aliases require string fields.
+
+The caller chooses matching options and supplies snapshots; these helpers load no files or databases.
+
+
+## Read next
+
+- [Authoring validation rules](rules-authoring.html): generate checks and add a custom rule.
+- [Function reference](https://ultreia-io.github.io/model.validation/reference/index.html): full API contracts.

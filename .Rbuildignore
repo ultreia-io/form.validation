@@ -14,3 +14,7 @@
 ^\.idea$
 ^build$
 ^vignettes/articles$
+^CONTRIBUTING\.md$
+^CODE_OF_CONDUCT\.md$
+^DEVELOPMENT\.md$
+^SECURITY\.md$

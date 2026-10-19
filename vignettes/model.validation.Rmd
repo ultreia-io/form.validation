@@ -12,9 +12,13 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 library(model.validation)
 ```
 
-`model.form` checks the form definition. `model.validation` checks submitted data against it.
+## About this example
 
-This walkthrough uses the survey supplied by `model.form` and this package's example validation rules.
+This guide demonstrates the bundled survey example, using its form definition, validation rules and sample data.
+
+You will load the rules, validate sample data, inspect findings, and export CSV and HTML reports.
+
+`model.form` supplies the survey definition; `model.validation` supplies its validation rules.
 
 ## Load the validation plan
 
@@ -117,3 +121,11 @@ See `?validate_data`, `?write_validation_results`, and `?write_validation_report
 ```{r cleanup, include=FALSE}
 unlink(output, recursive = TRUE)
 ```
+
+## Read next
+
+- [Authoring validation rules](rules-authoring.html): generate checks and add custom rules.
+- [Validation specification](validation-specification.html): formats, execution and references.
+- [Using validation in your package](downstream-packages.html): integrate and run validation.
+- [Validation reports](validation-reports.html): export and publish CSV and HTML reports.
+- [Function reference](https://ultreia-io.github.io/model.validation/reference/index.html): API details.

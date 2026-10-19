@@ -1,0 +1,50 @@
+---
+title: "Validation reports"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Validation reports}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Single-input HTML report
+
+Prepare report data once, then write a CSV-backed HTML page:
+
+```r
+report <- validation_report_data(result, model)
+write_validation_results(report, "report")
+write_validation_report(report, "report/report.html")
+```
+
+The Abstract shows the input, versions, status, and error/warning counts. Zero counts and skipped checks are hidden.
+
+Summary and Validation messages start with a severity icon and a labelled stage
+icon (Structure, Field, Business). All sheets appear in Validation messages,
+including fixed-cell sheets and workbook-level problems. CSV exports retain
+plain severity and stage text; the CSV files include explicit report metadata.
+
+Summary and Validation messages use sheet tabs with search, column filters, pagination, and CSV buttons.
+
+Table summaries group identical field, column, value, severity, stage, and message combinations, with occurrence counts.
+
+Fixed-cell findings appear individually in Summary. Validation messages retains every finding for every sheet.
+
+“Checks that could not finish” lists only incomplete or failed checks and is hidden when empty.
+
+An unfinished validation never appears as a successful report, even with no error findings.
+
+CSV and HTML reuse the prepared report’s formatted tables.
+
+The HTML loads adjacent `summary.csv` and `findings.csv` over HTTP.
+Publish both CSV files and the `report-assets` folder with the HTML.
+Apache or a Shiny static resource directory can serve the files.
+No rendering packages, Pandoc, or external CDN are required.
+For collections, set `assets_directory` to a shared relative directory.
+
+The original workbook is not copied. Existing report files require explicit `overwrite = TRUE`.
+
+`validation_report_data()` returns plain tables for reuse by a future Shiny interface, without rendering or revalidation.
+
+CSV exports include all recorded problems, explicit structure status and UTC generation time.
+Prepared reports also export finding stages, field labels, sheet order and layout.

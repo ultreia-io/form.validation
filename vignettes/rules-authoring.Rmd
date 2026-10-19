@@ -1,0 +1,60 @@
+---
+title: "Authoring validation rules"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Authoring validation rules}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+Generate checks from your form, then add custom rules for requirements the form cannot express.
+
+## 1. Generate field and structure rules
+
+This example copies the bundled survey into a temporary directory:
+
+```{r}
+library(model.validation)
+directory <- tempfile("survey-rules-")
+dir.create(directory)
+file.copy(model.form::form_resource("examples/survey-form.yaml", "model.form"), directory)
+generate_validation_rules("survey", directory, version = "1")
+```
+
+For your own form, use its name and directory. Regenerate after changing the definition, using `overwrite = TRUE`.
+
+## 2. Add a custom rule
+
+The bundled business rule warns when the total observation count exceeds its configured maximum:
+
+```{r, echo=FALSE, results='asis'}
+examples <- system.file("examples", package = "model.validation")
+cat("```yaml\n", paste(readLines(file.path(examples, "survey-business-validation.yaml")), collapse="\n"), "\n```\n", sep="")
+```
+
+Its callback returns a finding when the total is too high:
+
+```{r, echo=FALSE, results='asis'}
+cat("```r\n", paste(readLines(file.path(examples, "business.R")), collapse="\n"), "\n```\n", sep="")
+```
+
+Return `NULL` when the check passes. Use `validation_incomplete()` when required information is unavailable.
+
+## 3. Declare the process
+
+The process lists the generated files followed by your business rules:
+
+```{r, echo=FALSE, results='asis'}
+cat("```yaml\n", paste(readLines(file.path(examples, "survey-validation.yaml")), collapse="\n"), "\n```\n", sep="")
+```
+
+All files must identify the same model and rules version. Regeneration preserves your business file.
+
+## Read next
+
+- [Validation specification](validation-specification.html): YAML properties and execution rules.
+- [Using validation in your package](downstream-packages.html): register callbacks and execute a plan.
+
+```{r, include=FALSE}
+unlink(directory, recursive = TRUE)
+```

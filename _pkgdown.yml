@@ -18,7 +18,7 @@ reference:
 articles:
   - title: Getting started
     navbar: Guides
-    contents: [model.validation]
+    contents: [model.validation, rules-authoring, validation-specification, downstream-packages, validation-reports]
   - title: Development
     contents: [articles/coverage]
 home:
@@ -27,9 +27,34 @@ news:
   cran_dates: false
 navbar:
   structure:
-    left: [intro, reference, articles, news, coverage]
+    left: [intro, reference, articles, news, coverage, community]
     right: [search, github, lightswitch]
   components:
+    intro:
+      text: Get started
+      href: articles/model.validation.html
+    articles:
+      text: Articles
+      menu:
+        - text: Authoring validation rules
+          href: articles/rules-authoring.html
+        - text: Validation specification
+          href: articles/validation-specification.html
+        - text: Using validation in your package
+          href: articles/downstream-packages.html
+        - text: Validation reports
+          href: articles/validation-reports.html
+    community:
+      text: Community
+      menu:
+        - text: Contributing
+          href: CONTRIBUTING.html
+        - text: Maintainer guide
+          href: DEVELOPMENT.html
+        - text: Security policy
+          href: SECURITY.html
+        - text: Code of conduct
+          href: CODE_OF_CONDUCT.html
     coverage:
       text: Coverage
       href: articles/coverage.html

@@ -223,7 +223,7 @@ null_value <- function(x) {
 #' @return Whether the value matches, without coercion.
 #' @details Dates accept ISO strings or whole-day `Date` values. Datetimes accept
 #'   UTC ISO strings or whole-second `POSIXct` values. Other classed values fail.
-#'   Other values use [model.form::form_value_matches_type()].
+#'   Other values use `model.form::form_value_matches_type()`.
 #' @keywords internal
 value_type <- function(x, type) {
   if (length(x) != 1L || !is.atomic(x) || is.na(x)) return(FALSE)

@@ -1,0 +1,83 @@
+---
+title: "Using validation in your package"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Using validation in your package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+Keep your forms, rule files and callbacks in your package; pass data and reference snapshots explicitly.
+
+## Store the resources
+
+Declare `model.form` and `model.validation` in your package's `Imports`.
+
+```text
+inst/forms/
+  survey-form.yaml
+  survey-validation.yaml
+  survey-structure-validation.yaml
+  survey-generated-validation.yaml
+  survey-business-validation.yaml
+R/
+  checks.R
+```
+
+Use separate directories when shipping multiple model versions.
+
+## Load a plan
+
+Register your callback when loading the process:
+
+```r
+directory <- system.file("forms", package = "your.package")
+plan <- model.validation::load_validation_plan(
+  "survey", directory,
+  checks = list(total_count = total_count)
+)
+```
+
+Here `total_count` is your package's callback, as illustrated in the authoring guide.
+
+Keep the plan and checked form unchanged; reuse them across submissions.
+
+## Supply references and Excel data
+
+```r
+references <- model.validation::prepare_validation_references(list(
+  observers = list(values = "ALICE"),
+  stations = list(values = c("001", "002"))
+))
+data <- model.validation::read_validation_workbook("submission.xlsx")
+result <- model.validation::validate_data(plan, data, references, source = "submission.xlsx")
+```
+
+Supply code lists and registries from your application's sources. The validation package does not fetch them.
+
+Prepare code lists once per batch. Use `registry_index()` separately for registry matching.
+
+Excel reading preserves cell positions, individual value types, whitespace and textual leading zeros.
+
+It reads cached formula results without recalculation. Excel errors and formulas without cached values become missing.
+
+## Prepare values when needed
+
+Conversion is explicit and runs only after structural checks pass:
+
+```r
+result <- model.validation::validate_data(
+  plan, data, references,
+  prepare_data = function(data) model.validation::prepare_validation_data(data, plan$model)
+)
+```
+
+This converts string fields to text and midnight timestamps to dates. Other values remain unchanged.
+
+Custom preparation must preserve sheet names, order and dimensions. Preparation errors block content checks.
+
+## Read next
+
+- [Validation reports](validation-reports.html): export the results.
+- [Validation specification](validation-specification.html): reference and registry matching rules.
+- [Maintainer guide](https://ultreia-io.github.io/model.validation/DEVELOPMENT.html): package internals and development commands.

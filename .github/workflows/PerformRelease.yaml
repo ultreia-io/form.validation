@@ -1,0 +1,88 @@
+name: Perform Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version already recorded in DESCRIPTION and NEWS (e.g. 0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      _R_CHECK_CRAN_INCOMING_: 'false'
+      _R_CHECK_CRAN_INCOMING_REMOTE_: 'false'
+      _R_CHECK_SYSTEM_CLOCK_: 'false'
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: r-lib/actions/setup-r@v2.12.1
+        with:
+          r-version: release
+          use-public-rspm: true
+      - name: Check release version
+        shell: Rscript {0}
+        run: |
+          description <- read.dcf("DESCRIPTION")
+          version <- unname(description[1, "Version"])
+          stopifnot(grepl("^[0-9]+[.][0-9]+[.][0-9]+$", version))
+          stopifnot(identical(Sys.getenv("RELEASE_VERSION"), version))
+          heading <- paste("#", description[1, "Package"], version)
+          stopifnot(heading %in% readLines("NEWS.md"))
+
+      - uses: r-lib/actions/setup-pandoc@v2.12.1
+      - uses: r-lib/actions/setup-r-dependencies@v2.12.1
+        with:
+          extra-packages: |
+            any::rcmdcheck
+            any::roxygen2
+          needs: check
+
+      - name: Generate package documentation
+        shell: Rscript {0}
+        run: roxygen2::roxygenise()
+
+      - uses: r-lib/actions/check-r-package@v2.12.1
+        with:
+          args: 'c("--no-manual", "--as-cran")'
+          check-dir: '"build"'
+          error-on: '"note"'
+
+      - name: Create archive checksum
+        working-directory: build
+        run: sha256sum *.tar.gz > SHA256SUMS
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ inputs.version }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            build/*.tar.gz
+            build/SHA256SUMS
+          fail_on_unmatched_files: true
+          overwrite_files: false
+          generate_release_notes: true
+
+  website:
+    needs: release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/Website.yaml
+    with:
+      ref: ${{ github.sha }}
+    secrets: inherit

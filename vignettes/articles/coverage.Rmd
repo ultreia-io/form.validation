@@ -1,0 +1,62 @@
+---
+title: "Test coverage"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, results = "asis")
+root <- normalizePath("../..", mustWork = TRUE)
+lines <- read.csv(file.path(root, "docs/coverage/coverage.csv"), stringsAsFactors = FALSE)
+files <- sort(unique(lines$filename))
+covered <- sum(lines$value > 0)
+total <- nrow(lines)
+percent <- if (total) sprintf("%.2f%%", 100 * covered / total) else "Not measured"
+```
+
+```{r overview}
+cat(sprintf("**%s coverage** — %s of %s tracked lines exercised by tests.\n\n", percent, covered, total))
+```
+
+Select a file to inspect its source. `+` marks covered lines; `!` marks lines not exercised by tests.
+
+[Download line coverage (CSV)](../coverage/coverage.csv) · [Download Cobertura XML](../coverage/coverage.xml)
+
+## Files
+
+```{r files}
+summary <- do.call(rbind, lapply(seq_along(files), function(i) {
+  counts <- lines$value[lines$filename == files[[i]]]
+  data.frame(File = sprintf("[%s](#file-%s)", files[[i]], i),
+    Coverage = sprintf("%.2f%%", 100 * mean(counts > 0)),
+    Covered = sum(counts > 0), Missed = sum(counts == 0), Total = length(counts),
+    check.names = FALSE)
+}))
+if (length(files)) cat(knitr::kable(summary, align = c("l", "r", "r", "r", "r")), sep = "\n")
+```
+
+## Source
+
+```{r source}
+for (i in seq_along(files)) {
+  file <- files[[i]]
+  rows <- lines[lines$filename == file, , drop = FALSE]
+  missed <- sort(unique(rows$line[rows$value == 0]))
+  source <- readLines(file.path(root, file), warn = FALSE, encoding = "UTF-8")
+  cat(sprintf("\n\n### %s {#file-%s}\n\n", file, i))
+  if (length(missed)) {
+    links <- sprintf("[%s](#file-%s-L%s)", missed, i, missed)
+    cat("Uncovered lines: ", paste(links, collapse = ", "), ".\n\n", sep = "")
+  } else {
+    cat("All tracked lines were exercised.\n\n")
+  }
+  cat('<details class="mb-4"><summary>View source</summary><pre class="mt-2"><code>')
+  for (line in seq_along(source)) {
+    tracked <- line %in% rows$line
+    absent <- line %in% missed
+    mark <- if (absent) "!" else if (tracked) "+" else " "
+    css <- if (absent) ' class="bg-danger bg-opacity-10"' else ""
+    cat(sprintf('<span id="file-%s-L%s"%s>%4s %s %s</span>\n',
+      i, line, css, line, mark, htmltools::htmlEscape(source[[line]])))
+  }
+  cat("</code></pre></details>\n\n")
+}
+```

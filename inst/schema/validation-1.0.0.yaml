@@ -1,0 +1,37 @@
+# A small package-specific contract, not JSON Schema.
+dialect: model.validation/schema/1
+contract_version: '1.0.0'
+severities: [error, warning, info]
+process:
+  keys: [schema_version, rules_version, model, rulesets]
+  rulesets: [structure, content]
+  structure: filename
+  content: [generated_filename, business_filenames]
+  gate: structure_passes_before_content
+rule_shortcut:
+  applies_to: [structure, fields, business]
+  scalar_or_sequence: "{value: ...}"
+  mapping: explicit_rule_properties
+  empty_mapping: parameterless_rule
+stages:
+  structure:
+    keys: [schema_version, rules_version, model, stage, sheets]
+    sheet_values: [rows, min_rows, columns]
+    optional_keys: [rules]
+    rule_id: <namespace>/[<field>/]<callback>
+    forbidden_rule_values: [check, field]
+    optional_rule_values: [severity, description]
+  fields:
+    keys: [schema_version, rules_version, model, stage, rules]
+    rule_id: field/<sheet>.<field>/<check>
+    required_rule_values: [value]
+    optional_rule_values: [severity]
+    checks: [mandatory, required_field, type, reference, enum, minimum, maximum, pattern, unique]
+  business:
+    keys: [schema_version, rules_version, model, stage, rules]
+    rule_id: <namespace>/[<field>/]<callback>
+    forbidden_rule_values: [check, field]
+    optional_rule_values: [severity, description]
+defaults:
+  severity: error
+  description: rule_id

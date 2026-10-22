@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="{{style}}">
+  <link rel="stylesheet" href="{{stylesheet}}">
+  <link rel="stylesheet" href="{{overview_style}}">
+  <script defer src="{{loading_script}}" data-csv-worker="{{csv_worker}}"></script>
+  <script defer src="{{table_script}}"></script>
+  <script defer src="{{script}}"></script>
+</head>
+<body>
+  <template id="loading-state">
+    <div class="report-loading" role="status" aria-live="polite">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <span data-loading-message>Loading…</span>
+      <button type="button" hidden>Retry</button>
+    </div>
+  </template>
+  <template id="evidence-filter-card">
+    <div class="overview-card"><strong></strong><span></span><small>Occurrences</small></div>
+  </template>
+  <template id="reference-case">
+    <section>
+      <h3 data-case-reference></h3>
+      <p>Selected value: <code class="report-value" data-case-value></code></p>
+      <div data-case-table></div>
+    </section>
+  </template>
+  <main data-evidence-label="{{evidence_label}}">
+    <img class="report-logo" src="{{logo}}" alt="Report logo">
+    <div class="report-navigation">
+      <nav aria-label="Breadcrumb"><a href="{{parent_report}}">All reports</a> / <span aria-current="page">{{evidence_label}}</span></nav>
+      <span class="report-generated">Generated {{generated_at}}</span>
+    </div>
+    <h1>{{title}}</h1>
+    <p>{{description}}</p>
+    <p>{{instructions}}</p>
+    <div id="loading"></div>
+    <section id="overview" class="report-overview">
+      <div class="overview-cards" aria-label="{{evidence_label}} counts">
+        <div class="overview-card" data-tone="attention"><strong data-total="cases">—</strong><span>{{cases_label}}</span></div>
+        <div class="overview-card"><strong data-total="{{category_total}}">—</strong><span>{{references_label}}</span></div>
+        <div class="overview-card"><strong data-total="forms">—</strong><span>Affected forms</span></div>
+        <div class="overview-card" data-tone="error"><strong data-total="occurrences">—</strong><span>Occurrences</span></div>
+      </div>
+      <div id="evidence-filters" hidden>
+        <h3>Findings by severity</h3>
+        <div class="overview-cards" data-filter-cards="severity"></div>
+        <h3>Findings by expected type</h3>
+        <div class="overview-cards" data-filter-cards="expected_type"></div>
+      </div>
+    </section>
+    <section class="report-resources" aria-label="Resources">
+      <h2>Resources</h2>
+      <div class="resource-links">
+        <div><a href="{{summary_file}}" download>↓ {{summary_label}}</a><p>{{summary_description}}</p></div>
+        <div><a href="evidence.csv" download>↓ Evidence CSV</a><p>All affected forms and exact cell ranges</p></div>
+      </div>
+    </section>
+    <div id="reference-review"></div>
+    <noscript>JavaScript is required for interactive tables. Download the CSV files to inspect the evidence.</noscript>
+  </main>
+</body>
+</html>

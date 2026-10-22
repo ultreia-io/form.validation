@@ -5,7 +5,7 @@
 #' @param result A result from [validate_data()].
 #' @param model The form used to validate this input, supplying sheet order and layout.
 #' @return A `validation_report` list with `tables`, `summary`, `structure_passed`,
-#'   `sheets`, `execution`, and `generated_at`. Each sheet has its name, finding
+#'   `sheets`, `execution`, `generated_at`, and caller `metadata`. Each sheet has its name, finding
 #'   counts, a summary, and details. Values are readable text; the original
 #'   result retains its types. Execution contains only failed or incomplete checks.
 #' @details Table-sheet summaries group findings by field, column, value,
@@ -15,6 +15,8 @@
 #'   Incomplete and failed execution remain separate from validation findings.
 #'   Pass the report to [write_validation_results()] to reuse its formatted
 #'   `tables` for CSV export without preparing them again.
+#'   Optional `metadata$report_notes` is a character vector displayed as escaped
+#'   text in the Warning findings card. Other metadata is retained without interpretation.
 #' @examples
 #' model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
 #' result <- validate_data(validation_plan(model), list(), source = "submission.xlsx")
@@ -28,19 +30,25 @@ validation_report_data <- function(result, model) {
   }
   tables <- validation_result_tables(result)
   sheets <- model.form::form_sheets(model)
+  # Resolve static sheet and field metadata once, then match all finding rows.
+  field_labels <- stats::setNames(lapply(names(sheets), function(name) {
+    vapply(model.form::form_fields(model, name), `[[`, character(1), "name")
+  }), names(sheets))
   tables$details$sheet_order <- match(tables$details$sheet, names(sheets))
-  tables$details$layout <- vapply(tables$details$sheet, function(name) {
-    if (is.na(name) || !name %in% names(sheets)) "table" else sheets[[name]]$layout$kind
-  }, character(1))
-  tables$details$field_label <- vapply(seq_len(nrow(tables$details)), function(i) {
-    row <- tables$details[i, ]
-    fields <- if (!is.na(row$sheet) && row$sheet %in% names(sheets)) model.form::form_fields(model, row$sheet) else list()
-    if (!is.na(row$field) && row$field %in% names(fields)) fields[[row$field]]$name else row$field
-  }, character(1))
+  layouts <- vapply(sheets, function(sheet) sheet$layout$kind, character(1))
+  tables$details$layout <- unname(layouts[tables$details$sheet_order])
+  tables$details$layout[is.na(tables$details$sheet_order)] <- "table"
+  tables$details$field_label <- tables$details$field
+  for (name in names(sheets)) {
+    selected <- which(tables$details$sheet == name)
+    labels <- field_labels[[name]]
+    matched <- match(tables$details$field[selected], names(labels))
+    known <- !is.na(matched)
+    tables$details$field_label[selected[known]] <- unname(labels[matched[known]])
+  }
   findings <- tables$details[tables$details$kind == "validation", , drop = FALSE]
   findings$stage <- result$execution$stage[match(findings$rule_id, result$execution$rule_id)]
   findings$stage <- report_stage_labels(findings$stage)
-  sheets <- model.form::form_sheets(model)
   names_in_result <- unique(findings$sheet[!is.na(findings$sheet)])
   order <- c(names(sheets), setdiff(names_in_result, names(sheets)))
   if (anyNA(findings$sheet)) order <- c(order, NA_character_)
@@ -49,8 +57,7 @@ validation_report_data <- function(result, model) {
     name <- order[[i]]
     data <- findings[rows[[as.character(i)]], , drop = FALSE]
     if (!nrow(data)) return(NULL)
-    fields <- if (!is.na(name) && name %in% names(sheets)) model.form::form_fields(model, name) else list()
-    labels <- vapply(fields, `[[`, character(1), "name")
+    labels <- if (!is.na(name) && name %in% names(sheets)) field_labels[[name]] else character()
     matched <- match(data$field, names(labels))
     data$column_name <- ifelse(is.na(matched), data$field, unname(labels[matched]))
     details <- data[c("severity", "stage", "column_name", "column", "row", "value", "message")]
@@ -68,7 +75,7 @@ validation_report_data <- function(result, model) {
     }
     rownames(summary) <- NULL
     if (!is.null(details)) rownames(details) <- NULL
-    list(name = if (is.na(name)) "Workbook" else name,
+    list(name = if (is.na(name)) "Form" else name,
          errors = sum(data$severity == "error"), warnings = sum(data$severity == "warning"),
          summary = summary, details = details)
   })
@@ -77,7 +84,7 @@ validation_report_data <- function(result, model) {
   execution$stage <- report_stage_labels(execution$stage)
   structure(list(tables = tables, summary = tables$summary, structure_passed = result$structure_passed,
                  sheets = Filter(Negate(is.null), sections), execution = execution,
-                 generated_at = tables$summary$generated_at),
+                 generated_at = tables$summary$generated_at, metadata = result$metadata),
             class = "validation_report")
 }
 
@@ -105,7 +112,7 @@ validation_report_data <- function(result, model) {
 #'   known sheet/field; no cell coordinate is invented. Empty locations are blank.
 #'   An input without problems has a header-only findings file.
 #'
-#' Files use UTF-8, comma separators, decimal points, and standard CSV quoting.
+#' Files use UTF-8 with a BOM, comma separators, decimal points, and standard CSV quoting.
 #'   Scalar values become readable text; null is `null`, scalar NA is `NA`, and
 #'   compound values use YAML text inside the quoted CSV cell. Temporal values
 #'   use ISO text. CSV is for reporting; the in-memory result retains R types.
@@ -137,9 +144,21 @@ write_validation_results <- function(result, directory, overwrite = FALSE) {
   if (!dir.exists(directory) && !dir.create(directory, recursive = TRUE)) {
     stop("Cannot create output directory: ", directory, call. = FALSE)
   }
-  utils::write.csv(tables$summary, paths[["summary"]], row.names = FALSE, na = "", fileEncoding = "UTF-8")
-  utils::write.csv(tables$details, paths[["findings"]], row.names = FALSE, na = "", fileEncoding = "UTF-8")
+  write_report_csv(tables$summary, paths[["summary"]])
+  write_report_csv(tables$details, paths[["findings"]])
   invisible(paths)
+}
+
+#' Write a report table as UTF-8 CSV with a BOM
+#' @param data Report table.
+#' @param path Destination CSV file.
+#' @return No return value, called for file output.
+#' @keywords internal
+write_report_csv <- function(data, path) {
+  connection <- file(path, open = "wt", encoding = "UTF-8")
+  on.exit(close(connection))
+  cat("\ufeff", file = connection)
+  utils::write.csv(data, connection, row.names = FALSE, na = "")
 }
 
 #' Write a CSV-backed HTML validation report
@@ -155,6 +174,7 @@ write_validation_results <- function(result, directory, overwrite = FALSE) {
 #'   Use a shared relative path for a collection of reports.
 #' @param stylesheet Optional path to an additional CSS file overriding the default style.
 #' @param logo Optional path to a report logo image.
+#' @param parent_report Optional URL of the parent aggregate report; NULL omits navigation.
 #' @return The normalized HTML path, invisibly.
 #' @details Creates CSV files if absent. Existing CSV files must match the prepared
 #'   report, unless overwrite is TRUE. JavaScript and CSS are local external files;
@@ -164,12 +184,17 @@ write_validation_results <- function(result, directory, overwrite = FALSE) {
 #' @export
 write_validation_report <- function(report, path, title = "Validation report", author = NULL,
                                     overwrite = FALSE, assets_directory = "report-assets",
-                                    stylesheet = NULL, logo = NULL) {
+                                    stylesheet = NULL, logo = NULL, parent_report = NULL) {
   if (!inherits(report, "validation_report")) stop("report must come from validation_report_data()", call. = FALSE)
+  notes <- report$metadata$report_notes
+  if (!is.null(notes) && (!is.character(notes) || anyNA(notes)))
+    stop("metadata$report_notes must be character text without missing values", call. = FALSE)
+  notes <- if (length(notes)) paste(notes, collapse = "\n") else NULL
   text_value(path, "path")
   text_value(title, "title")
   text_value(assets_directory, "assets_directory")
   if (!is.null(author)) text_value(author, "author")
+  if (!is.null(parent_report)) text_value(parent_report, "parent_report")
   if (grepl("^[/~]|^[A-Za-z]+:", assets_directory)) stop("assets_directory must be relative", call. = FALSE)
   if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
     stop("overwrite must be TRUE or FALSE", call. = FALSE)
@@ -193,40 +218,21 @@ write_validation_report <- function(report, path, title = "Validation report", a
     }
   }
   assets <- file.path(directory, assets_directory)
-  if (!dir.exists(assets) && !dir.create(assets, recursive = TRUE)) stop("Cannot create asset directory", call. = FALSE)
-  sources <- stats::setNames(system.file("report", c("report.js", "report.css"),
-    package = "model.validation", mustWork = TRUE), c("script", "style"))
+  sources <- stats::setNames(system.file("report", c("report.js", "report.css", "overview.css", "report-ui.js", "csv-worker.js"),
+    package = "model.validation", mustWork = TRUE), c("script", "style", "overview_style", "loading_script", "csv_worker"))
   if (!is.null(stylesheet)) sources <- c(sources, stylesheet = stylesheet)
   if (!is.null(logo)) sources <- c(sources, logo = logo)
-  if (any(!file.exists(sources))) stop("Report asset does not exist", call. = FALSE)
-  filenames <- stats::setNames(paste0("report-", unname(tools::md5sum(sources)), ".",
-    tools::file_ext(sources)), names(sources))
-  for (i in seq_along(sources)) {
-    destination <- file.path(assets, filenames[[i]])
-    if (!file.exists(destination) && !file.copy(sources[[i]], destination)) stop("Cannot write report asset", call. = FALSE)
-  }
-  escape <- function(x) {
-    for (pair in list(c("&", "&amp;"), c("<", "&lt;"), c(">", "&gt;"), c('"', "&quot;"))) {
-      x <- gsub(pair[[1]], pair[[2]], x, fixed = TRUE)
-    }
-    x
-  }
+  filenames <- copy_report_assets(sources, assets)
   urls <- stats::setNames(vapply(file.path(assets_directory, filenames), function(path) {
     paste(vapply(strsplit(path, "/", fixed = TRUE)[[1]], utils::URLencode, character(1), reserved = TRUE), collapse = "/")
   }, character(1)), names(sources))
-  html <- c('<!doctype html>', '<html lang="en"><head><meta charset="utf-8">',
-    '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    paste0('<title>', escape(title), '</title>'),
-    paste0('<link rel="stylesheet" href="', escape(urls[[2]]), '">'),
-    if (!is.null(stylesheet)) paste0('<link rel="stylesheet" href="', escape(urls[["stylesheet"]]), '">'),
-    paste0('<script defer src="', escape(urls[[1]]), '"></script></head><body><main>'),
-    if (!is.null(logo)) paste0('<img class="report-logo" src="', escape(urls[["logo"]]), '" alt="Report logo">'),
-    paste0('<h1>', escape(title), '</h1>'),
-    if (!is.null(author)) paste0('<p class="author">', escape(author), '</p>'),
-    '<p id="loading" role="status">Loading report data\u2026</p>',
-    '<noscript>JavaScript is required to display this report.</noscript>',
-    '<p><a href="summary.csv">Summary CSV</a> \u00b7 <a href="findings.csv">Findings CSV</a></p>',
-    '<div id="report"></div></main></body></html>')
+  html <- render_report_template("report.html", list(
+    title = title, style = urls[["style"]], script = urls[["script"]],
+    overview_style = urls[["overview_style"]],
+    loading_script = urls[["loading_script"]], csv_worker = urls[["csv_worker"]],
+    stylesheet = if (!is.null(stylesheet)) urls[["stylesheet"]] else NULL,
+    logo = if (!is.null(logo)) urls[["logo"]] else NULL, author = author, parent_report = parent_report,
+    report_notes = notes))
   writeLines(html, path, useBytes = TRUE)
   invisible(normalizePath(path, mustWork = TRUE))
 }

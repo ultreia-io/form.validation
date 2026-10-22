@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="{{style}}">
+  <link rel="stylesheet" href="{{stylesheet}}">
+  <link rel="stylesheet" href="{{overview_style}}">
+  <script defer src="{{loading_script}}" data-csv-worker="{{csv_worker}}"></script>
+  <script defer src="{{script}}"></script>
+</head>
+<body>
+    <template id="loading-state">
+      <div class="report-loading" role="status" aria-live="polite">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span data-loading-message>Loading…</span>
+        <button type="button" hidden>Retry</button>
+      </div>
+    </template>
+  <main>
+    <img class="report-logo" src="{{logo}}" alt="Report logo">
+    <div class="report-navigation">
+      <nav class="report-parent"><a href="{{parent_report}}">← Back to aggregate report</a></nav>
+      <span id="report-generated" class="report-generated"></span>
+    </div>
+    <h1>{{title}}</h1>
+    <p class="author">{{author}}</p>
+    <div id="loading"></div>
+    <div id="report-overview"></div>
+    <noscript>JavaScript is required to display this report.</noscript>
+    <template id="findings-overview">
+      <section class="report-overview">
+        <div class="overview-outcome">
+          <strong class="overview-status" data-meta="status"></strong>
+          <p data-meta="explanation"></p>
+          <div class="overview-metadata">
+            <span>Structure: <strong data-meta="structure"></strong></span>
+            <span>Model version: <strong data-meta="model_version"></strong></span>
+            <span>Rules version: <strong data-meta="rules_version"></strong></span>
+          </div>
+        </div>
+        <h3>Validation findings and unfinished checks</h3>
+        <div class="overview-cards" aria-label="Findings and unfinished check counts">
+          <div class="overview-card" data-tone="error"><strong data-count="errors">—</strong><span><span class="severity-dot" data-severity="error" aria-hidden="true"></span>Error findings</span></div>
+          <div class="overview-card" data-tone="attention">
+            <strong data-count="warnings">—</strong>
+            <span><span class="severity-dot" data-severity="warning" aria-hidden="true"></span>Warning findings</span>
+            <small id="warning-policy" class="overview-notes">{{report_notes}}</small>
+          </div>
+          <div class="overview-card" data-tone="attention"><strong data-count="incomplete">—</strong><span><span aria-hidden="true">⏳</span>Incomplete checks</span></div>
+          <div class="overview-card" data-tone="error"><strong data-count="failed">—</strong><span><span aria-hidden="true">❌</span>Failed checks</span></div>
+        </div>
+      </section>
+    </template>
+    <section class="report-resources" aria-label="Resources">
+      <h2>Resources</h2>
+      <div class="resource-links">
+        <div><a href="summary.csv" download>↓ Summary CSV</a><p>Form status and validation counts</p></div>
+        <div><a href="findings.csv" download>↓ Findings CSV</a><p>Detailed findings and unfinished checks</p></div>
+      </div>
+    </section>
+    <div id="report"></div>
+  </main>
+</body>
+</html>

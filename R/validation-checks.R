@@ -57,13 +57,13 @@ run_builtin <- function(rule, context) {
 }
 
 #' Prepare code-list keys for reuse across submissions
-#' @param references Named list of reference snapshots accepted by [validate_data()].
+#' @param references Named list of reference snapshots accepted by [`validate_data()`][form.validation::validate_data].
 #' @param ids Character vector identifying code-list snapshots to prepare.
 #'   Defaults to all supplied names. Exclude custom registry snapshots.
 #' @return The supplied list with a private attribute containing prepared keys.
 #'   Snapshot values, aliases, versions, and existing attributes are preserved.
 #' @details Prepare once after loading a batch's reference snapshots, then pass
-#'   the result to each [validate_data()] call. No data is read or rewritten.
+#'   the result to each [`validate_data()`][form.validation::validate_data] call. No data is read or rewritten.
 #'   Keys include canonical codes and validated alias names. Missing or malformed
 #'   snapshots are recorded, but signal incomplete or failed execution only when
 #'   an eligible reference rule runs after the structure gate. Unused references
@@ -205,7 +205,7 @@ run_field <- function(rule, context) {
 #' @return Highest declared row as an integer, or zero when no cells are declared.
 #' @keywords internal
 minimum_cell_rows <- function(model, sheet) {
-  fields <- model.form::form_fields(model, sheet)
+  fields <- form.model::form_fields(model, sheet)
   as.integer(max(c(0L, vapply(fields, `[[`, numeric(1), "row"))))
 }
 
@@ -223,17 +223,17 @@ null_value <- function(x) {
 #' @return Whether the value matches, without coercion.
 #' @details Dates accept ISO strings or whole-day `Date` values. Datetimes accept
 #'   UTC ISO strings or finite `POSIXct` values, including fractional seconds. Other classed values fail.
-#'   Other values use `model.form::form_value_matches_type()`.
+#'   Other values use `form.model::form_value_matches_type()`.
 #' @keywords internal
 value_type <- function(x, type) {
   if (length(x) != 1L || !is.atomic(x) || is.na(x)) return(FALSE)
   if (inherits(x, "Date")) return(type == "date" && is.finite(unclass(x)) && unclass(x) == floor(unclass(x)))
   if (inherits(x, "POSIXct")) return(type == "datetime" && is.finite(unclass(x)))
-  model.form::form_value_matches_type(unname(x), type)
+  form.model::form_value_matches_type(unname(x), type)
 }
 
 #' Normalize a typed value for comparisons
-#' @param x A scalar already accepted by [value_type()].
+#' @param x A scalar already accepted by [`value_type()`][form.validation::value_type].
 #' @param type Declared type.
 #' @return A comparison scalar; dates become ISO strings and datetimes UTC seconds.
 #' @keywords internal

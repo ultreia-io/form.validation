@@ -1,8 +1,8 @@
 # Security policy
 
-Version 0.1.x receives security fixes while it is the current release series.
+Security fixes are provided for the latest release.
 
-Report vulnerabilities privately through [GitHub advisories](https://github.com/ultreia-io/model.validation/security/advisories/new).
+Report vulnerabilities privately through [GitHub advisories](https://github.com/ultreia-io/form.validation/security/advisories/new).
 
 If private reporting is unavailable, contact Tony through his GitHub profile before disclosing details publicly.
 

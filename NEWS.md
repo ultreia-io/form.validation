@@ -1,4 +1,6 @@
-# model.validation 0.2.0
+# form.validation 0.2.0
+
+* Rename the package from `model.validation` to `form.validation`; update installation references and namespace calls.
 
 * Distinguish interactive overview cards with explicit action labels and IOTC-coloured hover and focus states.
 
@@ -43,7 +45,7 @@
 
 # model.validation 0.1.0
 
-* Generate versioned structural and field rules from model.form definitions and reject stale rule files.
+* Generate versioned structural and field rules from form.model definitions and reject stale rule files.
 * Validate worksheet grids in stages, running content checks only after structural checks pass.
 * Apply field types and constraints, code-list references, and explicitly registered custom rules.
 * Return findings with source coordinates and distinguish validation errors from unfinished or failed checks.

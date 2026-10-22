@@ -115,7 +115,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     groups <- c(groups, unique(apply(files[group_columns[seq_len(depth)]], 1L, paste, collapse = "/")))
   assets <- file.path(directory, "report-assets")
   sources <- stats::setNames(system.file("report", c("report.css", "aggregate.js", "overview.css", "report-ui.js", "csv-worker.js", "report-table.js"),
-    package = "model.validation", mustWork = TRUE), c("style", "script", "overview_style", "loading_script", "csv_worker", "table_script"))
+    package = "form.validation", mustWork = TRUE), c("style", "script", "overview_style", "loading_script", "csv_worker", "table_script"))
   if (!is.null(stylesheet)) sources <- c(sources, stylesheet = stylesheet)
   if (!is.null(logo)) sources <- c(sources, logo = logo)
   asset_names <- copy_report_assets(sources, assets)

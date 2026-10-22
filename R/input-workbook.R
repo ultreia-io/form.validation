@@ -1,7 +1,7 @@
 #' Read stored Excel values into worksheet grids
 #'
 #' Read XLSX input. Reading does not validate, convert declared field
-#' types, or change the input file. [validate_data()] also accepts caller-supplied
+#' types, or change the input file. [`validate_data()`][form.validation::validate_data] also accepts caller-supplied
 #' grids directly.
 #' @param path Path to an XLSX workbook.
 #' @param timed Optional function with arguments `stage` and `expression` that

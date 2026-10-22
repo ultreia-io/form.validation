@@ -1,8 +1,8 @@
 test_that("generated validation files are compact and round-trip the plan", {
   paths <- rule_paths()
   on.exit(unlink(dirname(paths[[1L]]), recursive = TRUE))
-  structure <- model.validation:::read_rules_yaml(paths[[1L]])
-  fields <- model.validation:::read_rules_yaml(paths[[2L]])
+  structure <- form.validation:::read_rules_yaml(paths[[1L]])
+  fields <- form.validation:::read_rules_yaml(paths[[2L]])
   expect_identical(structure$stage, "structure")
   expect_identical(names(structure$sheets), c("Cover", "Observations"))
   expect_identical(fields$stage, "fields")
@@ -32,7 +32,7 @@ test_that("compact business rules receive explicit values and defaults", {
   expect_identical(result$findings$severity, "warning")
   expect_equal(result$findings$expected[[1L]], 10)
 
-  document <- model.validation:::read_rules_yaml(business)
+  document <- form.validation:::read_rules_yaml(business)
   document$rules[[1L]]$severity <- NULL
   document$rules[[1L]]$description <- NULL
   yaml::write_yaml(document, business)
@@ -52,8 +52,8 @@ test_that("rule files reject wrong versions, stages and stale definitions", {
   expect_error(read_validation_rules(rev(paths), fixture_model()), "ordered")
   changed <- fixture_definition()
   changed$form$version <- "2"
-  expect_error(read_validation_rules(paths, model.form::as_form_model(changed)), "identity/version")
-  original <- model.validation:::read_rules_yaml(paths[[1L]])
+  expect_error(read_validation_rules(paths, form.model::as_form_model(changed)), "identity/version")
+  original <- form.validation:::read_rules_yaml(paths[[1L]])
   for (change in list(
     function(d) { d$schema_version <- "2"; d },
     function(d) { d$sheets$Observations$columns <- 5L; d },
@@ -70,7 +70,7 @@ test_that("validation process declares the complete ordered pipeline", {
   on.exit(unlink(directory, recursive = TRUE))
   file.copy(system.file("examples", c("survey-structure-validation.yaml",
     "survey-generated-validation.yaml", "survey-business-validation.yaml",
-    "survey-validation.yaml"), package = "model.validation"), directory)
+    "survey-validation.yaml"), package = "form.validation"), directory)
   model <- upstream_model()
   process <- file.path(directory, "survey-validation.yaml")
   plan <- read_validation_process(process, model, checks = upstream_checks())
@@ -88,7 +88,7 @@ test_that("validation process declares the complete ordered pipeline", {
   expect_identical(result$status, "incomplete")
   expect_identical(result$findings$row, 6L)
   extra <- file.path(directory, "extra.yaml")
-  document <- model.validation:::read_rules_yaml(file.path(directory, "survey-business-validation.yaml"))
+  document <- form.validation:::read_rules_yaml(file.path(directory, "survey-business-validation.yaml"))
   names(document$rules) <- "extra/total_count"
   yaml::write_yaml(document, extra)
   appended <- read_validation_process(process, model, checks = upstream_checks(), business = extra)
@@ -105,14 +105,14 @@ test_that("invalid YAML is data only and never drops duplicate keys", {
   marker <- tempfile()
   on.exit(unlink(c(path, marker)))
   writeLines("schema_version: '1'\nschema_version: '2'", path)
-  expect_error(model.validation:::read_rules_yaml(path), "Duplicate")
+  expect_error(form.validation:::read_rules_yaml(path), "Duplicate")
   writeLines("schema_version: '1'\n---\nschema_version: '2'", path)
-  expect_error(model.validation:::read_rules_yaml(path), "Document markers")
+  expect_error(form.validation:::read_rules_yaml(path), "Document markers")
   writeLines(paste0("test: !expr file.create('", marker, "')"), path)
-  expect_error(model.validation:::read_rules_yaml(path), "Expression tags")
+  expect_error(form.validation:::read_rules_yaml(path), "Expression tags")
   expect_false(file.exists(marker))
   writeLines("1: value", path)
-  expect_error(model.validation:::read_rules_yaml(path), "Mapping keys must be strings")
+  expect_error(form.validation:::read_rules_yaml(path), "Mapping keys must be strings")
 })
 
 test_that("changed model values require regenerating the concrete rules", {
@@ -120,7 +120,7 @@ test_that("changed model values require regenerating the concrete rules", {
   on.exit(unlink(dirname(paths[[1L]]), recursive = TRUE))
   changed <- fixture_definition()
   changed$sheets$Observations$fields$amount$minimum <- 1
-  model <- model.form::as_form_model(changed)
+  model <- form.model::as_form_model(changed)
   expect_error(read_validation_rules(paths, model), "differs from model")
   write_validation_rules(model, paths[[1L]], paths[[2L]], "1", overwrite = TRUE)
   plan <- read_validation_rules(paths, model)
@@ -133,7 +133,7 @@ test_that("changed model values require regenerating the concrete rules", {
 test_that("generated rule order, parameters and severities cannot silently drift", {
   paths <- rule_paths()
   on.exit(unlink(dirname(paths[[1L]]), recursive = TRUE))
-  original <- model.validation:::read_rules_yaml(paths[[2L]])
+  original <- form.validation:::read_rules_yaml(paths[[2L]])
   for (change in list(
     function(d) { d$rules <- d$rules[-1L]; d },
     function(d) { d$rules <- rev(d$rules); d },
@@ -152,10 +152,10 @@ test_that("compact parameters preserve quoted text and numeric values", {
   paths <- rule_paths()
   on.exit(unlink(dirname(paths[[1L]]), recursive = TRUE))
   compact <- read_validation_rules(paths, fixture_model())
-  expanded <- model.validation:::read_validation_document(paths[[2L]], compact$model)
+  expanded <- form.validation:::read_validation_document(paths[[2L]], compact$model)
   yaml::write_yaml(expanded, paths[[2L]])
   expect_identical(read_validation_rules(paths, compact$model)$rules, compact$rules)
-  model <- model.form::as_form_model(d)
+  model <- form.model::as_form_model(d)
   write_validation_rules(model, paths[[1L]], paths[[2L]], "1", overwrite = TRUE)
   loaded <- read_validation_rules(paths, model)
   expected <- validation_plan(model)
@@ -167,7 +167,7 @@ test_that("business IDs bind the callback and field without duplicate properties
   on.exit(unlink(dirname(paths[[1L]]), recursive = TRUE))
   business <- business_path()
   on.exit(unlink(business), add = TRUE)
-  document <- model.validation:::read_rules_yaml(business)
+  document <- form.validation:::read_rules_yaml(business)
   names(document$rules) <- "business/Observations.amount/inspect_amount"
   yaml::write_yaml(document, business)
   seen <- NULL
@@ -199,7 +199,7 @@ test_that("forms with no fields round-trip an empty generated rules mapping", {
   }
   paths <- rule_paths()
   on.exit(unlink(dirname(paths[[1L]]), recursive = TRUE))
-  model <- model.form::as_form_model(d)
+  model <- form.model::as_form_model(d)
   write_validation_rules(model, paths[[1L]], paths[[2L]], "1", overwrite = TRUE)
   expect_identical(read_validation_rules(paths, model)$rules, validation_plan(model)$rules)
 })
@@ -209,7 +209,7 @@ test_that("business shortcuts preserve values and parameterless mappings", {
   on.exit(unlink(dirname(paths[[1L]]), recursive = TRUE))
   business <- business_path()
   on.exit(unlink(business), add = TRUE)
-  document <- model.validation:::read_rules_yaml(business)
+  document <- form.validation:::read_rules_yaml(business)
   header <- sub("\n$", "", yaml::as.yaml(document[setdiff(names(document), "rules")]))
   examples <- c('"01"', 'false', '0', 'null', '[]', '[cm, null]', '{value: {code: x}}', '{}')
   values <- list("01", FALSE, 0L, NULL, list(), list("cm", NULL), list(code = "x"), NULL)
@@ -229,11 +229,11 @@ test_that("minimum cell extents round-trip and follow declared locations", {
   d <- fixture_definition()
   d$sheets$Cover$layout$row_count <- NULL
   d$sheets$Cover$fields$title$location <- "A3"
-  model <- model.form::as_form_model(d)
+  model <- form.model::as_form_model(d)
   paths <- rule_paths()
   on.exit(unlink(dirname(paths[[1L]]), recursive = TRUE))
   write_validation_rules(model, paths[[1L]], paths[[2L]], overwrite = TRUE)
-  document <- model.validation:::read_rules_yaml(paths[[1L]])
+  document <- form.validation:::read_rules_yaml(paths[[1L]])
   expect_identical(document$sheets$Cover, list(min_rows = 3L, columns = 1L))
   plan <- read_validation_rules(paths, model)
   for (rows in c(3L, 4L)) {

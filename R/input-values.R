@@ -2,8 +2,8 @@
 #'
 #' Optional value conversion for callers that accept textual representations of
 #' supplied values. No workbook reading or validation is performed.
-#' @param data Named worksheet grids, as for [validate_data()].
-#' @param model Checked form model from model.form.
+#' @param data Named worksheet grids, as for [`validate_data()`][form.validation::validate_data].
+#' @param model Checked form model from form.model.
 #' @param na_strings Text tokens interpreted as missing, or a function receiving
 #'   an effective field definition and returning its tokens. Defaults to none.
 #' @param na_ignore_case Match missing-text tokens without case distinctions.
@@ -45,8 +45,8 @@ prepare_validation_data <- function(data, model, na_strings = character(), na_ig
     }
     if (is.matrix(grid)) data[[name]] <- as.data.frame(grid)
   }
-  layouts <- model.form::form_sheets(model)
-  for (field in model.form::form_fields(model)) {
+  layouts <- form.model::form_sheets(model)
+  for (field in form.model::form_fields(model)) {
     if (!field$sheet %in% names(data)) next
     grid <- data[[field$sheet]]
     if (field$column > ncol(grid)) next
@@ -121,7 +121,7 @@ coerce_calendar_date <- function(value) {
     parts <- as.integer(strsplit(value, ".", fixed = TRUE)[[1L]])
   } else return(value)
   canonical <- sprintf("%04d-%02d-%02d", parts[1L], parts[2L], parts[3L])
-  if (model.form::form_value_matches_type(canonical, "date")) canonical else value
+  if (form.model::form_value_matches_type(canonical, "date")) canonical else value
 }
 
 #' Normalize an unambiguous ISO datetime to a UTC ISO string
@@ -137,7 +137,7 @@ coerce_iso_datetime <- function(value) {
   parts <- regmatches(value, regexec(pattern, value))[[1]]
   if (!length(parts)) return(value)
   local <- paste0(parts[2], if (nzchar(parts[3])) sub("[.].*$", "", parts[3]) else ":00", "Z")
-  if (!model.form::form_value_matches_type(local, "datetime")) return(value)
+  if (!form.model::form_value_matches_type(local, "datetime")) return(value)
   zone <- parts[5]
   offset <- 0
   if (zone != "Z") {
@@ -150,11 +150,11 @@ coerce_iso_datetime <- function(value) {
   parsed <- as.POSIXct(strptime(local, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")) - offset
   if (nzchar(parts[4])) return(parsed + as.numeric(paste0("0", parts[4])))
   canonical <- format(parsed, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  if (model.form::form_value_matches_type(canonical, "datetime")) canonical else value
+  if (form.model::form_value_matches_type(canonical, "datetime")) canonical else value
 }
 
 #' Extract field values and coordinates
-#' @param field Effective field definition obtained through model.form.
+#' @param field Effective field definition obtained through form.model.
 #' @param sheet Sheet definition.
 #' @param data Named worksheet grids.
 #' @param config Normalized execution configuration.

@@ -37,7 +37,7 @@ test_that("multi-row preambles are ignored and data retains physical coordinates
   grid[2, ] <- list("Different label", "Units", NULL, "Notes")
   grid[3, ] <- list("S01", 2, "cm", "north")
   data$Observations <- grid
-  model <- model.form::as_form_model(d)
+  model <- form.model::as_form_model(d)
   expect_true(validate_fixture(data, model = model)$valid)
   data$Observations[1:2, ] <- rep(list("Arbitrary preamble"), 8)
   expect_true(validate_fixture(data, model = model)$valid)
@@ -95,7 +95,7 @@ test_that("all structure finishes before fields and business, and alone gates co
 test_that("failed or incomplete structural execution never invokes callbacks", {
   calls <- 0L
   callback <- validation_rule("business/counter", function(...) { calls <<- calls + 1L; NULL })
-  original <- model.validation:::run_builtin
+  original <- form.validation:::run_builtin
   for (problem in c("incomplete", "failed")) {
     local_mocked_bindings(run_builtin = function(rule, context) {
       if (rule$id == "workbook/sheets") {
@@ -103,7 +103,7 @@ test_that("failed or incomplete structural execution never invokes callbacks", {
         stop("Structure failed")
       }
       original(rule, context)
-    }, .package = "model.validation")
+    }, .package = "form.validation")
     result <- validate_data(validation_plan(fixture_model(), list(callback)), fixture_data())
     expect_identical(result$status, problem)
     expect_identical(calls, 0L)
@@ -119,7 +119,7 @@ test_that("A1 cell locations retain physical finding coordinates", {
   data <- fixture_data()
   data$Cover <- matrix(vector("list", 54), 2, 27)
   data$Cover[[2, 27]] <- 42
-  result <- validate_fixture(data, model = model.form::as_form_model(d))
+  result <- validate_fixture(data, model = form.model::as_form_model(d))
   expect_identical(result$findings$rule_id, "field/Cover.title/type")
   expect_identical(result$findings$row, 2L)
   expect_identical(result$findings$column, 27L)

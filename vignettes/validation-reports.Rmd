@@ -7,44 +7,33 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-## Single-input HTML report
+## Generate a report
 
-Prepare report data once, then write a CSV-backed HTML page:
+After validation, use the result and its form model to create the report:
 
 ```r
 report <- validation_report_data(result, model)
 write_validation_results(report, "report")
-write_validation_report(report, "report/report.html")
+write_validation_report(report, "report/index.html")
 ```
 
-The Abstract shows the input, versions, status, and error/warning counts. Zero counts and skipped checks are hidden.
+The `report` directory contains the HTML page, CSV downloads and supporting assets.
 
-Summary and Validation messages start with a severity icon and a labelled stage
-icon (Structure, Field, Business). All sheets appear in Validation messages,
-including fixed-cell sheets and workbook-level problems. CSV exports retain
-plain severity and stage text; the CSV files include explicit report metadata.
+## Review the results
 
-Summary and Validation messages use sheet tabs with search, column filters, pagination, and CSV buttons.
+Open the report through a web server. Opening the HTML directly from disk may prevent its data from loading.
 
-Table summaries group identical field, column, value, severity, stage, and message combinations, with occurrence counts.
+1. Check the validation status and finding counts at the top of the page.
+2. Use the detail tabs and filters to inspect findings and unfinished checks.
+3. Download the CSV files from Resources when you need to review the data outside the browser.
 
-Fixed-cell findings appear individually in Summary. Validation messages retains every finding for every sheet.
+Unfinished checks mean validation is incomplete, even when there are no error findings.
 
-“Checks that could not finish” lists only incomplete or failed checks and is hidden when empty.
+## Share or refresh the report
 
-An unfinished validation never appears as a successful report, even with no error findings.
+Publish the entire `report` directory, keeping its files and subdirectories together.
 
-CSV and HTML reuse the prepared report’s formatted tables.
+To regenerate an existing report, pass `overwrite = TRUE` to both writing functions.
 
-The HTML loads adjacent `summary.csv` and `findings.csv` over HTTP.
-Publish both CSV files and the `report-assets` folder with the HTML.
-Apache or a Shiny static resource directory can serve the files.
-No rendering packages, Pandoc, or external CDN are required.
-For collections, set `assets_directory` to a shared relative directory.
-
-The original workbook is not copied. Existing report files require explicit `overwrite = TRUE`.
-
-`validation_report_data()` returns plain tables for reuse by a future Shiny interface, without rendering or revalidation.
-
-CSV exports include all recorded problems, explicit structure status and UTC generation time.
-Prepared reports also export finding stages, field labels, sheet order and layout.
+For multiple forms, use the [batch workflow](../reference/validation_batch_plan.html)
+or [aggregate existing reports](../reference/write_validation_aggregate.html).

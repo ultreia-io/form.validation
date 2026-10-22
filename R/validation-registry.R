@@ -19,7 +19,7 @@ normalized_name_key <- function(x) {
 }
 
 #' Encode a validated scalar registry key
-#' @param x One nonmissing scalar accepted by [value_type()].
+#' @param x One nonmissing scalar accepted by [`value_type()`][form.validation::value_type].
 #' @return A character key with a numeric, Boolean, or string prefix. Dates and
 #'   timestamps use their canonical text representation; numeric zero is unsigned.
 #' @keywords internal
@@ -91,7 +91,7 @@ registry_index <- function(values, type = "string", matching = "exact", aliases 
 }
 
 #' Count registry matches for submitted values
-#' @param index Prepared lookup from [registry_index()].
+#' @param index Prepared lookup from [`registry_index()`][form.validation::registry_index].
 #' @param values Vector or list of submitted scalars of the index's declared type.
 #' @return Integer match counts in input order. Missing values return zero;
 #'   malformed non-missing values are errors. Exactly one match is valid.

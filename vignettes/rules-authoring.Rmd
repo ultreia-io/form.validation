@@ -14,10 +14,10 @@ Generate checks from your form, then add custom rules for requirements the form 
 This example copies the bundled survey into a temporary directory:
 
 ```{r}
-library(model.validation)
+library(form.validation)
 directory <- tempfile("survey-rules-")
 dir.create(directory)
-file.copy(model.form::form_resource("examples/survey-form.yaml", "model.form"), directory)
+file.copy(form.model::form_resource("examples/survey-form.yaml", "form.model"), directory)
 generate_validation_rules("survey", directory, version = "1")
 ```
 
@@ -28,7 +28,7 @@ For your own form, use its name and directory. Regenerate after changing the def
 The bundled business rule warns when the total observation count exceeds its configured maximum:
 
 ```{r, echo=FALSE, results='asis'}
-examples <- system.file("examples", package = "model.validation")
+examples <- system.file("examples", package = "form.validation")
 cat("```yaml\n", paste(readLines(file.path(examples, "survey-business-validation.yaml")), collapse="\n"), "\n```\n", sep="")
 ```
 

@@ -74,7 +74,7 @@ test_that("mandatory, type and reference precede remaining constraints regardles
   site$mandatory <- TRUE
   site <- c(list(pattern = "^[a-z]+$"), site)
   d$sheets$Observations$fields$site <- site
-  plan <- validation_plan(model.form::as_form_model(d))
+  plan <- validation_plan(form.model::as_form_model(d))
   rules <- Filter(function(rule) identical(rule$field, "Observations.site"), plan$rules)
   expect_identical(vapply(rules, `[[`, character(1), "kind"),
                    c("mandatory", "type", "reference", "pattern"))
@@ -100,11 +100,11 @@ test_that("compact references default to errors and preserve explicit warnings",
   d$sheets$Observations$fields$site <- list(mandatory = TRUE, type = "string", reference = "sites")
   data <- fixture_data()
   data$Observations$site <- c(NA_character_, "unknown")
-  result <- validate_fixture(data, model = model.form::as_form_model(d))
+  result <- validate_fixture(data, model = form.model::as_form_model(d))
   expect_identical(result$findings$rule_id,
                    c("field/Observations.site/mandatory", "field/Observations.site/reference"))
   expect_identical(result$findings$severity, c("error", "error"))
   d$sheets$Observations$fields$site$reference <- list(id = "sites", severity = "warning")
-  result <- validate_fixture(data, model = model.form::as_form_model(d))
+  result <- validate_fixture(data, model = form.model::as_form_model(d))
   expect_identical(result$findings$severity, c("error", "warning"))
 })

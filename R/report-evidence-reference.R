@@ -148,7 +148,7 @@ write_evidence_page <- function(directory, folder_name, report_filename, title, 
   folder <- file.path(directory, folder_name)
   sources <- stats::setNames(system.file("report",
     c("report.css", "overview.css", "report-ui.js", "csv-worker.js", "report-table.js", "reference-evidence.js"),
-    package = "model.validation", mustWork = TRUE),
+    package = "form.validation", mustWork = TRUE),
     c("style", "overview_style", "loading_script", "csv_worker", "table_script", "script"))
   if (!is.null(stylesheet)) sources <- c(sources, stylesheet = stylesheet)
   if (!is.null(logo)) sources <- c(sources, logo = logo)

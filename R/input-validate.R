@@ -1,11 +1,11 @@
 #' Read and validate a workbook without generating reports
 #' @param path Input workbook path, left unchanged.
-#' @param plan A rule plan from [validation_plan()] or [read_validation_rules()].
+#' @param plan A rule plan from [`validation_plan()`][form.validation::validation_plan] or [`read_validation_rules()`][form.validation::read_validation_rules].
 #' @param references Explicit reference snapshots, reusable across inputs.
 #' @param source Diagnostic input label; defaults to `path`.
 #' @param reader Function accepting `path` and `timed`, returning worksheet grids.
 #' @param prepare_data Function accepting `data` and `model`, called after structure
-#'   passes. Defaults to [prepare_validation_data()]; NULL leaves grids unchanged.
+#'   passes. Defaults to [`prepare_validation_data()`][form.validation::prepare_validation_data]; NULL leaves grids unchanged.
 #' @param log Function receiving timing lines; defaults to [message()].
 #' @inheritParams validate_data
 #' @return A typed `validation_result`. Reader failures are saved as failed results.
@@ -64,7 +64,7 @@ workbook_read_failure <- function(plan, path, message) {
   findings <- cbind(data.frame(rule_id = character(), severity = character(), source = character()),
     validation_finding("unused")[FALSE, ])
   structure(list(status = "failed", valid = NA, complete = FALSE, structure_passed = FALSE,
-    findings = findings, execution = execution, model = model.form::form_metadata(plan$model),
+    findings = findings, execution = execution, model = form.model::form_metadata(plan$model),
     source = path, rules_version = plan$rules_version,
     metadata = plan$metadata), class = "validation_result")
 }

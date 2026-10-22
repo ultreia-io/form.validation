@@ -1,6 +1,6 @@
 #' Freeze an explicit inventory for staged batch validation
 #'
-#' A batch plan describes work to execute. A [validation_plan()] describes the
+#' A batch plan describes work to execute. A [`validation_plan()`][form.validation::validation_plan] describes the
 #' rules for one form; several such rule plans may belong to a batch.
 #' @param inputs Data frame with `path`, unique relative `relative` paths and
 #'   `job` identifiers. Additional grouping columns and `title` are optional.
@@ -64,7 +64,7 @@ validation_batch_plan <- function(inputs, jobs, resources, directory,
   }
   jobs$model_version <- vapply(seq_len(nrow(jobs)), function(i) {
     rules <- resources[[jobs$resource[i]]]$plans[[jobs$plan[i]]]
-    model.form::form_metadata(rules$model)$form$version
+    form.model::form_metadata(rules$model)$form$version
   }, character(1))
   inputs$model_version <- jobs$model_version[match(inputs$job, jobs$id)]
   model_versions <- unique(c(model_versions, jobs$model_version))
@@ -94,7 +94,7 @@ validation_batch_plan <- function(inputs, jobs, resources, directory,
       references = attr(resources[[i]]$references, "provenance"))
   }
   jobs$forms <- vapply(jobs$id, function(id) sum(inputs$job == id), integer(1))
-  packages <- unique(c("model.validation", "model.form", packages))
+  packages <- unique(c("form.validation", "form.model", packages))
   versions <- stats::setNames(vapply(packages, function(package)
     as.character(utils::packageVersion(package)), character(1)), packages)
   plan <- structure(list(schema_version = 1L, created_at = batch_time(), directory = directory,

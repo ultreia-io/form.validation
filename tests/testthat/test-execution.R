@@ -22,7 +22,7 @@ test_that("reference findings and missing execution are distinct", {
 
 test_that("custom rules receive explicit inputs and return portable findings", {
   rule <- validation_rule("custom/limit", function(model, data, references, config) {
-    stopifnot(model.form::form_metadata(model)$form$id == "fixture")
+    stopifnot(form.model::form_metadata(model)$form$id == "fixture")
     stopifnot(identical(references$sites$values, c("north", "south")))
     values <- data$Observations$amount
     bad <- which(values > config$custom$limit)

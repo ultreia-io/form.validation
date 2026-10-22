@@ -2,7 +2,7 @@
 #'
 #' Prepare plain tables once for HTML output or a future interactive consumer.
 #' No workbook is read and no validation rule is executed.
-#' @param result A result from [validate_data()].
+#' @param result A result from [`validate_data()`][form.validation::validate_data].
 #' @param model The form used to validate this input, supplying sheet order and layout.
 #' @return A `validation_report` list with `tables`, `summary`, `structure_passed`,
 #'   `sheets`, `execution`, `generated_at`, and caller `metadata`. Each sheet has its name, finding
@@ -13,26 +13,26 @@
 #'   individual findings in Validation messages, including fixed-cell sheets. Whole-workbook findings have a
 #'   separate section.
 #'   Incomplete and failed execution remain separate from validation findings.
-#'   Pass the report to [write_validation_results()] to reuse its formatted
+#'   Pass the report to [`write_validation_results()`][form.validation::write_validation_results] to reuse its formatted
 #'   `tables` for CSV export without preparing them again.
 #'   Optional `metadata$report_notes` is a character vector displayed as escaped
 #'   text in the Warning findings card. Other metadata is retained without interpretation.
 #' @examples
-#' model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
+#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
 #' result <- validate_data(validation_plan(model), list(), source = "submission.xlsx")
 #' report <- validation_report_data(result, model)
 #' report$summary
 #' @export
 validation_report_data <- function(result, model) {
   if (!inherits(result, "validation_result")) stop("result must come from validate_data()", call. = FALSE)
-  if (!identical(result$model, model.form::form_metadata(model))) {
+  if (!identical(result$model, form.model::form_metadata(model))) {
     stop("Report form differs from validation result", call. = FALSE)
   }
   tables <- validation_result_tables(result)
-  sheets <- model.form::form_sheets(model)
+  sheets <- form.model::form_sheets(model)
   # Resolve static sheet and field metadata once, then match all finding rows.
   field_labels <- stats::setNames(lapply(names(sheets), function(name) {
-    vapply(model.form::form_fields(model, name), `[[`, character(1), "name")
+    vapply(form.model::form_fields(model, name), `[[`, character(1), "name")
   }), names(sheets))
   tables$details$sheet_order <- match(tables$details$sheet, names(sheets))
   layouts <- vapply(sheets, function(sheet) sheet$layout$kind, character(1))
@@ -92,8 +92,8 @@ validation_report_data <- function(result, model) {
 #'
 #' Create `summary.csv` with one row and `findings.csv` with one row per finding
 #' or incomplete/failed check. Successful checks produce no detail rows.
-#' @param result A result from [validate_data()] or a prepared
-#'   [validation_report_data()] report. A report reuses its formatted tables.
+#' @param result A result from [`validate_data()`][form.validation::validate_data] or a prepared
+#'   [`validation_report_data()`][form.validation::validation_report_data] report. A report reuses its formatted tables.
 #' @param directory Output folder for this one input. Created if necessary.
 #' @param overwrite Whether to replace existing CSV outputs. Defaults to `FALSE`.
 #' @return A named character vector with `summary` and `findings` paths, invisibly.
@@ -122,7 +122,7 @@ validation_report_data <- function(result, model) {
 #' Both existing paths are checked before writing either file. Filesystem write
 #'   errors are raised; the two-file write is not transactional.
 #' @examples
-#' model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
+#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
 #' result <- validate_data(validation_plan(model), list(), source = "submission.xlsx")
 #' directory <- tempfile()
 #' write_validation_results(result, directory)
@@ -165,7 +165,7 @@ write_report_csv <- function(data, path) {
 #'
 #' Write a small HTML page that loads adjacent summary.csv and findings.csv.
 #' Serve the output over HTTP using Apache or a Shiny static resource directory.
-#' @param report Prepared data from [validation_report_data()].
+#' @param report Prepared data from [`validation_report_data()`][form.validation::validation_report_data].
 #' @param path Destination HTML filename.
 #' @param title Report title.
 #' @param author Optional author text, or `NULL`.
@@ -219,7 +219,7 @@ write_validation_report <- function(report, path, title = "Validation report", a
   }
   assets <- file.path(directory, assets_directory)
   sources <- stats::setNames(system.file("report", c("report.js", "report.css", "overview.css", "report-ui.js", "csv-worker.js"),
-    package = "model.validation", mustWork = TRUE), c("script", "style", "overview_style", "loading_script", "csv_worker"))
+    package = "form.validation", mustWork = TRUE), c("script", "style", "overview_style", "loading_script", "csv_worker"))
   if (!is.null(stylesheet)) sources <- c(sources, stylesheet = stylesheet)
   if (!is.null(logo)) sources <- c(sources, logo = logo)
   filenames <- copy_report_assets(sources, assets)

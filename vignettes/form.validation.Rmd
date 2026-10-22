@@ -9,7 +9,7 @@ vignette: >
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-library(model.validation)
+library(form.validation)
 ```
 
 ## About this example
@@ -18,15 +18,15 @@ This guide demonstrates the bundled survey example, using its form definition, v
 
 You will load the rules, validate sample data, inspect findings, and export CSV and HTML reports.
 
-`model.form` supplies the survey definition; `model.validation` supplies its validation rules.
+`form.model` supplies the survey definition; `form.validation` supplies its validation rules.
 
 ## Load the validation plan
 
 Load the form, register the business callback, and read the process that lists the rules to execute.
 
 ```{r}
-model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
-directory <- system.file("examples", package = "model.validation")
+model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
+directory <- system.file("examples", package = "form.validation")
 callbacks <- new.env(parent = baseenv())
 sys.source(file.path(directory, "business.R"), callbacks)
 plan <- read_validation_process(
@@ -128,4 +128,4 @@ unlink(output, recursive = TRUE)
 - [Validation specification](validation-specification.html): formats, execution and references.
 - [Using validation in your package](downstream-packages.html): integrate and run validation.
 - [Validation reports](validation-reports.html): export and publish CSV and HTML reports.
-- [Function reference](https://ultreia-io.github.io/model.validation/reference/index.html): API details.
+- [Function reference](https://ultreia-io.github.io/form.validation/reference/index.html): API details.

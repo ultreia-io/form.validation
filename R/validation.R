@@ -3,7 +3,7 @@
 #' Run structural checks first. Field and business checks run only when the
 #' complete structure stage passes. No workbook readers, network lookups, or
 #' report rendering are invoked. Data, references, and configuration are caller-owned.
-#' @param plan A plan from [validation_plan()] or [read_validation_rules()].
+#' @param plan A plan from [`validation_plan()`][form.validation::validation_plan] or [`read_validation_rules()`][form.validation::read_validation_rules].
 #'   Optional caller-owned `plan$metadata` is retained in the result unchanged.
 #' @param data Named list of data frames or two-dimensional matrices, keyed by
 #'   exact workbook sheet names. Retain all physical preamble rows.
@@ -14,7 +14,7 @@
 #'   Optional `aliases` map alternate codes to canonical `values`; both are accepted.
 #'   Alias targets must exist in `values`; submitted values are not rewritten.
 #'   Missing snapshots make affected rules incomplete; malformed snapshot values
-#'   make them fail execution. Use [prepare_validation_references()] to reuse
+#'   make them fail execution. Use [`prepare_validation_references()`][form.validation::prepare_validation_references] to reuse
 #'   checked code-list keys across submissions.
 #' @param source One diagnostic label identifying the input file or submission.
 #' @param config Named list with optional `blank_strings` (default `FALSE`),
@@ -39,7 +39,7 @@
 #'     \item{execution}{Data frame with `rule_id`, `stage`, `severity`, `sheet`, `field`,
 #'       `status`, and `message`.
 #'       Status is `completed`, `skipped`, `incomplete`, or `failed`.}
-#'     \item{model}{Identity, versions, and provenance from model.form's public API.}
+#'     \item{model}{Identity, versions, and provenance from form.model's public API.}
 #'     \item{source}{Input label, also retained for submissions without findings.}
 #'     \item{structure_passed}{Whether the structure gate opened for content checks.}
 #'     \item{rules_version}{Version from YAML rule files, or `NA` for direct plans.}
@@ -67,7 +67,7 @@
 #' malformed callback results, and missing prerequisites are returned in execution
 #' records rather than being confused with submitted-data validation failures.
 #' @examples
-#' model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
+#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
 #' plan <- validation_plan(model)
 #' data <- list(Metadata = matrix(vector("list", 15), 5, 3),
 #'              Observations = matrix(vector("list", 66), 6, 11))
@@ -101,8 +101,8 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
   named_list(references, "references")
   text_value(source, "source")
   config <- execution_config(config)
-  context <- list(model = plan$model, sheets = model.form::form_sheets(plan$model),
-                  fields = model.form::form_fields(plan$model), data = data,
+  context <- list(model = plan$model, sheets = form.model::form_sheets(plan$model),
+                  fields = form.model::form_fields(plan$model), data = data,
                   references = references, config = config,
                   cache = new.env(parent = emptyenv()))
   field_values <- function(id) {
@@ -192,7 +192,7 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
   status <- if (any(execution$status == "failed")) "failed" else if (!complete) "incomplete" else if (has_errors) "invalid" else "valid"
   structure(list(status = status, valid = valid, complete = complete,
                  structure_passed = structure_passed, findings = findings,
-                 execution = execution, model = model.form::form_metadata(plan$model),
+                 execution = execution, model = form.model::form_metadata(plan$model),
                  source = source, rules_version = plan$rules_version,
                  metadata = plan$metadata), class = "validation_result")
 }
@@ -216,11 +216,11 @@ execution_config <- function(config) {
 }
 
 #' Print a validation result summary
-#' @param x A result from [validate_data()].
+#' @param x A result from [`validate_data()`][form.validation::validate_data].
 #' @param ... Additional arguments, currently ignored.
 #' @return `x`, invisibly. Writes the status and finding/execution counts.
 #' @examples
-#' model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
+#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
 #' print(validate_data(validation_plan(model), list()))
 #' @export
 print.validation_result <- function(x, ...) {

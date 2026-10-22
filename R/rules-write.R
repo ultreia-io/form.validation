@@ -4,16 +4,16 @@
 #' @param version Version shared by all validation files.
 #' @param overwrite Replace existing generated files; defaults to `FALSE`.
 #' @return Structure and generated field-rule paths, invisibly. Business files are untouched.
-#' @seealso [write_validation_rules()], [load_validation_plan()]
+#' @seealso [`write_validation_rules()`][form.validation::write_validation_rules], [`load_validation_plan()`][form.validation::load_validation_plan]
 #' @export
 generate_validation_rules <- function(name, directory, version = "1.0.0", overwrite = FALSE) {
-  model <- model.form::load_form_model(name, directory)
+  model <- form.model::load_form_model(name, directory)
   paths <- file.path(directory, paste0(name, c("-structure-validation.yaml", "-generated-validation.yaml")))
   write_validation_rules(model, paths[[1L]], paths[[2L]], version, overwrite)
 }
 
 #' Write model-derived validation files
-#' @param model Checked model.form model.
+#' @param model Checked form.model model.
 #' @param structure_path Output structure YAML path.
 #' @param generated_path Output field-rule YAML path.
 #' @param version Version shared by all validation files.
@@ -21,7 +21,7 @@ generate_validation_rules <- function(name, directory, version = "1.0.0", overwr
 #' @return Both paths, invisibly.
 #' @details Preserves custom structural rules. Field rules use compact YAML;
 #'   edit the form and regenerate when its definition changes.
-#' @seealso [generate_validation_rules()], [read_validation_rules()]
+#' @seealso [`generate_validation_rules()`][form.validation::generate_validation_rules], [`read_validation_rules()`][form.validation::read_validation_rules]
 #' @export
 write_validation_rules <- function(model, structure_path, generated_path,
                                    version = "1.0.0", overwrite = FALSE) {

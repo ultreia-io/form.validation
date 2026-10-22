@@ -8,15 +8,15 @@
 | Rules         | `rules.R`, `rules-read.R`, `rules-write.R`                                              | Define plans and read or generate rule YAML.                 |
 | Validation    | `validation.R`, `validation-checks.R`, `validation-findings.R`, `validation-registry.R` | Execute checks, match registry entries and collect findings. |
 | Reporting     | `report.R`                                                                              | Prepare report data and write CSV and HTML.                  |
-| Documentation | `model.validation-package.R`                                                            | Provide package-level documentation.                         |
+| Documentation | `form.validation-package.R`                                                            | Provide package-level documentation.                         |
 
 ## Verification and release
 
 ```sh
-Rscript -e 'pkgload::load_all("../model.form"); roxygen2::roxygenise(); testthat::test_local()'
+Rscript -e 'pkgload::load_all("../form.model"); roxygen2::roxygenise(); testthat::test_local()'
 mkdir -p build
 (cd build && R CMD build --no-manual ..)
-R CMD check --no-manual --output=build build/model.validation_0.1.0.tar.gz
+R CMD check --no-manual --output=build build/form.validation_0.1.0.tar.gz
 Rscript tools/build-site.R
 ```
 
@@ -34,7 +34,7 @@ The workflow checks the selected commit, creates its tag and GitHub Release, and
 
 It then deploys the website from the same commit.
 
-Release `model.form` first; `model.validation` depends on its `v0.1.0` tag.
+Release `form.model` first; `form.validation` depends on its `v0.1.0` tag.
 
 ## Execution
 

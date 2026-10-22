@@ -1,4 +1,4 @@
-url: https://ultreia-io.github.io/model.validation/
+url: https://ultreia-io.github.io/form.validation/
 template:
   bootstrap: 5
   light-switch: true
@@ -11,6 +11,8 @@ reference:
     contents: [generate_validation_rules, load_validation_plan, validation_schema, write_validation_rules, read_validation_rules, read_validation_process, write_validation_results]
   - title: Single-input reports
     contents: [validation_report_data, write_validation_report]
+  - title: Batch workflow
+    contents: [validation_batch_plan, read_validation_batch_plan, validate_workbook, validate_batch, write_validation_batch_reports, build_validation_publication, write_validation_aggregate]
   - title: Reference and registry matching
     contents: [normalized_name_key, registry_index, registry_match_counts, prepare_validation_references]
   - title: Custom rules
@@ -18,7 +20,7 @@ reference:
 articles:
   - title: Getting started
     navbar: Guides
-    contents: [model.validation, rules-authoring, validation-specification, downstream-packages, validation-reports]
+    contents: [form.validation, rules-authoring, validation-specification, downstream-packages, validation-reports]
   - title: Development
     contents: [articles/coverage]
 home:
@@ -32,7 +34,7 @@ navbar:
   components:
     intro:
       text: Get started
-      href: articles/model.validation.html
+      href: articles/form.validation.html
     articles:
       text: Articles
       menu:

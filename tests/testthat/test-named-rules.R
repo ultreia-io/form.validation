@@ -2,7 +2,7 @@ test_that("named generation preserves paths and reads the form family", {
   directory <- tempfile()
   dir.create(directory)
   on.exit(unlink(directory, recursive = TRUE))
-  file.copy(system.file("examples/survey-form.yaml", package = "model.form"),
+  file.copy(system.file("examples/survey-form.yaml", package = "form.model"),
             file.path(directory, "survey-form.yaml"))
   expect_error(load_validation_plan("survey", directory), "Missing YAML file")
   paths <- generate_validation_rules("survey", directory, version = "1")
@@ -16,17 +16,17 @@ test_that("named generation preserves paths and reads the form family", {
   process_path <- file.path(directory, "survey-validation.yaml")
   yaml::write_yaml(process, process_path)
   plan <- load_validation_plan("survey", directory)
-  expect_identical(model.form::form_definition(plan$model),
-                   model.form::form_definition(model.form::read_form_model(file.path(directory, "survey-form.yaml"))))
+  expect_identical(form.model::form_definition(plan$model),
+                   form.model::form_definition(form.model::read_form_model(file.path(directory, "survey-form.yaml"))))
   expect_true(validate_data(plan, upstream_data(), upstream_references())$valid)
   expect_error(generate_validation_rules("survey", directory), "File exists")
   business <- file.path(directory, "survey-business-validation.yaml")
-  file.copy(system.file("examples/survey-business-validation.yaml", package = "model.validation"), business)
+  file.copy(system.file("examples/survey-business-validation.yaml", package = "form.validation"), business)
   process$rulesets$content <- c(process$rulesets$content, list(basename(business)))
   yaml::write_yaml(process, process_path)
   expect_error(load_validation_plan("survey", directory), "Missing custom check")
   callbacks <- new.env(parent = baseenv())
-  sys.source(system.file("examples/business.R", package = "model.validation"), callbacks)
+  sys.source(system.file("examples/business.R", package = "form.validation"), callbacks)
   checks <- list(total_count = callbacks$total_count)
   plan <- load_validation_plan("survey", directory, checks)
   expect_identical(tail(vapply(plan$rules, `[[`, character(1), "id"), 1), "business/total_count")

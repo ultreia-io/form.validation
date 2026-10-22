@@ -7,11 +7,15 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-Keep your forms, rule files and callbacks in your package; pass data and reference snapshots explicitly.
+This guide shows how to validate an Excel submission from your own R package.
 
-## Store the resources
+It uses the survey files and `total_count` callback from [Authoring validation rules](rules-authoring.html).
 
-Declare `model.form` and `model.validation` in your package's `Imports`.
+## 1. Add dependencies and resources
+
+Declare `form.model` and `form.validation` in your package's `Imports`.
+
+Store the survey files and callback in these locations:
 
 ```text
 inst/forms/
@@ -24,60 +28,64 @@ R/
   checks.R
 ```
 
-Use separate directories when shipping multiple model versions.
+## 2. Load the validation plan
 
-## Load a plan
-
-Register your callback when loading the process:
+Replace `your.package` with your package name. Register the callback defined in `R/checks.R`:
 
 ```r
 directory <- system.file("forms", package = "your.package")
-plan <- model.validation::load_validation_plan(
+plan <- form.validation::load_validation_plan(
   "survey", directory,
   checks = list(total_count = total_count)
 )
 ```
 
-Here `total_count` is your package's callback, as illustrated in the authoring guide.
+You can reuse this plan for submissions using the same form and rules.
 
-Keep the plan and checked form unchanged; reuse them across submissions.
+## 3. Supply the reference values
 
-## Supply references and Excel data
+Prepare the code lists required by the survey. Replace these example values with your application's reference data:
 
 ```r
-references <- model.validation::prepare_validation_references(list(
+references <- form.validation::prepare_validation_references(list(
   observers = list(values = "ALICE"),
   stations = list(values = c("001", "002"))
 ))
-data <- model.validation::read_validation_workbook("submission.xlsx")
-result <- model.validation::validate_data(plan, data, references, source = "submission.xlsx")
 ```
 
-Supply code lists and registries from your application's sources. The validation package does not fetch them.
-
-Prepare code lists once per batch. Use `registry_index()` separately for registry matching.
-
-Excel reading preserves cell positions, individual value types, whitespace and textual leading zeros.
-
-It reads cached formula results without recalculation. Excel errors and formulas without cached values become missing.
-
-## Prepare values when needed
-
-Conversion is explicit and runs only after structural checks pass:
+## 4. Validate a submission
 
 ```r
-result <- model.validation::validate_data(
-  plan, data, references,
-  prepare_data = function(data) model.validation::prepare_validation_data(data, plan$model)
+data <- form.validation::read_validation_workbook("submission.xlsx")
+result <- form.validation::validate_data(
+  plan, data, references, source = "submission.xlsx"
 )
 ```
 
-This converts string fields to text and midnight timestamps to dates. Other values remain unchanged.
+Inspect the findings and check whether the submission passed:
 
-Custom preparation must preserve sheet names, order and dimensions. Preparation errors block content checks.
+```r
+result$findings
+accepted <- result$complete && isTRUE(result$valid)
+```
 
-## Read next
+Use the [report guide](validation-reports.html) to generate HTML and CSV output from this result.
 
-- [Validation reports](validation-reports.html): export the results.
-- [Validation specification](validation-specification.html): reference and registry matching rules.
-- [Maintainer guide](https://ultreia-io.github.io/model.validation/DEVELOPMENT.html): package internals and development commands.
+## Optional: convert values before content checks
+
+If your application accepts values such as numeric text or textual booleans, use this validation call instead:
+
+```r
+result <- form.validation::validate_data(
+  plan, data, references, source = "submission.xlsx",
+  prepare_data = function(data) {
+    form.validation::prepare_validation_data(data, plan$model)
+  }
+)
+```
+
+Preparation runs after structural checks pass and uses the types declared in the form model.
+
+Supported values are converted; invalid values remain available for validation to report.
+
+See [value preparation](../reference/prepare_validation_data.html) for accepted formats and missing-value options.

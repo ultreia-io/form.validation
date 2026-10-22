@@ -7,7 +7,7 @@ rule_paths <- function() {
   paths
 }
 change_rules <- function(path, change) {
-  document <- model.validation:::read_rules_yaml(path)
+  document <- form.validation:::read_rules_yaml(path)
   yaml::write_yaml(change(document), path)
 }
 business_path <- function() {

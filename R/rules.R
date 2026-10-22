@@ -6,8 +6,8 @@
 #' Field findings or execution failures never suppress business checks.
 #' @param id One unique nonempty rule ID. IDs must not collide with generated IDs.
 #' @param check Function accepting `model`, `data`, `references`, and `config`.
-#'   Return `NULL` on success or rows from [validation_finding()] on failure.
-#'   Signal [validation_incomplete()] when prerequisites are missing.
+#'   Return `NULL` on success or rows from [`validation_finding()`][form.validation::validation_finding] on failure.
+#'   Signal [`validation_incomplete()`][form.validation::validation_incomplete] when prerequisites are missing.
 #'   `config$field_values("Sheet.field")` reuses the run's prepared field data.
 #'   It returns `sheet`, `field`, `type`, physical `rows` and `column`, and
 #'   `original` values as a list. Logical `present`, `null`, `filled`, and `typed`
@@ -47,16 +47,16 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 
 #' Generate a validation plan from a form model
 #'
-#' Recheck the definition through model.form's public API, then generate ordered
+#' Recheck the definition through form.model's public API, then generate ordered
 #' sheet and field checks. Append explicit custom rules without modifying the model.
-#' @param model A `form_model` from model.form.
-#' @param rules List of custom rules created by [validation_rule()].
+#' @param model A `form_model` from form.model.
+#' @param rules List of custom rules created by [`validation_rule()`][form.validation::validation_rule].
 #' @return A `validation_plan` with checked `model`, ordered `rules`, and
 #'   `rulesets` grouping rule IDs into structure and merged content.
 #'   Each rule has a stable `id`, `kind`, and `severity`; generated field rules
 #'   also identify their model sheet and field. Treat plans as read-only and
 #'   regenerate after editing a model. Direct plans have no `rules_version`;
-#'   use [write_validation_rules()] and [read_validation_rules()] for versioned files.
+#'   use [`write_validation_rules()`][form.validation::write_validation_rules] and [`read_validation_rules()`][form.validation::read_validation_rules] for versioned files.
 #' @details Supported declarations include declared sheets, sheet order,
 #'   row/column counts, table start rows, mandatory fields,
 #'   all nine field types, enums, bounds, patterns, uniqueness, reference membership,
@@ -65,16 +65,16 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 #' Uniqueness applies only to table fields. Unsupported schema versions, types, layouts, or constraints
 #' are explicit generation errors; they are never silently discarded.
 #' @section Errors:
-#' Invalid model definitions raise model.form errors. Invalid custom rules,
+#' Invalid model definitions raise form.model errors. Invalid custom rules,
 #' duplicate rule IDs, and unsupported declarations raise generation errors.
 #' @examples
-#' model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
+#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
 #' plan <- validation_plan(model)
 #' vapply(plan$rules, function(rule) rule$id, character(1))
 #' @export
 validation_plan <- function(model, rules = list()) {
-  meta <- model.form::form_metadata(model)
-  model <- model.form::as_form_model(model.form::form_definition(model))
+  meta <- form.model::form_metadata(model)
+  model <- form.model::as_form_model(form.model::form_definition(model))
   if (!identical(meta$schema_version, "1.0.0")) {
     stop("Unsupported model schema version: ", meta$schema_version, call. = FALSE)
   }
@@ -86,10 +86,10 @@ validation_plan <- function(model, rules = list()) {
     validation_rule(rule$id, rule$check, rule$severity, rule$description, rule$parameters, rule$stage)
   }
   generated <- list(rule_record("workbook/sheets", "sheets", stage = "structure"))
-  sheets <- model.form::form_sheets(model)
+  sheets <- form.model::form_sheets(model)
   for (sheet_name in names(sheets)) {
     sheet <- sheets[[sheet_name]]
-    fields <- model.form::form_fields(model, sheet_name)
+    fields <- form.model::form_fields(model, sheet_name)
     layout <- sheet$layout
     if (!layout$kind %in% c("cells", "table")) stop("Unsupported layout: ", layout$kind, call. = FALSE)
     for (kind in c("presence", "layout")) {
@@ -156,7 +156,7 @@ execution_rulesets <- function(rules) {
 #' @return Form ID and version.
 #' @keywords internal
 rules_model_identity <- function(model) {
-  meta <- model.form::form_metadata(model)
+  meta <- form.model::form_metadata(model)
   list(id = meta$form$id, version = meta$form$version)
 }
 
@@ -165,7 +165,7 @@ rules_model_identity <- function(model) {
 #' @return Named mappings in model sheet order.
 #' @keywords internal
 structure_sheets <- function(model) {
-  sheets <- model.form::form_sheets(model)
+  sheets <- form.model::form_sheets(model)
   stats::setNames(lapply(names(sheets), function(name) {
     sheet <- sheets[[name]]
     result <- list()

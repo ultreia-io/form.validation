@@ -1,4 +1,4 @@
 library(testthat)
-library(model.validation)
+library(form.validation)
 
-test_check("model.validation")
+test_check("form.validation")

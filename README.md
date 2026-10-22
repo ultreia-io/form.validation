@@ -1,22 +1,15 @@
+# form.validation
 
-<!-- README.md is generated from README.Rmd. Edit this file. -->
-
-# model.validation
-
-[![Build](https://github.com/ultreia-io/model.validation/actions/workflows/Build.yaml/badge.svg?branch=develop)](https://github.com/ultreia-io/model.validation/actions/workflows/Build.yaml)
-[![Test](https://github.com/ultreia-io/model.validation/actions/workflows/Test.yaml/badge.svg?branch=develop)](https://github.com/ultreia-io/model.validation/actions/workflows/Test.yaml)
-[![Website](https://img.shields.io/badge/website-documentation-blue)](https://ultreia-io.github.io/model.validation/)
-[![Coverage
-reports](https://img.shields.io/badge/coverage-CI_reports-blue)](https://github.com/ultreia-io/model.validation/actions/workflows/Test.yaml)
+[![Build](https://github.com/ultreia-io/form.validation/actions/workflows/Build.yaml/badge.svg?branch=develop)](https://github.com/ultreia-io/form.validation/actions/workflows/Build.yaml)
+[![Test Coverage](https://github.com/ultreia-io/form.validation/actions/workflows/TestCoverage.yaml/badge.svg?branch=main)](https://github.com/ultreia-io/form.validation/actions/workflows/TestCoverage.yaml)
+[![Website](https://img.shields.io/badge/website-documentation-blue)](https://ultreia-io.github.io/form.validation/)
 [![Latest
-release](https://img.shields.io/github/v/release/ultreia-io/model.validation?display_name=tag&sort=semver)](https://github.com/ultreia-io/model.validation/releases/latest)
-[![License](https://img.shields.io/github/license/ultreia-io/model.validation)](https://github.com/ultreia-io/model.validation/blob/main/LICENSE)
-[![Lifecycle:
-experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+release](https://img.shields.io/github/v/release/ultreia-io/form.validation?display_name=tag&sort=semver)](https://github.com/ultreia-io/form.validation/releases/latest)
+[![License](https://img.shields.io/github/license/ultreia-io/form.validation)](https://github.com/ultreia-io/form.validation/blob/main/LICENSE)
 
 Validate submitted form data and produce CSV and HTML reports.
 
-Requires [model.form](https://ultreia-io.github.io/model.form/)
+Requires [form.model](https://ultreia-io.github.io/form.model/)
 for checked definitions and shared field-type checks.
 
 ## Installation
@@ -25,15 +18,15 @@ Install the latest released version with Excel support:
 
 ``` r
 install.packages("pak") # Once
-pak::pak("ultreia-io/model.validation@*release")
+pak::pak("ultreia-io/form.validation@*release")
 ```
 
-`pak` installs all required dependencies automatically: `model.form`, `yaml`, `readxl` and `cellranger`.
+`pak` installs all required dependencies automatically: `form.model`, `yaml`, `readxl` and `cellranger`.
 
 For the development version:
 
 ``` r
-pak::pak("ultreia-io/model.validation@develop")
+pak::pak("ultreia-io/form.validation@develop")
 ```
 
 ## Start here
@@ -41,8 +34,8 @@ pak::pak("ultreia-io/model.validation@develop")
 Validate your workbook against its form definition:
 
 ``` r
-library(model.validation)
-model <- model.form::read_form_model("my-form.yaml")
+library(form.validation)
+model <- form.model::read_form_model("my-form.yaml")
 plan <- validation_plan(model)
 data <- read_validation_workbook("submission.xlsx")
 result <- validate_data(plan, data)
@@ -52,7 +45,7 @@ result$findings
 Supply reference snapshots when the model declares code lists.
 
 The [Getting started
-guide](https://ultreia-io.github.io/model.validation/articles/model.validation.html)
+guide](https://ultreia-io.github.io/form.validation/articles/form.validation.html)
 provides a complete survey example.
 
 ## What it does
@@ -62,19 +55,23 @@ provides a complete survey example.
 - Run explicitly supplied custom checks.
 - Record findings with physical cell locations.
 - Export CSV results and HTML reports.
+- Run batches and rebuild reports without repeating validation.
+- Review aggregate findings and evidence for code lists, registries and conversion errors.
 
 Accept a submission only when `result$complete` and
 `isTRUE(result$valid)` are both true.
 
 ## Learn more
 
-- [Authoring validation rules](https://ultreia-io.github.io/model.validation/articles/rules-authoring.html): generate checks and add custom rules.
-- [Validation specification](https://ultreia-io.github.io/model.validation/articles/validation-specification.html): formats, execution and references.
-- [Using validation in your package](https://ultreia-io.github.io/model.validation/articles/downstream-packages.html): integrate and run validation.
+- [Authoring validation rules](https://ultreia-io.github.io/form.validation/articles/rules-authoring.html): generate checks and add custom rules.
+- [Validation specification](https://ultreia-io.github.io/form.validation/articles/validation-specification.html): formats, execution and references.
+- [Using validation in your package](https://ultreia-io.github.io/form.validation/articles/downstream-packages.html): integrate and run validation.
 - [Validation
-  reports](https://ultreia-io.github.io/model.validation/articles/validation-reports.html):
+  reports](https://ultreia-io.github.io/form.validation/articles/validation-reports.html):
   CSV and HTML output.
+- [Batch workflow](https://ultreia-io.github.io/form.validation/reference/validation_batch_plan.html): plan, validate and prepare reports for publication.
+- [Aggregate reports](https://ultreia-io.github.io/form.validation/reference/write_validation_aggregate.html): combine reports and review evidence.
 - [Function
-  reference](https://ultreia-io.github.io/model.validation/reference/index.html).
+  reference](https://ultreia-io.github.io/form.validation/reference/index.html).
 
 LGPL-2.1. See [LICENSE](LICENSE).

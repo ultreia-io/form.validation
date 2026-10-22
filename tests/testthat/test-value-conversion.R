@@ -11,9 +11,9 @@ test_that("explicit conversion preserves values outside the declared policy", {
 })
 
 test_that("date conversion retains time components and skips preambles", {
-  definition <- model.form::form_definition(field_model("date", mandatory = FALSE))
+  definition <- form.model::form_definition(field_model("date", mandatory = FALSE))
   definition$sheets$Values$layout$start_row <- 2L
-  model <- model.form::as_form_model(definition)
+  model <- form.model::as_form_model(definition)
   midnight <- as.POSIXct("2024-01-01", tz = "UTC")
   values <- list(midnight, midnight, midnight + 3600, NA_real_, "2024-01-02")
   data <- list(Values = data.frame(value = I(values)))

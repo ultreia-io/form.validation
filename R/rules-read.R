@@ -10,18 +10,18 @@
 validation_schema <- function(version = "1.0.0") {
   text_value(version, "version")
   if (version != "1.0.0") stop("Unsupported validation schema version: ", version, call. = FALSE)
-  read_rules_yaml(system.file("schema/validation-1.0.0.yaml", package = "model.validation", mustWork = TRUE))
+  read_rules_yaml(system.file("schema/validation-1.0.0.yaml", package = "form.validation", mustWork = TRUE))
 }
 
 #' Load a named model and validation process
 #' @param name Prefix of `<name>-form.yaml` and `<name>-validation.yaml`.
 #' @param directory Directory containing both files.
-#' @param checks Named callback functions; see [read_validation_rules()].
+#' @param checks Named callback functions; see [`read_validation_rules()`][form.validation::read_validation_rules].
 #' @return A `validation_plan` containing the model and its checks.
-#' @seealso [read_validation_process()] for a model and process stored separately.
+#' @seealso [`read_validation_process()`][form.validation::read_validation_process] for a model and process stored separately.
 #' @export
 load_validation_plan <- function(name, directory, checks = list()) {
-  model <- model.form::load_form_model(name, directory)
+  model <- form.model::load_form_model(name, directory)
   read_validation_process(file.path(directory, paste0(name, "-validation.yaml")), model, checks)
 }
 
@@ -34,10 +34,10 @@ load_validation_plan <- function(name, directory, checks = list()) {
 #' @param model Model used by every listed ruleset.
 #' @param checks Named callbacks required by structural and business rules.
 #' @param business Additional explicit business YAML paths, appended to content.
-#' @return A `validation_plan` ready for [validate_data()].
+#' @return A `validation_plan` ready for [`validate_data()`][form.validation::validate_data].
 #' @examples
-#' directory <- system.file("examples", package = "model.validation")
-#' model <- model.form::read_form_model("examples/survey-form.yaml", "model.form")
+#' directory <- system.file("examples", package = "form.validation")
+#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
 #' callbacks <- new.env(parent = baseenv())
 #' sys.source(file.path(directory, "business.R"), callbacks)
 #' plan <- read_validation_process(file.path(directory, "survey-validation.yaml"), model,
@@ -78,14 +78,14 @@ read_validation_process <- function(path, model, checks = list(), business = cha
 #' @param paths YAML paths ordered as structure, generated fields, then business files.
 #' @param model Checked model supplying field definitions and layouts.
 #' @param checks Named callback functions, keyed by the last component of each custom rule ID.
-#' @return A `validation_plan` for [validate_data()].
+#' @return A `validation_plan` for [`validate_data()`][form.validation::validate_data].
 #' @details Requires one structure and one field file, matching the model and rule version.
 #'   Generated rule order, values and severity must match; stale files need regeneration.
 #'   Structural and business files may declare callbacks as `namespace/[field/]callback`.
 #'   Parameters reach callbacks through `config$rule`, including the optional field ID.
 #'   Severity defaults to `error`, and description to the rule ID.
 #'   YAML is parsed as data; callbacks must be supplied explicitly.
-#' @seealso [read_validation_process()], [validation_schema()]
+#' @seealso [`read_validation_process()`][form.validation::read_validation_process], [`validation_schema()`][form.validation::validation_schema]
 #' @export
 read_validation_rules <- function(paths, model, checks = list()) {
   if (!is.character(paths) || !length(paths) || anyNA(paths) || any(!nzchar(paths))) {
@@ -189,7 +189,7 @@ bind_generated_rules <- function(plan, documents) {
 #' @keywords internal
 bind_custom_rules <- function(documents, model, checks) {
   rules <- list()
-  field_ids <- names(model.form::form_fields(model))
+  field_ids <- names(form.model::form_fields(model))
   documents <- Filter(function(document) document$stage != "fields", documents)
   for (document in documents) for (id in names(document[["rules"]])) {
     rule <- document[["rules"]][[id]]
@@ -250,6 +250,9 @@ check_generated_rules <- function(rules, path) {
 }
 
 #' Check structural and business rule entries
+#' A field in the rule ID is an executable target and must exist in the model.
+#' A `sheet`/`field` pair in the mapping is callback location metadata and may
+#' identify an absent source declaration. The two field forms cannot be combined.
 #' @param rules Expanded custom-rule mappings, or `NULL`.
 #' @param path Source path for errors.
 #' @return Invisible `NULL`, or an error.
@@ -259,9 +262,16 @@ check_custom_rules <- function(rules, path) {
     text_value(id, paste(path, "rule ID"))
     rule <- rules[[id]]
     named_list(rule, paste(path, "rule", id))
-    business_rule_target(id)
-    if (any(c("check", "field") %in% names(rule))) {
-      stop(path, ": business check and field belong in the rule ID: ", id, call. = FALSE)
+    target <- business_rule_target(id)
+    if ("check" %in% names(rule)) {
+      stop(path, ": callback identifiers belong in the rule ID: ", id, call. = FALSE)
+    }
+    if ("field" %in% names(rule)) {
+      if (!is.null(target$field)) {
+        stop(path, ": executable field targets belong in the rule ID; remove the duplicate field property: ", id, call. = FALSE)
+      }
+      text_value(rule$sheet, paste(path, id, "sheet"))
+      text_value(rule$field, paste(path, id, "field"))
     }
     if (!is.null(rule$severity)) {
       text_value(rule$severity, paste(path, id, "severity"))

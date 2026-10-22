@@ -1,5 +1,7 @@
 # Maintainer guide
 
+`develop` is the integration branch. `main` contains releases. Implementation branches use `feature/`.
+
 ## Code organization
 
 | Area          | Files                                                                                   | Responsibility                                               |
@@ -8,33 +10,54 @@
 | Rules         | `rules.R`, `rules-read.R`, `rules-write.R`                                              | Define plans and read or generate rule YAML.                 |
 | Validation    | `validation.R`, `validation-checks.R`, `validation-findings.R`, `validation-registry.R` | Execute checks, match registry entries and collect findings. |
 | Reporting     | `report.R`                                                                              | Prepare report data and write CSV and HTML.                  |
-| Documentation | `model.validation-package.R`                                                            | Provide package-level documentation.                         |
+| Documentation | `form.validation-package.R`                                                            | Provide package-level documentation.                         |
 
-## Verification and release
+## Local verification
 
-```sh
-Rscript -e 'pkgload::load_all("../model.form"); roxygen2::roxygenise(); testthat::test_local()'
-mkdir -p build
-(cd build && R CMD build --no-manual ..)
-R CMD check --no-manual --output=build build/model.validation_0.1.0.tar.gz
-Rscript tools/build-site.R
-```
+Run these commands from the repository root with the development dependencies installed.
 
-The site includes a native coverage page at `docs/articles/coverage.html`, using the shared theme and navigation.
+1. **Generate documentation and run tests:**
 
-Coverage CSV and XML stay in `docs/coverage/`. Archives and check output stay in `build/`.
+   ```sh
+   Rscript -e 'roxygen2::roxygenise(); testthat::test_local()'
+   ```
 
-Run `Rscript tools/coverage.R` to refresh coverage data alone; rebuild the site to refresh its page.
+2. **Build and check the package:**
 
-Prepare DESCRIPTION and NEWS on `develop`, then commit and push.
+   ```sh
+   mkdir -p build
+   (cd build && R CMD build --no-manual ..)
+   package_version=$(Rscript -e 'cat(read.dcf("DESCRIPTION")[1, "Version"])')
+   R CMD check --no-manual --output=build "build/form.validation_${package_version}.tar.gz"
+   ```
 
-Open **Actions → Perform Release → Run workflow**, select `develop`, enter the version, and run it.
+3. **Build the documentation website:**
 
-The workflow checks the selected commit, creates its tag and GitHub Release, and uploads the archive and checksum.
+   ```sh
+   Rscript tools/build-site.R
+   ```
 
-It then deploys the website from the same commit.
+## Release
 
-Release `model.form` first; `model.validation` depends on its `v0.1.0` tag.
+1. **Prepare the release on `develop`:**
+
+   1. **Prepare the release files:** update the version in `DESCRIPTION`, finalize `NEWS.md` and documentation.
+   2. **Perform the [local checks](#local-verification).**
+   3. **Commit the changes:** use `[form.validation] Release <version>`.
+   4. **Push the release commit.**
+
+2. **Start the release on GitHub:**
+
+   1. Open **Actions → Start Release**.
+   2. Click **Run workflow**, select `develop`, then click **Run workflow** to confirm.
+   3. Open the release PR created by the workflow.
+
+3. **Merge the release PR:**
+
+   1. **Wait for the checks:** all checks on the release PR must be green.
+   2. **Merge:** click **Merge pull request**, then **Confirm merge**.
+
+**Publish Release** publishes the package, checksum and documentation automatically.
 
 ## Execution
 

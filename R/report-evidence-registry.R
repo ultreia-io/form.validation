@@ -1,0 +1,20 @@
+# Registry callbacks record their target and required match count in expected.
+# Only completed findings are evidence; unavailable registries stay unfinished checks.
+collect_registry_evidence <- function(detail, provenance, report, context_columns) {
+  keep <- detail$kind == "validation" & endsWith(detail$rule_id, "/registry_match") &
+    detail$severity %in% c("error", "warning")
+  rows <- detail[keep, , drop = FALSE]
+  if (!nrow(rows)) return(NULL)
+  expected <- unique(rows$expected)
+  references <- vapply(expected, function(value) {
+    expectation <- yaml::yaml.load(value, eval.expr = FALSE)
+    if (!is.list(expectation) || !is.character(expectation$reference) ||
+        length(expectation$reference) != 1L || is.na(expectation$reference) ||
+        !nzchar(expectation$reference) || !identical(as.integer(expectation$matches), 1L))
+      stop("Registry evidence requires a reference and exactly one expected match")
+    expectation$reference
+  }, character(1))
+  rows$reference <- unname(references[match(rows$expected, expected)])
+  rows$reason <- rows$message
+  summarize_reference_evidence(rows, provenance, report, context_columns, c("severity", "reason"))
+}

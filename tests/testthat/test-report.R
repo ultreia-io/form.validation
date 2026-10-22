@@ -34,7 +34,7 @@ test_that("reports retain the structure gate and incomplete or failed execution"
   broken <- validation_rule("test/failure", function(...) stop("Cannot finish"))
   whole <- validation_rule("test/workbook", function(...) validation_finding("Review workbook"), "info")
   failed <- validation_report_data(validate_fixture(rules = list(broken, whole)), fixture_model())
-  expect_identical(failed$sheets[[1]]$name, "Workbook")
+  expect_identical(failed$sheets[[1]]$name, "Form")
   expect_identical(failed$summary$status, "failed")
   expect_true("Cannot finish" %in% failed$execution$message)
   valid <- validation_report_data(validate_fixture(), fixture_model())

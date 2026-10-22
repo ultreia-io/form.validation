@@ -1,6 +1,6 @@
-# Synthetic unit fixture; the installed example is owned exclusively by model.form.
+# Synthetic unit fixture; the installed example is owned exclusively by form.model.
 fixture_model <- function() {
-  model.form::as_form_model(list(schema_version = "1.0.0", form = list(id = "fixture", version = "1"),
+  form.model::as_form_model(list(schema_version = "1.0.0", form = list(id = "fixture", version = "1"),
     references = list("sites"), sheets = list(
       Cover = list(layout = list(kind = "cells", row_count = 1L, column_count = 1L),
         fields = list(title = list(mandatory = TRUE, location = "A1", type = "string"))),
@@ -17,20 +17,20 @@ fixture_data <- function() {
                                  unit = c("cm", NA_character_), site = c("north", "south")))
 }
 fixture_references <- function() list(sites = list(values = c("north", "south")))
-fixture_definition <- function() model.form::form_definition(fixture_model())
+fixture_definition <- function() form.model::form_definition(fixture_model())
 field_model <- function(type, constraints = NULL, mandatory = TRUE) {
   d <- list(schema_version = "1.0.0", form = list(id = "values", version = "1"),
             references = list(), sheets = list(Values = list(
               fields = list(value = c(list(mandatory = mandatory, type = type), constraints)),
               layout = list(kind = "table", column_count = 1L, start_row = 1L))))
-  model.form::as_form_model(d)
+  form.model::as_form_model(d)
 }
 validate_fixture <- function(data = fixture_data(), references = fixture_references(),
                              model = fixture_model(), rules = list(), config = list()) {
   validate_data(validation_plan(model, rules), data, references, source = "submission.xlsx", config = config)
 }
 
-upstream_model <- function() model.form::read_form_model("examples/survey-form.yaml", "model.form")
+upstream_model <- function() form.model::read_form_model("examples/survey-form.yaml", "form.model")
 upstream_references <- function() list(observers = list(values = "ALICE"), stations = list(values = c("001", "002")))
 upstream_data <- function() {
   data <- list(Metadata = matrix(vector("list", 15), 5, 3),
@@ -44,6 +44,6 @@ upstream_data <- function() {
 }
 upstream_checks <- function() {
   callbacks <- new.env(parent = baseenv())
-  sys.source(system.file("examples/business.R", package = "model.validation"), callbacks)
+  sys.source(system.file("examples/business.R", package = "form.validation"), callbacks)
   list(total_count = callbacks$total_count)
 }

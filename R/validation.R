@@ -4,6 +4,7 @@
 #' complete structure stage passes. No workbook readers, network lookups, or
 #' report rendering are invoked. Data, references, and configuration are caller-owned.
 #' @param plan A plan from [validation_plan()] or [read_validation_rules()].
+#'   Optional caller-owned `plan$metadata` is retained in the result unchanged.
 #' @param data Named list of data frames or two-dimensional matrices, keyed by
 #'   exact workbook sheet names. Retain all physical preamble rows.
 #'   Column names and row names have no validation meaning. Use list columns or
@@ -42,6 +43,7 @@
 #'     \item{source}{Input label, also retained for submissions without findings.}
 #'     \item{structure_passed}{Whether the structure gate opened for content checks.}
 #'     \item{rules_version}{Version from YAML rule files, or `NA` for direct plans.}
+#'     \item{metadata}{Caller metadata from the plan, or `NULL` when absent.}
 #'   }
 #' @details Every declared sheet is mandatory. Its absence is a validation error,
 #'   while extra sheets are ignored by default. Empty tables have no records to
@@ -152,7 +154,8 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
         } else run_builtin(rule, context)
         list(status = "completed", message = "", findings = check_findings(found))
       }, warning = function(w) stop(conditionMessage(w), call. = FALSE)),
-      validation_incomplete = function(e) list(status = "incomplete", message = conditionMessage(e), findings = NULL),
+      validation_incomplete = function(e) list(status = "incomplete", message = conditionMessage(e),
+        sheet = e$sheet, field = e$field, findings = NULL),
       error = function(e) list(status = "failed", message = conditionMessage(e), findings = NULL))
     }
     if (identical(rule$kind, "prepare")) {
@@ -164,9 +167,11 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
          (!is.null(outcome$findings) && nrow(outcome$findings) && rule$severity == "error"))) {
       structure_passed <- FALSE
     }
+    sheet <- if (is.null(outcome$sheet)) rule$sheet else outcome$sheet
+    field <- if (is.null(outcome$field)) rule$field else outcome$field
     records[[length(records) + 1L]] <- data.frame(rule_id = rule$id, stage = rule$stage, severity = rule$severity,
-                                                sheet = if (is.null(rule$sheet)) NA_character_ else rule$sheet,
-                                                field = if (is.null(rule$field)) NA_character_ else rule$field,
+                                                sheet = if (is.null(sheet)) NA_character_ else sheet,
+                                                field = if (is.null(field)) NA_character_ else field,
                                                 status = outcome$status,
                                                 message = outcome$message, stringsAsFactors = FALSE)
     if (!is.null(outcome$findings) && nrow(outcome$findings)) {
@@ -188,7 +193,8 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
   structure(list(status = status, valid = valid, complete = complete,
                  structure_passed = structure_passed, findings = findings,
                  execution = execution, model = model.form::form_metadata(plan$model),
-                 source = source, rules_version = plan$rules_version), class = "validation_result")
+                 source = source, rules_version = plan$rules_version,
+                 metadata = plan$metadata), class = "validation_result")
 }
 
 #' Normalize explicit execution options

@@ -19,8 +19,9 @@ stages:
     sheet_values: [rows, min_rows, columns]
     optional_keys: [rules]
     rule_id: <namespace>/[<field>/]<callback>
-    forbidden_rule_values: [check, field]
-    optional_rule_values: [severity, description]
+    forbidden_rule_values: [check]
+    optional_rule_values: [severity, description, sheet, field]
+    field_location: requires_sheet_and_no_field_in_rule_id
   fields:
     keys: [schema_version, rules_version, model, stage, rules]
     rule_id: field/<sheet>.<field>/<check>
@@ -30,8 +31,9 @@ stages:
   business:
     keys: [schema_version, rules_version, model, stage, rules]
     rule_id: <namespace>/[<field>/]<callback>
-    forbidden_rule_values: [check, field]
-    optional_rule_values: [severity, description]
+    forbidden_rule_values: [check]
+    optional_rule_values: [severity, description, sheet, field]
+    field_location: requires_sheet_and_no_field_in_rule_id
 defaults:
   severity: error
   description: rule_id

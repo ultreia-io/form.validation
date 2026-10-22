@@ -87,14 +87,18 @@ empty_findings <- function() {
 #' records incomplete execution, rather than treating unverified data as valid.
 #' Ordinary errors and warnings are recorded as failed execution instead.
 #' @param message One nonempty explanation of the missing prerequisite.
+#' @param sheet,field Optional nonempty source identifiers locating the incomplete
+#'   check. A field may identify a missing declaration, not a field in the model.
 #' @return Does not return; signals a `validation_incomplete` error condition.
 #' @examples
 #' tryCatch(validation_incomplete("Reference snapshot unavailable"),
 #'          validation_incomplete = function(e) conditionMessage(e))
 #' @export
-validation_incomplete <- function(message) {
+validation_incomplete <- function(message, sheet = NULL, field = NULL) {
   text_value(message, "message")
-  stop(structure(list(message = message, call = NULL),
+  if (!is.null(sheet)) text_value(sheet, "sheet")
+  if (!is.null(field)) text_value(field, "field")
+  stop(structure(list(message = message, call = NULL, sheet = sheet, field = field),
                  class = c("validation_incomplete", "error", "condition")))
 }
 

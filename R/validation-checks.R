@@ -222,24 +222,27 @@ null_value <- function(x) {
 #' @param type Model field type.
 #' @return Whether the value matches, without coercion.
 #' @details Dates accept ISO strings or whole-day `Date` values. Datetimes accept
-#'   UTC ISO strings or whole-second `POSIXct` values. Other classed values fail.
+#'   UTC ISO strings or finite `POSIXct` values, including fractional seconds. Other classed values fail.
 #'   Other values use `model.form::form_value_matches_type()`.
 #' @keywords internal
 value_type <- function(x, type) {
   if (length(x) != 1L || !is.atomic(x) || is.na(x)) return(FALSE)
   if (inherits(x, "Date")) return(type == "date" && is.finite(unclass(x)) && unclass(x) == floor(unclass(x)))
-  if (inherits(x, "POSIXct")) return(type == "datetime" && is.finite(unclass(x)) && unclass(x) == floor(unclass(x)))
+  if (inherits(x, "POSIXct")) return(type == "datetime" && is.finite(unclass(x)))
   model.form::form_value_matches_type(unname(x), type)
 }
 
 #' Normalize a typed value for comparisons
 #' @param x A scalar already accepted by [value_type()].
 #' @param type Declared type.
-#' @return A comparison scalar; dates and datetimes become ISO strings.
+#' @return A comparison scalar; dates become ISO strings and datetimes UTC seconds.
 #' @keywords internal
 comparison_value <- function(x, type) {
   if (inherits(x, "Date")) return(format(x, "%Y-%m-%d"))
-  if (inherits(x, "POSIXct")) return(format(x, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"))
+  if (type == "datetime") {
+    if (inherits(x, "POSIXct")) return(as.numeric(x))
+    return(as.numeric(as.POSIXct(strptime(x, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"))))
+  }
   unname(x)
 }
 

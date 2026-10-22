@@ -250,6 +250,9 @@ check_generated_rules <- function(rules, path) {
 }
 
 #' Check structural and business rule entries
+#' A field in the rule ID is an executable target and must exist in the model.
+#' A `sheet`/`field` pair in the mapping is callback location metadata and may
+#' identify an absent source declaration. The two field forms cannot be combined.
 #' @param rules Expanded custom-rule mappings, or `NULL`.
 #' @param path Source path for errors.
 #' @return Invisible `NULL`, or an error.
@@ -259,9 +262,16 @@ check_custom_rules <- function(rules, path) {
     text_value(id, paste(path, "rule ID"))
     rule <- rules[[id]]
     named_list(rule, paste(path, "rule", id))
-    business_rule_target(id)
-    if (any(c("check", "field") %in% names(rule))) {
-      stop(path, ": business check and field belong in the rule ID: ", id, call. = FALSE)
+    target <- business_rule_target(id)
+    if ("check" %in% names(rule)) {
+      stop(path, ": callback identifiers belong in the rule ID: ", id, call. = FALSE)
+    }
+    if ("field" %in% names(rule)) {
+      if (!is.null(target$field)) {
+        stop(path, ": executable field targets belong in the rule ID; remove the duplicate field property: ", id, call. = FALSE)
+      }
+      text_value(rule$sheet, paste(path, id, "sheet"))
+      text_value(rule$field, paste(path, id, "field"))
     }
     if (!is.null(rule$severity)) {
       text_value(rule$severity, paste(path, id, "severity"))

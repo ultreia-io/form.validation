@@ -1,3 +1,7 @@
+# form.validation 0.2.1
+
+* Install `form.model` from its release archive, including generated documentation.
+
 # form.validation 0.2.0
 
 * Rename package `model.validation` to `form.validation`.

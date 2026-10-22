@@ -1,0 +1,179 @@
+name: Publish Release
+
+# Manual merging of a release PR starts publication. Closing it without merging does nothing.
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+# Checks only read sources; publication and Pages jobs request their own write permissions.
+permissions:
+  contents: read
+
+# Serialize publications without cancelling a release already in progress.
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+jobs:
+  # Reuse the Linux, macOS and Windows checks against the actual merged commit.
+  checks:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    uses: ./.github/workflows/Build.yaml
+    with:
+      ref: ${{ github.event.pull_request.merge_commit_sha }}
+    secrets: inherit
+
+  # Publish only after all platform checks pass. Build the downloadable archive on Linux.
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    # R is preinstalled in this Ubuntu image; no R download or installation is needed.
+    container: rocker/r-ver:4.6.1
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: write
+    outputs:
+      commit: ${{ github.event.pull_request.merge_commit_sha }}
+    env:
+      # Reuse dependency metadata while retaining pak's default daily refresh.
+      PKG_METADATA_CACHE_DIR: ${{ github.workspace }}/.github/pak-metadata
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
+      _R_CHECK_CRAN_INCOMING_: 'false'
+      _R_CHECK_CRAN_INCOMING_REMOTE_: 'false'
+      _R_CHECK_SYSTEM_CLOCK_: 'false'
+    steps:
+      # Keep downloaded APT packages: Docker images normally delete them after installation.
+      - name: Prepare Linux package cache
+        if: runner.os == 'Linux'
+        id: apt-cache
+        run: |
+          rm -f /etc/apt/apt.conf.d/docker-clean
+          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      # Share downloads across Linux jobs; refresh the cache weekly.
+      # APT still refreshes its indexes and installs packages normally.
+      - name: Cache Linux packages
+        if: runner.os == 'Linux'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+          key: apt-rocker-4.6.1-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
+          restore-keys: |
+            apt-rocker-4.6.1-${{ runner.arch }}-v1-
+
+      # Add Git, R check tools and lsb_release, which setup-r uses to identify Ubuntu.
+      - name: Install Linux check tools
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release
+
+      # Use the commit approved by the manual merge throughout publication.
+      - name: Check out merged release
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+      # Configure the image's R installation and use package binaries where supported.
+      - name: Set up R
+        id: setup-r
+        uses: r-lib/actions/setup-r@v2.12.1
+        with:
+          r-version: "4.6.1"
+          install-r: false
+          use-public-rspm: true
+
+      # Rocker installs into its site library; tell setup-r-dependencies to cache that actual location.
+      - name: Select R package cache directory on Linux
+        if: runner.os == 'Linux'
+        shell: Rscript {0}
+        run: cat(paste0("R_LIBS_USER=", .libPaths()[1], "\n"), file = Sys.getenv("GITHUB_ENV"), append = TRUE)
+      # Read the prepared version and expose its tag to the release action below.
+      - name: Verify prepared version
+        id: version
+        shell: Rscript {0}
+        run: |
+          description <- read.dcf("DESCRIPTION")
+          version <- unname(description[1, "Version"])
+          if (!grepl("^[0-9]+[.][0-9]+[.][0-9]+$", version)) {
+            stop("DESCRIPTION version must use X.Y.Z format; found: ", version, call. = FALSE)
+          }
+          expected_branch <- paste0("release/v", version)
+          if (!identical(Sys.getenv("RELEASE_BRANCH"), expected_branch)) {
+            stop("Release branch ", Sys.getenv("RELEASE_BRANCH"), " does not match DESCRIPTION version ",
+                 version, "; expected branch: ", expected_branch, call. = FALSE)
+          }
+          heading <- paste("#", description[1, "Package"], version)
+          if (!heading %in% readLines("NEWS.md")) {
+            stop("NEWS.md is missing the heading: ", heading, call. = FALSE)
+          }
+          cat(paste0("tag=v", version, "\n"), file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+      # Pandoc renders package vignettes during the build.
+      - name: Set up Pandoc
+        uses: r-lib/actions/setup-pandoc@v2.12.1
+      # Restore the last metadata snapshot before dependency resolution on every platform.
+      # A new key saves any refreshed metadata; pak still decides when it needs an update.
+      - name: Cache R dependency metadata
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: ${{ env.PKG_METADATA_CACHE_DIR }}
+          key: pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: |
+            pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-
+
+      # This job installs its own dependencies and the documentation/check tools.
+      - name: Install package and check dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2.12.1
+        with:
+          extra-packages: |
+            any::rcmdcheck
+            any::roxygen2
+          needs: check
+      # Generate Rd files from roxygen comments for inclusion in the source archive.
+      - name: Generate package documentation
+        shell: Rscript {0}
+        run: roxygen2::roxygenise()
+      # This job has its own workspace: build and check the archive that will be uploaded.
+      # Treat warnings and notes as failures as well as errors.
+      - name: Build and check publication archive
+        uses: r-lib/actions/check-r-package@v2.12.1
+        with:
+          args: 'c("--no-manual", "--as-cran")'
+          check-dir: '"build"'
+          error-on: '"note"'
+      # Supply a checksum alongside the archive so downloads can be verified.
+      - name: Create archive checksum
+        working-directory: build
+        run: sha256sum *.tar.gz > SHA256SUMS
+      # Create the tag on the merged commit and attach the checked archive and checksum.
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.event.pull_request.merge_commit_sha }}
+          files: |
+            build/*.tar.gz
+            build/SHA256SUMS
+          fail_on_unmatched_files: true
+          overwrite_files: false
+          generate_release_notes: true
+
+  # Deploy documentation from the same commit once the GitHub release is available.
+  website:
+    needs: publish
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/Website.yaml
+    with:
+      ref: ${{ needs.publish.outputs.commit }}
+    secrets: inherit

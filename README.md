@@ -1,7 +1,7 @@
 # form.validation
 
 [![Build](https://github.com/ultreia-io/form.validation/actions/workflows/Build.yaml/badge.svg?branch=develop)](https://github.com/ultreia-io/form.validation/actions/workflows/Build.yaml)
-[![Test](https://github.com/ultreia-io/form.validation/actions/workflows/Test.yaml/badge.svg?branch=main)](https://github.com/ultreia-io/form.validation/actions/workflows/Test.yaml)
+[![Test Coverage](https://github.com/ultreia-io/form.validation/actions/workflows/TestCoverage.yaml/badge.svg?branch=main)](https://github.com/ultreia-io/form.validation/actions/workflows/TestCoverage.yaml)
 [![Website](https://img.shields.io/badge/website-documentation-blue)](https://ultreia-io.github.io/form.validation/)
 [![Latest
 release](https://img.shields.io/github/v/release/ultreia-io/form.validation?display_name=tag&sort=semver)](https://github.com/ultreia-io/form.validation/releases/latest)

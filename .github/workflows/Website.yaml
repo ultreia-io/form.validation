@@ -1,11 +1,13 @@
 name: Website
 
 on:
+  # Publish Release supplies the exact released commit.
   workflow_call:
     inputs:
       ref:
         required: true
         type: string
+  # Allow a documentation-only deployment for a selected commit or tag.
   workflow_dispatch:
     inputs:
       ref:
@@ -13,42 +15,101 @@ on:
         required: false
         type: string
 
+# Pages deployment needs write access to Pages and an OIDC identity token; sources remain read-only.
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Only the most recent requested documentation deployment should remain active.
 concurrency:
   group: github-pages
   cancel-in-progress: true
 
 jobs:
   deploy:
-    if: github.event_name != 'push'
     runs-on: ubuntu-latest
+    # R is preinstalled in this Ubuntu image; no R download or installation is needed.
+    container: rocker/r-ver:4.6.1
+    defaults:
+      run:
+        shell: bash
 
+    # Record the deployed URL in GitHub's Pages environment.
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     env:
+      # Reuse dependency metadata while retaining pak's default daily refresh.
+      PKG_METADATA_CACHE_DIR: ${{ github.workspace }}/.github/pak-metadata
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
+      # Keep downloaded APT packages: Docker images normally delete them after installation.
+      - name: Prepare Linux package cache
+        if: runner.os == 'Linux'
+        id: apt-cache
+        run: |
+          rm -f /etc/apt/apt.conf.d/docker-clean
+          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      # Share downloads across Linux jobs; refresh the cache weekly.
+      # APT still refreshes its indexes and installs packages normally.
+      - name: Cache Linux packages
+        if: runner.os == 'Linux'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+          key: apt-rocker-4.6.1-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
+          restore-keys: |
+            apt-rocker-4.6.1-${{ runner.arch }}-v1-
+
+      # Add Git, R check tools and lsb_release, which setup-r uses to identify Ubuntu.
+      - name: Install Linux check tools
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release
+
+      # Document the supplied release commit, or the branch selected for a manual run.
       - name: Check out repository
         uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.ref || github.ref }}
 
+      # Configure the image's R installation and prefer package binaries where supported.
       - name: Set up R
+        id: setup-r
         uses: r-lib/actions/setup-r@v2.12.1
         with:
-          r-version: release
+          r-version: "4.6.1"
+          install-r: false
           use-public-rspm: true
 
+      # Rocker installs into its site library; tell setup-r-dependencies to cache that actual location.
+      - name: Select R package cache directory on Linux
+        if: runner.os == 'Linux'
+        shell: Rscript {0}
+        run: cat(paste0("R_LIBS_USER=", .libPaths()[1], "\n"), file = Sys.getenv("GITHUB_ENV"), append = TRUE)
+
+      # Render the Markdown and vignette content used by pkgdown.
       - name: Set up Pandoc
         uses: r-lib/actions/setup-pandoc@v2.12.1
 
+      # Restore the last metadata snapshot before dependency resolution on every platform.
+      # A new key saves any refreshed metadata; pak still decides when it needs an update.
+      - name: Cache R dependency metadata
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: ${{ env.PKG_METADATA_CACHE_DIR }}
+          key: pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: |
+            pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-
+
+      # Install pkgdown, roxygen and the dependencies declared for website generation.
       - name: Install site dependencies
         uses: r-lib/actions/setup-r-dependencies@v2.12.1
         with:
@@ -57,24 +118,30 @@ jobs:
             any::pkgdown
           needs: website
 
+      # pkgdown builds its API reference from these generated Rd files.
       - name: Generate package documentation
         shell: Rscript {0}
         run: roxygen2::roxygenise()
 
+      # Build the site and its coverage reports under docs/.
+      # .nojekyll tells Pages to serve the generated files without Jekyll processing.
       - name: Build pkgdown site
         shell: Rscript {0}
         run: |
           source("tools/build-site.R")
           file.create("docs/.nojekyll")
 
+      # Load the repository's Pages configuration for deployment.
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6.0.0
 
+      # Package the generated docs/ directory as the artifact consumed by deploy-pages.
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: docs
 
+      # Publish the uploaded site artifact and expose its URL to the environment above.
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5.0.0

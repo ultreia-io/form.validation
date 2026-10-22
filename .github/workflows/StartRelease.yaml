@@ -1,0 +1,116 @@
+name: Start Release
+
+# Start manually after committing the release version and changelog on develop.
+# PR updates rerun metadata validation; Build.yaml runs the package checks.
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+# Read-only by default; the PR creation job requests its specific write permissions below.
+permissions:
+  contents: read
+
+# Serialize manual starts; each PR has its own group for metadata checks.
+concurrency:
+  group: prepare-release-${{ github.event.pull_request.number || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Release metadata
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       startsWith(github.head_ref, 'release/v'))
+    runs-on: ubuntu-latest
+    # R is preinstalled in this Ubuntu image; no R download or installation is needed.
+    container: rocker/r-ver:4.6.1
+    defaults:
+      run:
+        shell: bash
+    # The Gitflow action creates a release branch, opens its PR and adds the release label.
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      RELEASE_BRANCH: ${{ github.head_ref }}
+      SOURCE_REF: ${{ github.ref }}
+    steps:
+      # Keep downloaded APT packages: Docker images normally delete them after installation.
+      - name: Prepare Linux package cache
+        if: runner.os == 'Linux'
+        id: apt-cache
+        run: |
+          rm -f /etc/apt/apt.conf.d/docker-clean
+          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      # Share downloads across Linux jobs; refresh the cache weekly.
+      # APT still refreshes its indexes and installs packages normally.
+      - name: Cache Linux packages
+        if: runner.os == 'Linux'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+          key: apt-metadata-rocker-4.6.1-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
+          restore-keys: |
+            apt-metadata-rocker-4.6.1-${{ runner.arch }}-v1-
+
+      # setup-r uses lsb_release to identify the preinstalled R environment.
+      - name: Install Linux identification tool
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends lsb-release
+
+      # Read the selected develop commit, or GitHub's proposed merge on a PR event.
+      - name: Check out release sources
+        uses: actions/checkout@v7.0.1
+      # Only R is needed here to read DESCRIPTION; package checks run in Build.yaml.
+      - name: Set up R for metadata validation
+        uses: r-lib/actions/setup-r@v2.12.1
+        with:
+          r-version: "4.6.1"
+          install-r: false
+      # Validate the version already prepared by the maintainer; do not modify files.
+      - name: Verify prepared release
+        id: release
+        shell: Rscript {0}
+        run: |
+          # DESCRIPTION is the version source; release PRs must retain that prepared version.
+          description <- read.dcf("DESCRIPTION")
+          version <- unname(description[1, "Version"])
+          if (!grepl("^[0-9]+[.][0-9]+[.][0-9]+$", version)) {
+            stop("DESCRIPTION version must use X.Y.Z format; found: ", version, call. = FALSE)
+          }
+          if (Sys.getenv("GITHUB_EVENT_NAME") == "workflow_dispatch") {
+            if (Sys.getenv("SOURCE_REF") != "refs/heads/develop") {
+              stop("Start Release must run from develop; selected ref: ", Sys.getenv("SOURCE_REF"), call. = FALSE)
+            }
+          } else {
+            expected <- sub("^release/v", "", Sys.getenv("RELEASE_BRANCH"))
+            if (!identical(version, expected)) {
+              stop("Release branch version ", expected, " does not match DESCRIPTION version ", version, ".", call. = FALSE)
+            }
+          }
+          heading <- paste("#", description[1, "Package"], version)
+          if (!heading %in% readLines("NEWS.md")) {
+            stop("NEWS.md is missing the heading: ", heading, call. = FALSE)
+          }
+          cat(paste0("version=", version, "\n"), file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+
+      # Freeze develop in release/vX.Y.Z and open a PR into main for manual review and merge.
+      # Use this action only for PR creation; PublishRelease.yaml handles the merged commit.
+      - name: Open Gitflow release pull request
+        if: github.event_name == 'workflow_dispatch'
+        uses: hoangvvo/gitflow-workflow-action@a8dcd721fe5390b7f837873d5af2497980890a7e # 0.3.8
+        with:
+          develop_branch: develop
+          main_branch: main
+          version: v${{ steps.release.outputs.version }}
+        env:
+          # A custom token starts PR checks automatically; GITHUB_TOKEN may require approval.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}

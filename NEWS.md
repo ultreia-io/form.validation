@@ -2,6 +2,9 @@
 
 * Rename the package from `model.validation` to `form.validation`; update installation references and namespace calls.
 
+* Simplify README maintenance and the release guide; add release PRs with manual merging and automated publication.
+* Use prebuilt R containers for Linux CI and cache dependency metadata.
+
 * Distinguish interactive overview cards with explicit action labels and IOTC-coloured hover and focus states.
 
 * Convert valid day-first slash dates and year-first dotted dates with strict calendar checks.

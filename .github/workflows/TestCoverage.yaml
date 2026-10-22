@@ -1,0 +1,140 @@
+name: Test Coverage
+
+# Measure coverage after a release merge into main, or on manual request.
+# Build.yaml runs package checks and tests on everyday pushes and pull requests.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git branch, tag, or commit to test
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        description: Git branch, tag, or commit to test
+        required: false
+        type: string
+
+# Coverage does not require repository write access.
+permissions:
+  contents: read
+
+jobs:
+  # Coverage runs once on Linux; Build.yaml already checks the package on all three platforms.
+  coverage:
+    runs-on: ubuntu-latest
+    # R is preinstalled in this Ubuntu image; no R download or installation is needed.
+    container: rocker/r-ver:4.6.1
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      # Reuse dependency metadata while retaining pak's default daily refresh.
+      PKG_METADATA_CACHE_DIR: ${{ github.workspace }}/.github/pak-metadata
+      # GITHUB_PAT authenticates dependency downloads; CODECOV_TOKEN enables the optional external upload.
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    steps:
+      # Keep downloaded APT packages: Docker images normally delete them after installation.
+      - name: Prepare Linux package cache
+        if: runner.os == 'Linux'
+        id: apt-cache
+        run: |
+          rm -f /etc/apt/apt.conf.d/docker-clean
+          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      # Share downloads across Linux jobs; refresh the cache weekly.
+      # APT still refreshes its indexes and installs packages normally.
+      - name: Cache Linux packages
+        if: runner.os == 'Linux'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+          key: apt-coverage-rocker-4.6.1-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
+          restore-keys: |
+            apt-coverage-rocker-4.6.1-${{ runner.arch }}-v1-
+
+      # Add R check tools, Ubuntu identification and curl/gpg required by the Codecov uploader.
+      - name: Install Linux check tools
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release curl gpg
+
+      # Use the requested ref, or the event commit (the proposed merge for PRs).
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      # Configure the image's R installation and use package binaries where supported.
+      - name: Set up R
+        id: setup-r
+        uses: r-lib/actions/setup-r@v2.12.1
+        with:
+          r-version: "4.6.1"
+          install-r: false
+          use-public-rspm: true
+
+      # Rocker installs into its site library; tell setup-r-dependencies to cache that actual location.
+      - name: Select R package cache directory on Linux
+        if: runner.os == 'Linux'
+        shell: Rscript {0}
+        run: cat(paste0("R_LIBS_USER=", .libPaths()[1], "\n"), file = Sys.getenv("GITHUB_ENV"), append = TRUE)
+
+      # Restore the last metadata snapshot before dependency resolution on every platform.
+      # A new key saves any refreshed metadata; pak still decides when it needs an update.
+      - name: Cache R dependency metadata
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: ${{ env.PKG_METADATA_CACHE_DIR }}
+          key: pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: |
+            pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-
+
+      # covr executes the tests with instrumentation; xml2 supports the Cobertura XML export.
+      - name: Install coverage dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2.12.1
+        with:
+          extra-packages: |
+            any::covr
+            any::xml2
+            any::roxygen2
+          needs: coverage
+
+      # Generate the Rd files needed when installing the package for coverage.
+      - name: Generate package documentation
+        shell: Rscript {0}
+        run: roxygen2::roxygenise()
+
+      # Run the existing tests and write line coverage as CSV and Cobertura XML.
+      # The script reports uncovered lines but imposes no minimum coverage percentage.
+      - name: Generate coverage reports
+        shell: Rscript {0}
+        run: source("tools/coverage.R")
+
+      # Keep downloadable coverage results in the workflow artifacts, even without Codecov configured.
+      - name: Store coverage reports
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: coverage-report
+          path: docs/coverage/
+
+      # Upload only the generated XML when a token is configured; upload errors then fail this step.
+      - name: Upload coverage to Codecov
+        if: env.CODECOV_TOKEN != ''
+        uses: codecov/codecov-action@v7.0.0
+        with:
+          token: ${{ env.CODECOV_TOKEN }}
+          slug: ultreia-io/form.validation
+          files: docs/coverage/coverage.xml
+          disable_search: true
+          fail_ci_if_error: true

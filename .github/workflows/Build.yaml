@@ -1,9 +1,9 @@
 name: Build
 
+# Check development pushes and PRs. Publish Release checks the main merge through workflow_call.
 on:
   push:
     branches:
-      - main
       - develop
       - 'feature/**'
   pull_request:
@@ -20,6 +20,7 @@ on:
         required: false
         type: string
 
+# Package verification reads sources and dependencies; it does not publish or modify the repository.
 permissions:
   contents: read
 
@@ -27,40 +28,109 @@ jobs:
   check:
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
     runs-on: ${{ matrix.config.os }}
+    # Linux: R is preinstalled in the Rocker container.
+    # Windows: R is preinstalled in the GitHub runner image.
+    # macOS: setup-r installs R in the GitHub runner.
+    container: ${{ matrix.config.container }}
+    defaults:
+      run:
+        shell: bash
 
+    # Run every platform even if another fails, so the result covers all supported environments.
     strategy:
       fail-fast: false
       matrix:
         config:
           - os: ubuntu-latest
-            r: release
+            r: "4.6.1"
+            container: rocker/r-ver:4.6.1
           - os: macos-latest
             r: release
+            container: ""
           - os: windows-latest
             r: release
+            container: ""
 
     env:
+      # Use the runner's Homebrew metadata without updating or cleaning unrelated tools.
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      # Persist dependency metadata separately from the installed R package cache.
+      # pak keeps its default one-day refresh interval.
+      PKG_METADATA_CACHE_DIR: ${{ github.workspace }}/.github/pak-metadata
+      # Authenticate GitHub dependency downloads using the workflow token.
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      # Keep source references for diagnostics. Skip CRAN submission and runner clock checks in CI.
       R_KEEP_PKG_SOURCE: yes
       _R_CHECK_SYSTEM_CLOCK_: 'false'
       _R_CHECK_CRAN_INCOMING_: 'false'
       _R_CHECK_CRAN_INCOMING_REMOTE_: 'false'
 
     steps:
+      # Keep downloaded APT packages: Docker images normally delete them after installation.
+      - name: Prepare Linux package cache
+        if: runner.os == 'Linux'
+        id: apt-cache
+        run: |
+          rm -f /etc/apt/apt.conf.d/docker-clean
+          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      # Share downloads across Linux jobs; refresh the cache weekly.
+      # APT still refreshes its indexes and installs packages normally.
+      - name: Cache Linux packages
+        if: runner.os == 'Linux'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+          key: apt-rocker-4.6.1-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
+          restore-keys: |
+            apt-rocker-4.6.1-${{ runner.arch }}-v1-
+
+      # Add Git, R check tools and lsb_release, which setup-r uses to identify Ubuntu.
+      - name: Install Linux check tools
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release
+
+      # An explicit ref selects a release commit; otherwise use the event commit (the proposed merge for PRs).
       - name: Check out repository
         uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.ref || github.sha }}
 
+      # Reuse R supplied by Linux and Windows images; install R only on macOS.
       - name: Set up R
+        id: setup-r
         uses: r-lib/actions/setup-r@v2.12.1
         with:
           r-version: ${{ matrix.config.r }}
+          install-r: ${{ runner.os == 'macOS' }}
           use-public-rspm: true
 
+      # Rocker installs into its site library; tell setup-r-dependencies to cache that actual location.
+      - name: Select R package cache directory on Linux
+        if: runner.os == 'Linux'
+        shell: Rscript {0}
+        run: cat(paste0("R_LIBS_USER=", .libPaths()[1], "\n"), file = Sys.getenv("GITHUB_ENV"), append = TRUE)
+
+      # Pandoc is needed to render the package vignettes.
       - name: Set up Pandoc
         uses: r-lib/actions/setup-pandoc@v2.12.1
 
+      # Restore the last metadata snapshot before dependency resolution on every platform.
+      # A new key saves any refreshed metadata; pak still decides when it needs an update.
+      - name: Cache R dependency metadata
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: ${{ env.PKG_METADATA_CACHE_DIR }}
+          key: pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: |
+            pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-
+
+      # Install package dependencies plus the tools used to generate documentation and run R CMD check.
       - name: Install R dependencies
         uses: r-lib/actions/setup-r-dependencies@v2.12.1
         with:
@@ -69,10 +139,13 @@ jobs:
             any::roxygen2
           needs: check
 
+      # Rd documentation is generated from roxygen comments before building the source package.
       - name: Generate package documentation
         shell: Rscript {0}
         run: roxygen2::roxygenise()
 
+      # Build and check installation, tests, examples and vignettes. Skip only the PDF manual.
+      # Notes and warnings fail this check, just like errors; results are kept under build/.
       - name: Check package
         uses: r-lib/actions/check-r-package@v2.12.1
         with:

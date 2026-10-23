@@ -29,6 +29,11 @@ Open the report through a web server. Opening the HTML directly from disk may pr
 
 Unfinished checks mean validation is incomplete, even when there are no error findings.
 
+The Information findings card shows informational messages without affecting validation status.
+For each table sheet, it includes the loaded row count from the first data row, including blank rows.
+Blank rows between populated rows produce warnings; leading and trailing blank rows do not.
+Select the card to filter the report to information findings.
+
 ## Share or refresh the report
 
 Publish the entire `report` directory, keeping its files and subdirectories together.

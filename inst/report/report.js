@@ -19,7 +19,7 @@
   function severityTab(button, name, counts) {
     button.textContent = name;
     const present = counts.filter(item => item.count > 0);
-    const description = `${name} — ${counts.map(item => `${countFormat.format(item.count)} ${item.severity === 'error' ? (item.count === 1 ? 'error' : 'errors') : (item.count === 1 ? 'warning' : 'warnings')}`).join(', ')}`;
+    const description = `${name} — ${counts.map(item => `${countFormat.format(item.count)} ${item.severity === 'info' ? (item.count === 1 ? 'information finding' : 'information findings') : (item.count === 1 ? item.severity : `${item.severity}s`)}`).join(', ')}`;
     button.title = description;
     button.setAttribute('aria-label', description);
     if (!present.length) return;
@@ -117,7 +117,7 @@
     return ui.tabs(parent, groups.map(([name, rows], index) => ({
       id: String(index), label: name || 'Form',
       decorate(button) {
-        severityTab(button, name || 'Form', ['error', 'warning'].map(severity => ({severity,
+        severityTab(button, name || 'Form', ['error', 'warning', 'info'].map(severity => ({severity,
           count: rows.filter(row => row.severity === severity).length})));
       },
       matches: filters => rows.some(row => Object.entries(filters).every(([key, value]) => row[key] === value)),
@@ -151,7 +151,7 @@
     const overview = document.getElementById('findings-overview').content.firstElementChild.cloneNode(true);
     const number = new Intl.NumberFormat('en');
     overview.querySelectorAll('[data-count]').forEach(node => {
-      const count = Number(s[node.dataset.count]);
+      const count = Number(s[node.dataset.count] || 0);
       node.textContent = number.format(count);
       node.closest('.overview-card').dataset.empty = String(count === 0);
     });
@@ -201,10 +201,10 @@
     }
     const definitions = [
       {id: 'summary', label: 'Summary',
-        decorate: button => severityTab(button, 'Summary', [{severity: 'error', count: Number(s.errors)}, {severity: 'warning', count: Number(s.warnings)}]),
+        decorate: button => severityTab(button, 'Summary', [{severity: 'error', count: Number(s.errors)}, {severity: 'warning', count: Number(s.warnings)}, {severity: 'info', count: Number(s.infos || 0)}]),
         render: async (content, update) => sections(content, (await getFindings(update)).groups, true)},
       {id: 'messages', label: 'Validation messages',
-        decorate: button => severityTab(button, 'Validation messages', [{severity: 'error', count: Number(s.errors)}, {severity: 'warning', count: Number(s.warnings)}]),
+        decorate: button => severityTab(button, 'Validation messages', [{severity: 'error', count: Number(s.errors)}, {severity: 'warning', count: Number(s.warnings)}, {severity: 'info', count: Number(s.infos || 0)}]),
         render: async (content, update) => sections(content, (await getFindings(update)).groups, false)}
     ];
     if (unfinishedCount) definitions.push({id: 'execution', label: 'Unfinished checks',
@@ -213,9 +213,9 @@
       table(content, (await getFindings(update)).unfinished, ['severity', 'stage', 'sheet', 'field', 'rule_id', 'kind', 'message'], 'unfinished-checks')});
     const details = ui.tabs(root, definitions, 'details', 'Details', true);
     for (const [count, target, key, value] of [
-      ['errors', 'summary', 'severity', 'error'], ['warnings', 'summary', 'severity', 'warning'],
+      ['errors', 'summary', 'severity', 'error'], ['warnings', 'summary', 'severity', 'warning'], ['infos', 'summary', 'severity', 'info'],
       ['incomplete', 'execution', 'kind', 'incomplete'], ['failed', 'execution', 'kind', 'failed']]) {
-      ui.bindCard(overview.querySelector(`[data-count="${count}"]`).closest('.overview-card'), Number(s[count]),
+      ui.bindCard(overview.querySelector(`[data-count="${count}"]`).closest('.overview-card'), Number(s[count] || 0),
         () => details.open(target, {[key]: value}, true), `Show ${value} ${key === 'severity' ? 'findings' : 'checks'}`,
         key === 'severity' ? 'View findings' : 'View checks');
     }

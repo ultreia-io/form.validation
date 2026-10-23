@@ -83,6 +83,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     if (nrow(summary) != 1L) stop("Expected one summary row: ", d$directory)
     if (!all(c("input", "model_version", "rules_version", "status", "structure_passed", "errors", "warnings", "incomplete", "failed") %in% names(summary))) stop("Incomplete summary schema")
     if (!all(c("kind", "rule_id", "severity", "sheet", "field", "value", "expected", "message", "stage") %in% names(detail))) stop("Incomplete findings schema")
+    if (!"infos" %in% names(summary)) summary$infos <- "0"
     summary$input <- d$directory
     summary$report <- file.path(d$directory, d$report)
     for (key in metadata) summary[[key]] <- d[[key]]
@@ -108,7 +109,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
   }
   if (!length(files)) {
     files <- data.frame(input = character(), report = character(), status = character(),
-      structure_passed = character(), errors = character(), warnings = character(), incomplete = character(), failed = character())
+      structure_passed = character(), errors = character(), warnings = character(), infos = character(), incomplete = character(), failed = character())
     for (key in metadata) files[[key]] <- character()
     issues <- execution <- data.frame(input = character())
   } else {
@@ -177,7 +178,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       href = url(file.path(basename(path), report_filename))))
     totals <- data.frame(files = nrow(f), structure_passed = sum(toupper(f$structure_passed) == "TRUE"),
       structure_blocked = sum(toupper(f$structure_passed) == "FALSE"), errors = sum(as.numeric(f$errors)),
-      warnings = sum(as.numeric(f$warnings)), incomplete_checks = sum(as.numeric(f$incomplete)), failed_checks = sum(as.numeric(f$failed)))
+      warnings = sum(as.numeric(f$warnings)), infos = sum(as.numeric(f$infos)), incomplete_checks = sum(as.numeric(f$incomplete)), failed_checks = sum(as.numeric(f$failed)))
     statuses <- as.data.frame(base::table(f$status), stringsAsFactors = FALSE); names(statuses) <- c("Status", "Files")
     version_counts <- data.frame(version = model_versions,
       files = vapply(model_versions, function(version) sum(f$model_version == version), integer(1)))

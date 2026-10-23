@@ -60,3 +60,12 @@ navbar:
     coverage:
       text: Coverage
       href: articles/coverage.html
+
+footer:
+  structure:
+    left: [company, copyright, license]
+    right: built_with
+  components:
+    company: "[ultreia.io](https://ultreia.io/)"
+    copyright: "· © 2026"
+    license: "· [License: LGPL-2.1](https://github.com/ultreia-io/form.validation/blob/main/LICENSE)"

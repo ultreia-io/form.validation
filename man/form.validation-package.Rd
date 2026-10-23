@@ -22,11 +22,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Tony Chemit \email{tchemit@users.noreply.github.com}
+\strong{Maintainer}: Tony Chemit \email{dev@tchemit.fr}
 
 Authors:
 \itemize{
-  \item Tony Chemit \email{tchemit@users.noreply.github.com}
+  \item Tony Chemit \email{dev@tchemit.fr}
 }
 
 }

@@ -11,7 +11,7 @@
 ^lib$
 ^README\.html$
 ^\.idea$
-^build$
+^build/(?!vignette\.rds$).*
 ^vignettes/articles$
 ^CONTRIBUTING\.md$
 ^CODE_OF_CONDUCT\.md$

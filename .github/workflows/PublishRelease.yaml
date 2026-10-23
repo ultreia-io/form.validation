@@ -32,7 +32,7 @@ jobs:
     needs: checks
     runs-on: ubuntu-latest
     # R is preinstalled in this Ubuntu image; no R download or installation is needed.
-    container: rocker/r-ver:4.6.1
+    container: rocker/r-ver:latest
     defaults:
       run:
         shell: bash
@@ -56,6 +56,10 @@ jobs:
         run: |
           rm -f /etc/apt/apt.conf.d/docker-clean
           echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+          # Identify the actual image so latest never reuses another R or OS version's cache.
+          echo "r-version=$(Rscript -e 'cat(as.character(getRversion()))')" >> "$GITHUB_OUTPUT"
+          . /etc/os-release
+          echo "os-version=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
 
       # Share downloads across Linux jobs; refresh the cache weekly.
       # APT still refreshes its indexes and installs packages normally.
@@ -66,9 +70,9 @@ jobs:
           path: |
             /var/cache/apt/archives
             /var/lib/apt/lists
-          key: apt-rocker-4.6.1-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
+          key: apt-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
           restore-keys: |
-            apt-rocker-4.6.1-${{ runner.arch }}-v1-
+            apt-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-
 
       # Add Git, R check tools and lsb_release, which setup-r uses to identify Ubuntu.
       - name: Install Linux check tools
@@ -87,7 +91,7 @@ jobs:
         id: setup-r
         uses: r-lib/actions/setup-r@v2.12.1
         with:
-          r-version: "4.6.1"
+          r-version: ${{ steps.apt-cache.outputs.r-version }}
           install-r: false
           use-public-rspm: true
 

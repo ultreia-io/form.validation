@@ -73,7 +73,7 @@ write_reference_evidence_csv <- function(rows, path, reference_label = "Code lis
 
 # Write a focused report alongside aggregate reports. All HTML lives in templates.
 write_reference_evidence <- function(parts, directory, report_filename, context_columns,
-                                     title, stylesheet, logo, kind = c("code-list", "registry")) {
+                                     title, stylesheet, logo, kind = c("code-list", "registry"), evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   kind <- match.arg(kind)
   registry <- kind == "registry"
   extra_columns <- if (registry) c("severity", "reason") else character()
@@ -140,11 +140,11 @@ write_reference_evidence <- function(parts, directory, report_filename, context_
     instructions = if (registry) "Review each case before changing a form, a registry or its matching rules." else
       "Review each case before changing a form, a code list or its mapping.",
     summary_file = summary_file, summary_label = if (registry) "Values CSV" else "Codes CSV",
-    summary_description = if (registry) "Unmatched or ambiguous values by registry" else "Rejected values by code list"))
+    summary_description = if (registry) "Unmatched or ambiguous values by registry" else "Rejected values by code list"), evidence_assets = evidence_assets, scope = scope, parent_label = parent_label)
 }
 
 # Render all evidence pages with the same external template and interactive assets.
-write_evidence_page <- function(directory, folder_name, report_filename, title, stylesheet, logo, labels) {
+write_evidence_page <- function(directory, folder_name, report_filename, title, stylesheet, logo, labels, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   folder <- file.path(directory, folder_name)
   sources <- stats::setNames(system.file("report",
     c("report.css", "overview.css", "report-ui.js", "csv-worker.js", "report-table.js", "reference-evidence.js"),
@@ -152,14 +152,22 @@ write_evidence_page <- function(directory, folder_name, report_filename, title, 
     c("style", "overview_style", "loading_script", "csv_worker", "table_script", "script"))
   if (!is.null(stylesheet)) sources <- c(sources, stylesheet = stylesheet)
   if (!is.null(logo)) sources <- c(sources, logo = logo)
-  assets <- paste0("../report-assets/", copy_report_assets(sources, file.path(directory, "report-assets")))
+  assets <- paste0(evidence_assets, "/",
+    copy_report_assets(sources, file.path(folder, evidence_assets)))
   names(assets) <- names(sources)
   values <- c(as.list(assets), labels, list(title = paste(title, "\u2014", labels$evidence_label),
     generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC", tz = "UTC"),
     parent_report = paste0("../", report_filename)))
   if (is.null(stylesheet)) values["stylesheet"] <- list(NULL)
   if (is.null(logo)) values["logo"] <- list(NULL)
-  writeLines(render_report_template("reference-evidence.html", values),
-             file.path(folder, report_filename), useBytes = TRUE)
+  # Evidence lives one level below its aggregate; expose every ancestor.
+  parts <- if (nzchar(scope)) strsplit(scope, "/", fixed = TRUE)[[1L]] else character()
+  ancestors <- c(parent_label, parts)
+  breadcrumbs <- vapply(seq_along(ancestors), function(i) paste(
+    render_report_template("breadcrumb-link.html", list(label = ancestors[i],
+      href = paste0(strrep("../", length(ancestors) - i + 1L), report_filename))), collapse = "\n"), character(1))
+  html <- render_report_template("reference-evidence.html", values)
+  html <- sub("<!-- evidence-breadcrumbs -->", paste(breadcrumbs, collapse = "\n"), html, fixed = TRUE)
+  writeLines(html, file.path(folder, report_filename), useBytes = TRUE)
   file.path(folder_name, report_filename)
 }

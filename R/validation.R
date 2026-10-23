@@ -194,7 +194,7 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
                  structure_passed = structure_passed, findings = findings,
                  execution = execution, model = form.model::form_metadata(plan$model),
                  source = source, rules_version = plan$rules_version,
-                 metadata = plan$metadata), class = "validation_result")
+                 metadata = plan$metadata, reference_provenance = attr(references, "provenance")), class = "validation_result")
 }
 
 #' Normalize explicit execution options

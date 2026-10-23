@@ -19,7 +19,7 @@ collect_conversion_evidence <- function(detail, report, context_columns) {
 }
 
 # Group conversion cases by model, field and unchanged submitted value.
-write_conversion_evidence <- function(parts, directory, report_filename, context_columns, title, stylesheet, logo) {
+write_conversion_evidence <- function(parts, directory, report_filename, context_columns, title, stylesheet, logo, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   folder_name <- "conversion-evidence"
   folder <- file.path(directory, folder_name)
   dir.create(file.path(folder, "evidence"), recursive = TRUE, showWarnings = FALSE)
@@ -78,5 +78,5 @@ write_conversion_evidence <- function(parts, directory, report_filename, context
     evidence_label = "Conversion errors", cases_label = "Values to review", category_total = "types",
     references_label = "Expected types", summary_file = "values.csv", summary_label = "Values CSV",
     summary_description = "Rejected values by model, sheet, field and expected type",
-    description = NULL, instructions = NULL))
+    description = NULL, instructions = NULL), evidence_assets = evidence_assets, scope = scope, parent_label = parent_label)
 }

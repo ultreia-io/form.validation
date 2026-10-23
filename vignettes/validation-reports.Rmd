@@ -37,3 +37,15 @@ To regenerate an existing report, pass `overwrite = TRUE` to both writing functi
 
 For multiple forms, use the [batch workflow](../reference/validation_batch_plan.html)
 or [aggregate existing reports](../reference/write_validation_aggregate.html).
+
+## Review evidence
+
+Individual reports include cards for code-list, registry and conversion evidence.
+Zero-count cards stay disabled; no empty evidence report is generated.
+
+Reference evidence uses the snapshot provenance retained in the validation result.
+For saved results without it, pass `reference_provenance` to `validation_report_data()`.
+
+The report writes prepared evidence to `evidence.json` alongside its CSV files.
+Keep this file when copying reports for aggregation: aggregates reuse it without
+extracting evidence again from findings. Regenerate older reports before aggregating them.

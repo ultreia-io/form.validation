@@ -52,6 +52,14 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   for (i in seq_len(nrow(files))) {
     file <- files[i, ]
     add_batch_breadcrumbs(file.path(stage, file$relative, reports$report_filename), file$relative, report_filename)
+    evidence_labels <- c(`code-list-evidence` = "Code-list evidence", `registry-evidence` = "Registry evidence",
+      `conversion-evidence` = "Conversion errors")
+    for (kind in names(evidence_labels)) {
+      relative <- file.path(file$relative, kind)
+      path <- file.path(stage, relative, reports$report_filename)
+      if (file.exists(path)) add_batch_breadcrumbs(path, relative, report_filename,
+        current_label = evidence_labels[[kind]], parent_filename = reports$report_filename)
+    }
     job <- plan$jobs[match(file$job, plan$jobs$id), ]
     refs <- plan$resources[[job$resource]]$references
     provenance[[file$relative]] <- Filter(function(reference) identical(reference$status, "available"), refs)
@@ -63,9 +71,10 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
     report_filename = report_filename, title = title, author = author, stylesheet = stylesheet, logo = logo,
     model_versions = plan$model_versions, reference_provenance = if (length(Filter(length, provenance))) provenance else NULL,
     reference_context_columns = reference_context_columns, report_notes = report_notes)
-  reference_reports <- length(attr(pages, "reference_report"))
-  registry_reports <- length(attr(pages, "registry_report"))
-  conversion_reports <- length(attr(pages, "conversion_report"))
+  individual_evidence <- basename(dirname(names(reports$artifacts)[basename(names(reports$artifacts)) == reports$report_filename]))
+  reference_reports <- sum(individual_evidence == "code-list-evidence") + length(attr(pages, "reference_report"))
+  registry_reports <- sum(individual_evidence == "registry-evidence") + length(attr(pages, "registry_report"))
+  conversion_reports <- sum(individual_evidence == "conversion-evidence") + length(attr(pages, "conversion_report"))
   html <- list.files(stage, pattern = "\\.html$", recursive = TRUE, full.names = TRUE)
   if (length(html) != nrow(descriptors) + length(pages) + reference_reports + registry_reports + conversion_reports) stop("Unexpected HTML report count")
   for (path in html) {
@@ -107,16 +116,16 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
 }
 
 # Add ancestor navigation only to the staged publication copy.
-add_batch_breadcrumbs <- function(path, relative, report_filename) {
+add_batch_breadcrumbs <- function(path, relative, report_filename, current_label = NULL, parent_filename = report_filename) {
   parts <- strsplit(relative, "/", fixed = TRUE)[[1L]]
   depth <- length(parts)
   labels <- c("All reports", utils::head(parts, -1L))
   links <- vapply(seq_along(labels), function(i) paste(render_report_template("breadcrumb-link.html", list(
-    href = batch_url(paste0(strrep("../", depth - i + 1L), report_filename)), label = labels[i])), collapse = "\n"), character(1))
-  navigation <- paste(render_report_template("breadcrumbs.html", list(filename = parts[depth])), collapse = "\n")
+    href = batch_url(paste0(strrep("../", depth - i + 1L), if (i == length(labels)) parent_filename else report_filename)), label = labels[i])), collapse = "\n"), character(1))
+  navigation <- paste(render_report_template("breadcrumbs.html", list(filename = if (is.null(current_label)) parts[depth] else current_label)), collapse = "\n")
   navigation <- sub("<!-- breadcrumb-items -->", paste(links, collapse = "\n"), navigation, fixed = TRUE)
   html <- paste(readLines(path, warn = FALSE), collapse = "\n")
-  html <- gsub('<nav (?:class="report-parent"|id="breadcrumbs")[^>]*>.*?</nav>', "", html, perl = TRUE)
+  html <- gsub('<nav (?:class="report-parent"|id="breadcrumbs"|aria-label="Breadcrumb")[^>]*>.*?</nav>', "", html, perl = TRUE)
   anchor <- '<div class="report-navigation">'
   if (!grepl(anchor, html, fixed = TRUE)) stop("Missing report navigation element: ", path)
   html <- sub(anchor, paste0(anchor, "\n", navigation), html, fixed = TRUE)

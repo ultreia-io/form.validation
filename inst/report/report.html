@@ -48,17 +48,19 @@
             <span><span class="severity-dot" data-severity="warning" aria-hidden="true"></span>Warning findings</span>
             <small id="warning-policy" class="overview-notes">{{report_notes}}</small>
           </div>
+          <div class="overview-card" data-tone="info"><strong data-count="infos">—</strong><span><span class="severity-dot" data-severity="info" aria-hidden="true"></span>Information findings</span></div>
           <div class="overview-card" data-tone="attention"><strong data-count="incomplete">—</strong><span><span aria-hidden="true">⏳</span>Incomplete checks</span></div>
           <div class="overview-card" data-tone="error"><strong data-count="failed">—</strong><span><span aria-hidden="true">❌</span>Failed checks</span></div>
         </div>
       </section>
     </template>
-    <section class="report-resources" aria-label="Resources">
+    <section class="report-resources report-overview" aria-label="Resources">
       <h2>Resources</h2>
       <div class="resource-links">
         <div><a href="summary.csv" download>↓ Summary CSV</a><p>Form status and validation counts</p></div>
         <div><a href="findings.csv" download>↓ Findings CSV</a><p>Detailed findings and unfinished checks</p></div>
       </div>
+      <!-- evidence-cards -->
     </section>
     <div id="report"></div>
   </main>

@@ -50,6 +50,7 @@
           <span><span class="severity-dot" data-severity="warning" aria-hidden="true"></span>Warning findings</span>
           <small id="warning-policy" class="overview-notes">{{report_notes}}</small>
         </div>
+        <div class="overview-card" data-tone="info"><strong data-total="infos">—</strong><span><span class="severity-dot" data-severity="info" aria-hidden="true"></span>Information findings</span></div>
         <div class="overview-card" data-tone="attention"><strong data-total="incomplete_checks">—</strong><span><span aria-hidden="true">⏳</span>Incomplete checks</span></div>
         <div class="overview-card" data-tone="error"><strong data-total="failed_checks">—</strong><span><span aria-hidden="true">❌</span>Failed checks</span></div>
       </div>
@@ -60,11 +61,7 @@
           <div><a href="issues.csv" download>↓ Issues CSV</a><p>Grouped validation findings</p></div>
           <div><a href="execution.csv" download>↓ Execution CSV</a><p>Incomplete and failed checks</p></div>
         </div>
-        <div class="overview-cards evidence-report-links" aria-label="Evidence reports across this batch">
-          <a class="overview-card evidence-report-link" href="{{reference_report}}"><span>Code-list evidence</span><strong>{{reference_count}} findings</strong><small>Rejected codes across this batch</small><small class="overview-action"><span>Open report</span><span aria-hidden="true">→</span></small></a>
-          <a class="overview-card evidence-report-link" href="{{registry_report}}"><span>Registry evidence</span><strong>{{registry_count}} findings</strong><small>Unmatched or ambiguous values across this batch</small><small class="overview-action"><span>Open report</span><span aria-hidden="true">→</span></small></a>
-          <a class="overview-card evidence-report-link" href="{{conversion_report}}"><span>Conversion errors</span><strong>{{conversion_count}} findings</strong><small>Rejected values by expected type across this batch</small><small class="overview-action"><span>Open report</span><span aria-hidden="true">→</span></small></a>
-        </div>
+        <!-- evidence-cards -->
       </section>
     </section>
     <nav id="aggregate-children" aria-label="Child report groups"></nav>

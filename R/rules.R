@@ -60,7 +60,8 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 #' @details Supported declarations include declared sheets, sheet order,
 #'   row/column counts, table start rows, mandatory fields,
 #'   all nine field types, enums, bounds, patterns, uniqueness, reference membership,
-#'   and same-sheet conditional requiredness.
+#'   and same-sheet conditional requiredness. Generated content rules also include
+#'   table row counts (info) and internal empty-row checks (warning).
 #'
 #' Uniqueness applies only to table fields. Unsupported schema versions, types, layouts, or constraints
 #' are explicit generation errors; they are never silently discarded.
@@ -121,6 +122,19 @@ validation_plan <- function(model, rules = list()) {
       }
     }
   }
+  observations <- list()
+  for (sheet_name in names(sheets)) {
+    if (sheets[[sheet_name]]$layout$kind != "table") next
+    for (kind in c("row_count", "empty_rows")) {
+      rule <- rule_record(paste("sheet", sheet_name, kind, sep = "/"), kind,
+        severity = if (kind == "row_count") "info" else "warning",
+        sheet = sheet_name, stage = "fields")
+      rule$value <- TRUE
+      observations[[length(observations) + 1L]] <- rule
+    }
+  }
+  structural <- vapply(generated, function(rule) rule$stage == "structure", logical(1))
+  generated <- c(generated[structural], observations, generated[!structural])
   all_rules <- c(generated, unname(rules))
   structural <- vapply(all_rules, function(rule) rule$stage == "structure", logical(1))
   all_rules <- c(all_rules[structural], all_rules[!structural])

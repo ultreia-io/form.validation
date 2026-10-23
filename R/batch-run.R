@@ -122,7 +122,10 @@ write_validation_batch_reports <- function(plan, report_filename = "index.html",
         !identical(saved$input_sha256, file$sha256))
       stop("Saved result differs from the plan: ", file$relative, call. = FALSE)
     log(paste("REPORT", file$relative))
-    report <- validation_report_data(saved$result, saved$model)
+    job <- plan$jobs[match(file$job, plan$jobs$id), ]
+    context <- as.list(file[unique(c(plan$group_columns, plan$identity_columns))])
+    report <- validation_report_data(saved$result, saved$model,
+      reference_provenance = plan$resources[[job$resource]]$references, context = context)
     depth <- length(strsplit(file$relative, "/", fixed = TRUE)[[1L]])
     write_validation_report(report, file.path(stage, file$relative, report_filename),
       title = if ("title" %in% names(file)) file$title else paste(title, "-", file$relative),

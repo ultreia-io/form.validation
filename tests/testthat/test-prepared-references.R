@@ -12,7 +12,7 @@ test_that("prepared references preserve findings and respect changed snapshots",
   expect_identical(validate_data(plan, data, prepared), expected)
   prepared$sites$values <- c("north", "south", "unknown")
   expect_true(validate_data(plan, data, prepared)$valid)
-  expect_equal(nrow(validate_data(plan, data, prepared)$findings), 0L)
+  expect_equal(nrow(declared_findings(validate_data(plan, data, prepared))), 0L)
 })
 
 test_that("prepared missing and malformed snapshots retain deferred execution semantics", {

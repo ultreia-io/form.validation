@@ -5,6 +5,8 @@ model:
   version: '2026.1'
 stage: fields
 rules:
+  sheet/Observations/row_count: {value: true, severity: info}
+  sheet/Observations/empty_rows: {value: true, severity: warning}
   field/Metadata.submission/mandatory: true
   field/Metadata.submission/type: "string"
   field/Metadata.submission/pattern: "^[0-9]{3}$"

@@ -14,7 +14,7 @@
   function severityTab(button, name, counts) {
     button.textContent = name;
     const present = counts.filter(item => item.count > 0);
-    const description = `${name} — ${counts.map(item => `${countFormat.format(item.count)} ${item.severity === 'error' ? (item.count === 1 ? 'error' : 'errors') : (item.count === 1 ? 'warning' : 'warnings')}`).join(', ')}`;
+    const description = `${name} — ${counts.map(item => `${countFormat.format(item.count)} ${item.severity === 'info' ? (item.count === 1 ? 'information finding' : 'information findings') : (item.count === 1 ? item.severity : `${item.severity}s`)}`).join(', ')}`;
     button.title = description;
     button.setAttribute('aria-label', description);
     if (!present.length) return;
@@ -43,7 +43,7 @@
     return ui.tabs(parent, [...groups].sort((a, b) => rank(a[0]) - rank(b[0])).map(([sheet, rows], index) => ({
       id: String(index), label: sheet || 'Form',
       decorate(button) {
-        severityTab(button, sheet || 'Form', ['error', 'warning'].map(severity => ({severity,
+        severityTab(button, sheet || 'Form', ['error', 'warning', 'info'].map(severity => ({severity,
           count: rows.reduce((total, row) => total + (row.severity === severity ? Number(row.occurrences) : 0), 0)})));
       },
       matches: filters => rows.some(row => Object.entries(filters).every(([key, value]) => row[key] === value)),
@@ -70,7 +70,7 @@
       node.textContent = format.format(count);
       node.closest('.overview-card').dataset.empty = String(count === 0);
     }
-    overview.querySelectorAll('[data-total]').forEach(node => setCount(node, Number(totals[node.dataset.total])));
+    overview.querySelectorAll('[data-total]').forEach(node => setCount(node, Number(totals[node.dataset.total] || 0)));
     overview.querySelectorAll('[data-status]').forEach(node => setCount(node, Number(statuses[node.dataset.status] || 0)));
     const versions = document.getElementById('overview-versions');
     const template = document.getElementById('overview-version-card');
@@ -99,7 +99,7 @@
         render: async (content, update) => table(content, (await load('files.csv', update)).rows,
         ['input', 'model_version', 'status', 'errors', 'warnings'], true, 10)},
       {id: 'findings', label: 'Validation findings',
-        decorate: button => severityTab(button, 'Validation findings', [{severity: 'error', count: Number(totals.errors)}, {severity: 'warning', count: Number(totals.warnings)}]),
+        decorate: button => severityTab(button, 'Validation findings', [{severity: 'error', count: Number(totals.errors)}, {severity: 'warning', count: Number(totals.warnings)}, {severity: 'info', count: Number(totals.infos || 0)}]),
         render: async (content, update) => findings(content, await load('issues.csv', update), 'findings', meta.sheet_order)}
     ];
     if (Number(totals.incomplete_checks) + Number(totals.failed_checks)) definitions.push(
@@ -115,9 +115,9 @@
         () => details.open('files', {status}, true), `Show ${status} forms`, 'View forms');
     });
     for (const [count, target, key, value] of [
-      ['errors', 'findings', 'severity', 'error'], ['warnings', 'findings', 'severity', 'warning'],
+      ['errors', 'findings', 'severity', 'error'], ['warnings', 'findings', 'severity', 'warning'], ['infos', 'findings', 'severity', 'info'],
       ['incomplete_checks', 'execution', 'kind', 'incomplete'], ['failed_checks', 'execution', 'kind', 'failed']]) {
-      ui.bindCard(overview.querySelector(`[data-total="${count}"]`).closest('.overview-card'), Number(totals[count]),
+      ui.bindCard(overview.querySelector(`[data-total="${count}"]`).closest('.overview-card'), Number(totals[count] || 0),
         () => details.open(target, {[key]: value}, true), `Show ${value} ${key === 'severity' ? 'findings' : 'checks'}`,
         key === 'severity' ? 'View findings' : 'View checks');
     }

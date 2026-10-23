@@ -24,10 +24,10 @@ stages:
     field_location: requires_sheet_and_no_field_in_rule_id
   fields:
     keys: [schema_version, rules_version, model, stage, rules]
-    rule_id: field/<sheet>.<field>/<check>
+    rule_id: [field/<sheet>.<field>/<check>, sheet/<sheet>/<check>]
     required_rule_values: [value]
     optional_rule_values: [severity]
-    checks: [mandatory, required_field, type, reference, enum, minimum, maximum, pattern, unique]
+    checks: [row_count, empty_rows, mandatory, required_field, type, reference, enum, minimum, maximum, pattern, unique]
   business:
     keys: [schema_version, rules_version, model, stage, rules]
     rule_id: <namespace>/[<field>/]<callback>

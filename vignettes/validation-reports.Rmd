@@ -29,6 +29,11 @@ Open the report through a web server. Opening the HTML directly from disk may pr
 
 Unfinished checks mean validation is incomplete, even when there are no error findings.
 
+The Information findings card shows informational messages without affecting validation status.
+For each table sheet, it includes the loaded row count from the first data row, including blank rows.
+Blank rows between populated rows produce warnings; leading and trailing blank rows do not.
+Select the card to filter the report to information findings.
+
 ## Share or refresh the report
 
 Publish the entire `report` directory, keeping its files and subdirectories together.
@@ -37,3 +42,15 @@ To regenerate an existing report, pass `overwrite = TRUE` to both writing functi
 
 For multiple forms, use the [batch workflow](../reference/validation_batch_plan.html)
 or [aggregate existing reports](../reference/write_validation_aggregate.html).
+
+## Review evidence
+
+Individual reports include cards for code-list, registry and conversion evidence.
+Zero-count cards stay disabled; no empty evidence report is generated.
+
+Reference evidence uses the snapshot provenance retained in the validation result.
+For saved results without it, pass `reference_provenance` to `validation_report_data()`.
+
+The report writes prepared evidence to `evidence.json` alongside its CSV files.
+Keep this file when copying reports for aggregation: aggregates reuse it without
+extracting evidence again from findings. Regenerate older reports before aggregating them.

@@ -1,3 +1,12 @@
+# form.validation 0.3.0
+
+* Add table row counts, internal blank-row warnings and Information findings cards.
+* Add contextual evidence reports for individual forms and aggregates, reusing prepared evidence.
+* Update dependency from `form.model` 0.3.0 to 0.3.1.
+* Prepare for CRAN submission: include generated help and the vignette index, and update maintainer details.
+* Improve website branding, documentation links and coverage reporting.
+* Update Linux CI containers and website dependency caching.
+
 # form.validation 0.2.1
 
 * Install `form.model` from its release archive, including generated documentation.

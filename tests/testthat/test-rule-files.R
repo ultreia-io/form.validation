@@ -28,9 +28,9 @@ test_that("compact business rules receive explicit values and defaults", {
   data$Observations$amount[[1L]] <- 11
   result <- validate_data(plan, data, fixture_references(),
     config = list(custom = list(caller = "test")))
-  expect_identical(result$findings$rule_id, "business/total_amount")
-  expect_identical(result$findings$severity, "warning")
-  expect_equal(result$findings$expected[[1L]], 10)
+  expect_identical(declared_findings(result)$rule_id, "business/total_amount")
+  expect_identical(declared_findings(result)$severity, "warning")
+  expect_equal(declared_findings(result)$expected[[1L]], 10)
 
   document <- form.validation:::read_rules_yaml(business)
   document$rules[[1L]]$severity <- NULL
@@ -81,12 +81,12 @@ test_that("validation process declares the complete ordered pipeline", {
   expect_true(validate_data(plan, data, upstream_references())$valid)
   data$Observations[6:7, 2] <- list(600L, 700L)
   result <- validate_data(plan, data, upstream_references())
-  expect_identical(result$findings$rule_id, "business/total_count")
-  expect_identical(result$findings$value[[1]], 1300L)
+  expect_identical(declared_findings(result)$rule_id, "business/total_count")
+  expect_identical(declared_findings(result)$value[[1]], 1300L)
   data$Observations[[6, 2]] <- "wrong"
   result <- validate_data(plan, data, upstream_references())
   expect_identical(result$status, "incomplete")
-  expect_identical(result$findings$row, 6L)
+  expect_identical(declared_findings(result)$row, 6L)
   extra <- file.path(directory, "extra.yaml")
   document <- form.validation:::read_rules_yaml(file.path(directory, "survey-business-validation.yaml"))
   names(document$rules) <- "extra/total_count"
@@ -126,7 +126,7 @@ test_that("changed model values require regenerating the concrete rules", {
   plan <- read_validation_rules(paths, model)
   data <- fixture_data()
   data$Observations$amount[[1L]] <- 0
-  expect_identical(validate_data(plan, data, fixture_references())$findings$rule_id,
+  expect_identical(declared_findings(validate_data(plan, data, fixture_references()))$rule_id,
                    "field/Observations.amount/minimum")
 })
 

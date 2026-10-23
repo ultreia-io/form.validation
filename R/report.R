@@ -4,7 +4,10 @@
 #' No workbook is read and no validation rule is executed.
 #' @param result A result from [`validate_data()`][form.validation::validate_data].
 #' @param model The form used to validate this input, supplying sheet order and layout.
-#' @return A `validation_report` list with `tables`, `summary`, `structure_passed`,
+#' @param reference_provenance Snapshot records keyed by reference identifier,
+#'   with `status` and `sha256`. Defaults to provenance retained by validation.
+#' @param context Named public metadata, such as a site or gear, retained in evidence.
+#' @return A `validation_report` list with `tables`, prepared `evidence`, `summary`, `structure_passed`,
 #'   `sheets`, `execution`, `generated_at`, and caller `metadata`. Each sheet has its name, finding
 #'   counts, a summary, and details. Values are readable text; the original
 #'   result retains its types. Execution contains only failed or incomplete checks.
@@ -23,7 +26,8 @@
 #' report <- validation_report_data(result, model)
 #' report$summary
 #' @export
-validation_report_data <- function(result, model) {
+validation_report_data <- function(result, model, reference_provenance = result$reference_provenance,
+                                   context = list()) {
   if (!inherits(result, "validation_result")) stop("result must come from validate_data()", call. = FALSE)
   if (!identical(result$model, form.model::form_metadata(model))) {
     stop("Report form differs from validation result", call. = FALSE)
@@ -76,13 +80,14 @@ validation_report_data <- function(result, model) {
     rownames(summary) <- NULL
     if (!is.null(details)) rownames(details) <- NULL
     list(name = if (is.na(name)) "Form" else name,
-         errors = sum(data$severity == "error"), warnings = sum(data$severity == "warning"),
+         errors = sum(data$severity == "error"), warnings = sum(data$severity == "warning"), infos = sum(data$severity == "info"),
          summary = summary, details = details)
   })
   execution <- result$execution[result$execution$status %in% c("failed", "incomplete"),
     c("severity", "stage", "sheet", "field", "rule_id", "status", "message"), drop = FALSE]
   execution$stage <- report_stage_labels(execution$stage)
-  structure(list(tables = tables, summary = tables$summary, structure_passed = result$structure_passed,
+  evidence <- prepare_report_evidence(tables, reference_provenance, context)
+  structure(list(tables = tables, evidence = evidence, summary = tables$summary, structure_passed = result$structure_passed,
                  sheets = Filter(Negate(is.null), sections), execution = execution,
                  generated_at = tables$summary$generated_at, metadata = result$metadata),
             class = "validation_report")
@@ -99,8 +104,8 @@ validation_report_data <- function(result, model) {
 #' @return A named character vector with `summary` and `findings` paths, invisibly.
 #' @details Summary columns are `input`, `model_version` (`form.version`),
 #'   `rules_version`, `status`, `structure_passed`, `generated_at` (UTC),
-#'   `errors`, `warnings`, `incomplete`, and `failed`.
-#'   Errors and warnings count validation findings, not execution problems.
+#'   `errors`, `warnings`, `infos`, `incomplete`, and `failed`.
+#'   Errors, warnings and information counts describe validation findings, not execution problems.
 #'   Direct in-memory plans have no rule version and leave that cell empty.
 #'
 #' Detail columns are `rule_id`, `kind`, `severity`, `sheet`, `field`, `row`,
@@ -179,7 +184,9 @@ write_report_csv <- function(data, path) {
 #' @details Creates CSV files if absent. Existing CSV files must match the prepared
 #'   report, unless overwrite is TRUE. JavaScript and CSS are local external files;
 #'   no rendering packages, Pandoc, CDN, or embedded validation data are required.
-#'   Publish the HTML, both CSV files and the asset directory together. Opening
+#'   Also writes reusable `evidence.json` and nonempty evidence report directories.
+#'   Zero-count evidence cards remain visible without links.
+#'   Publish the complete output directory and its assets together. Opening
 #'   the HTML directly through file:// is not supported.
 #' @export
 write_validation_report <- function(report, path, title = "Validation report", author = NULL,
@@ -226,6 +233,8 @@ write_validation_report <- function(report, path, title = "Validation report", a
   urls <- stats::setNames(vapply(file.path(assets_directory, filenames), function(path) {
     paste(vapply(strsplit(path, "/", fixed = TRUE)[[1]], utils::URLencode, character(1), reserved = TRUE), collapse = "/")
   }, character(1)), names(sources))
+  evidence <- write_individual_evidence(report, directory, basename(path), title,
+    stylesheet, logo, assets_directory, overwrite)
   html <- render_report_template("report.html", list(
     title = title, style = urls[["style"]], script = urls[["script"]],
     overview_style = urls[["overview_style"]],
@@ -233,6 +242,7 @@ write_validation_report <- function(report, path, title = "Validation report", a
     stylesheet = if (!is.null(stylesheet)) urls[["stylesheet"]] else NULL,
     logo = if (!is.null(logo)) urls[["logo"]] else NULL, author = author, parent_report = parent_report,
     report_notes = notes))
+  html <- sub("<!-- evidence-cards -->", paste(render_report_template("evidence-cards.html", evidence), collapse = "\n"), html, fixed = TRUE)
   writeLines(html, path, useBytes = TRUE)
   invisible(normalizePath(path, mustWork = TRUE))
 }
@@ -247,7 +257,7 @@ validation_result_tables <- function(result) {
   summary <- data.frame(input = result$source, model_version = result$model$form$version,
     rules_version = result$rules_version, status = result$status,
     structure_passed = result$structure_passed, generated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-    errors = sum(findings$severity == "error"), warnings = sum(findings$severity == "warning"),
+    errors = sum(findings$severity == "error"), warnings = sum(findings$severity == "warning"), infos = sum(findings$severity == "info"),
     incomplete = sum(execution$status == "incomplete"), failed = sum(execution$status == "failed"),
     stringsAsFactors = FALSE)
   details <- data.frame(rule_id = findings$rule_id, kind = rep("validation", nrow(findings)),

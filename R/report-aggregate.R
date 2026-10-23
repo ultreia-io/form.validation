@@ -12,22 +12,21 @@
 #' @param report_notes Public validation-policy notes shown in the Warning
 #'   findings card on every aggregate page. Text is HTML-escaped.
 #' @param model_versions Optional model versions to show, including versions with no files.
-#' @param reference_provenance Optional list keyed by descriptor directory, each
-#'   containing named reference records with `status` and `sha256`.
-#'   Available records identify verified snapshots used during validation.
-#'   Enables separate reports for rejected code-list values and registry matches.
-#'   Registry callbacks use `/registry_match` rule IDs and an `expected` object
-#'   with `reference` and `matches = 1`; both error and warning findings are retained.
+#' @param reference_provenance Retained for compatibility. Snapshot identity is
+#'   already stored in each individual report's prepared evidence.
 #' @param reference_context_columns Descriptor columns to show in code summaries and source tables.
 #' @return Relative aggregate HTML paths, invisibly, with a `reference_report`
 #'   attribute for code-list evidence, `registry_report` for registry evidence,
 #'   and `conversion_report` for number, integer, boolean and temporal type failures.
+#'   Attributes contain all contextual evidence report paths. Each aggregate's
+#'   evidence includes only its forms, with counts and links scoped accordingly.
 #'   Conversion evidence uses saved errors and warnings without altering values.
 #' @details Reads all CSV columns as text. Each directory level receives files.csv,
 #'   issues.csv and execution.csv and an HTML overview. Validation findings and
 #'   execution problems remain separate. Grouped findings show occurrences and
 #'   affected files; their identity includes model/rules versions and caller metadata.
-#'   Individual reports must already exist below directory, at descriptor paths.
+#'   Individual reports and prepared `evidence.json` must already exist below
+#'   directory, at descriptor paths. Evidence is reused, never extracted from CSV.
 #'   No input workbook is read, copied or revalidated. Existing outputs are refused.
 #' @export
 write_validation_aggregate <- function(descriptors, directory, group_columns,
@@ -84,6 +83,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     if (nrow(summary) != 1L) stop("Expected one summary row: ", d$directory)
     if (!all(c("input", "model_version", "rules_version", "status", "structure_passed", "errors", "warnings", "incomplete", "failed") %in% names(summary))) stop("Incomplete summary schema")
     if (!all(c("kind", "rule_id", "severity", "sheet", "field", "value", "expected", "message", "stage") %in% names(detail))) stop("Incomplete findings schema")
+    if (!"infos" %in% names(summary)) summary$infos <- "0"
     summary$input <- d$directory
     summary$report <- file.path(d$directory, d$report)
     for (key in metadata) summary[[key]] <- d[[key]]
@@ -91,19 +91,25 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     detail$input <- rep(d$directory, nrow(detail))
     for (key in unique(c(metadata, "model_version", "rules_version"))) detail[[key]] <- rep(summary[[key]], nrow(detail))
     if (any(!detail$kind %in% c("validation", "failed", "incomplete"))) stop("Unknown finding kind")
-    if (!is.null(reference_provenance)) reference_evidence[i] <- list(collect_reference_evidence(
-      detail, reference_provenance[[d$directory]], file.path(d$directory, d$report), reference_context_columns))
-    if (!is.null(reference_provenance)) registry_evidence[i] <- list(collect_registry_evidence(
-      detail, reference_provenance[[d$directory]], file.path(d$directory, d$report), reference_context_columns))
-    conversion_evidence[i] <- list(collect_conversion_evidence(
-      detail, file.path(d$directory, d$report), reference_context_columns))
+    prepared <- read_report_evidence(file.path(directory, d$directory, "evidence.json"))
+    part <- function(kind) {
+      rows <- prepared$parts[[kind]]
+      if (is.null(rows) || !nrow(rows)) return(NULL)
+      rows$input <- rep(d$directory, nrow(rows))
+      rows$report <- rep(paste0("../", d$directory, "/", d$report), nrow(rows))
+      for (key in reference_context_columns) rows[[key]] <- rep(d[[key]], nrow(rows))
+      rows
+    }
+    reference_evidence[i] <- list(part("reference"))
+    registry_evidence[i] <- list(part("registry"))
+    conversion_evidence[i] <- list(part("conversion"))
     # Collapse each form before retaining it; the full corpus never occupies memory.
     issues[[i]] <- grouped(detail[detail$kind == "validation", , drop = FALSE], by_input = TRUE)
     execution[[i]] <- grouped(detail[detail$kind != "validation", , drop = FALSE], by_input = TRUE)
   }
   if (!length(files)) {
     files <- data.frame(input = character(), report = character(), status = character(),
-      structure_passed = character(), errors = character(), warnings = character(), incomplete = character(), failed = character())
+      structure_passed = character(), errors = character(), warnings = character(), infos = character(), incomplete = character(), failed = character())
     for (key in metadata) files[[key]] <- character()
     issues <- execution <- data.frame(input = character())
   } else {
@@ -119,17 +125,9 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
   if (!is.null(stylesheet)) sources <- c(sources, stylesheet = stylesheet)
   if (!is.null(logo)) sources <- c(sources, logo = logo)
   asset_names <- copy_report_assets(sources, assets)
-  reference_report <- if (is.null(reference_provenance)) NULL else write_reference_evidence(
-    reference_evidence, directory, report_filename, reference_context_columns, title, stylesheet, logo)
-  registry_report <- if (is.null(reference_provenance)) NULL else write_reference_evidence(
-    registry_evidence, directory, report_filename, reference_context_columns, title, stylesheet, logo, "registry")
-  conversion_report <- write_conversion_evidence(conversion_evidence, directory, report_filename,
-    reference_context_columns, title, stylesheet, logo)
+  reference_reports <- registry_reports <- conversion_reports <- character()
   evidence_count <- function(parts) format(sum(vapply(parts, function(part)
     sum(as.numeric(part$occurrences)), numeric(1))), big.mark = ",", scientific = FALSE, trim = TRUE)
-  reference_count <- evidence_count(reference_evidence)
-  registry_count <- evidence_count(registry_evidence)
-  conversion_count <- evidence_count(conversion_evidence)
   for (group in groups) {
     depth <- if (nzchar(group)) length(strsplit(group, "/", fixed = TRUE)[[1]]) else 0L
     selected <- if (nzchar(group)) startsWith(files$input, paste0(group, "/")) else rep(TRUE, nrow(files))
@@ -140,6 +138,32 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     outputs <- file.path(folder, c(report_filename, "files.csv", "issues.csv", "execution.csv"))
     if (any(file.exists(outputs))) stop("Aggregate output already exists: ", folder)
     prefix <- strrep("../", depth)
+    page_title <- if (nzchar(group)) paste(title, "\u2014", group) else title
+    # Reuse the evidence collected once per form, scoped to this aggregate.
+    # Source links still target the original individual reports at the root.
+    scoped_evidence <- function(parts) lapply(parts[which(selected)], function(part) {
+      if (!is.null(part)) part$report <- paste0(prefix, part$report)
+      part
+    })
+    reference_parts <- scoped_evidence(reference_evidence)
+    registry_parts <- scoped_evidence(registry_evidence)
+    conversion_parts <- scoped_evidence(conversion_evidence)
+    reference_count <- evidence_count(reference_parts)
+    registry_count <- evidence_count(registry_parts)
+    conversion_count <- evidence_count(conversion_parts)
+    evidence_assets <- paste0(prefix, "../report-assets")
+    reference_report <- if (reference_count == "0") NULL else write_reference_evidence(
+      reference_parts, folder, report_filename, reference_context_columns, page_title, stylesheet, logo,
+      evidence_assets = evidence_assets, scope = group)
+    registry_report <- if (registry_count == "0") NULL else write_reference_evidence(
+      registry_parts, folder, report_filename, reference_context_columns, page_title, stylesheet, logo,
+      "registry", evidence_assets = evidence_assets, scope = group)
+    conversion_report <- if (conversion_count == "0") NULL else write_conversion_evidence(conversion_parts, folder, report_filename,
+      reference_context_columns, page_title, stylesheet, logo, evidence_assets = evidence_assets, scope = group)
+    relative_report <- function(path) if (length(path)) if (nzchar(group)) file.path(group, path) else path
+    reference_reports <- c(reference_reports, relative_report(reference_report))
+    registry_reports <- c(registry_reports, relative_report(registry_report))
+    conversion_reports <- c(conversion_reports, relative_report(conversion_report))
     f$report <- paste0(prefix, f$report)
     write_report_csv(f, outputs[2]); write_report_csv(grouped(v), outputs[3]); write_report_csv(grouped(e), outputs[4])
     breadcrumbs <- list(list(label = "All reports", href = paste0(prefix, report_filename)))
@@ -154,7 +178,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       href = url(file.path(basename(path), report_filename))))
     totals <- data.frame(files = nrow(f), structure_passed = sum(toupper(f$structure_passed) == "TRUE"),
       structure_blocked = sum(toupper(f$structure_passed) == "FALSE"), errors = sum(as.numeric(f$errors)),
-      warnings = sum(as.numeric(f$warnings)), incomplete_checks = sum(as.numeric(f$incomplete)), failed_checks = sum(as.numeric(f$failed)))
+      warnings = sum(as.numeric(f$warnings)), infos = sum(as.numeric(f$infos)), incomplete_checks = sum(as.numeric(f$incomplete)), failed_checks = sum(as.numeric(f$failed)))
     statuses <- as.data.frame(base::table(f$status), stringsAsFactors = FALSE); names(statuses) <- c("Status", "Files")
     version_counts <- data.frame(version = model_versions,
       files = vapply(model_versions, function(version) sum(f$model_version == version), integer(1)))
@@ -162,7 +186,6 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     sheet_order <- if ("sheet_order" %in% names(sheet_rows))
       unique(sheet_rows$sheet[order(suppressWarnings(as.numeric(sheet_rows$sheet_order)), na.last = TRUE)]) else unique(sheet_rows$sheet)
     sheet_order <- sheet_order[!is.na(sheet_order) & nzchar(sheet_order)]
-    page_title <- if (nzchar(group)) paste(title, "\u2014", group) else title
     jsonlite::write_json(list(title = page_title, breadcrumbs = breadcrumbs, children = children,
       totals = totals, statuses = statuses, versions = version_counts, sheet_order = as.list(sheet_order), notes = as.list(if (!depth) notes else character()),
       no_inputs = !nrow(f)), file.path(folder, "aggregate.json"), auto_unbox = TRUE, pretty = TRUE)
@@ -174,16 +197,22 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       loading_script = paste0(prefix, "report-assets/", asset_names[["loading_script"]]),
       csv_worker = paste0(prefix, "report-assets/", asset_names[["csv_worker"]]),
       table_script = paste0(prefix, "report-assets/", asset_names[["table_script"]]),
-      reference_report = if (is.null(reference_report)) NULL else paste0(prefix, reference_report),
-      registry_report = if (is.null(registry_report)) NULL else paste0(prefix, registry_report),
-      conversion_report = paste0(prefix, conversion_report),
+      reference_report = if (reference_count != "0") reference_report else NULL,
+      registry_report = if (registry_count != "0") registry_report else NULL,
+      conversion_report = if (conversion_count != "0") conversion_report else NULL,
+      reference_empty = if (reference_count == "0") "0" else NULL,
+      registry_empty = if (registry_count == "0") "0" else NULL,
+      conversion_empty = if (conversion_count == "0") "0" else NULL,
       reference_count = reference_count, registry_count = registry_count, conversion_count = conversion_count,
       overview_style = paste0(prefix, "report-assets/", asset_names[["overview_style"]]),
       stylesheet = if (!is.null(stylesheet)) paste0(prefix, "report-assets/", asset_names[["stylesheet"]]) else NULL,
       logo = if (!is.null(logo)) paste0(prefix, "report-assets/", asset_names[["logo"]]) else NULL,
       author = author))
+    cards <- evidence_card_values(list(reference = reference_parts, registry = registry_parts,
+      conversion = conversion_parts), reference_report, registry_report, conversion_report)
+    html <- sub("<!-- evidence-cards -->", paste(render_report_template("evidence-cards.html", cards), collapse = "\n"), html, fixed = TRUE)
     writeLines(html, outputs[1], useBytes = TRUE)
   }
   invisible(structure(ifelse(nzchar(groups), file.path(groups, report_filename), report_filename),
-    reference_report = reference_report, registry_report = registry_report, conversion_report = conversion_report))
+    reference_report = reference_reports, registry_report = registry_reports, conversion_report = conversion_reports))
 }

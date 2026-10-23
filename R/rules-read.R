@@ -242,8 +242,8 @@ check_generated_rules <- function(rules, path) {
     if (!"value" %in% names(rule) || length(setdiff(names(rule), c("value", "severity")))) {
       stop(path, ": generated rule requires value and optional severity: ", id, call. = FALSE)
     }
-    if (!is.null(rule$severity) && !identical(rule$severity, "warning")) {
-      stop(path, ": generated severity must be warning or omitted: ", id, call. = FALSE)
+    if (!is.null(rule$severity) && !rule$severity %in% c("warning", "info")) {
+      stop(path, ": generated severity must be warning, info or omitted: ", id, call. = FALSE)
     }
   }
   invisible(NULL)

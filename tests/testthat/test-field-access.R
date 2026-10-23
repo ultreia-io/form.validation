@@ -32,7 +32,7 @@ test_that("callback masks preserve blanks, invalid values and physical coordinat
   expect_identical(seen$typed, c(FALSE, FALSE, FALSE, TRUE))
   expect_identical(seen$eligible, 4L)
   expect_identical(seen$rows, 1:4)
-  expect_identical(result$findings$row, 3L)
+  expect_identical(declared_findings(result)$row, 3L)
   unknown <- validation_rule("business/unknown", function(model, data, references, config) {
     config$field_values("Values.absent")
   })

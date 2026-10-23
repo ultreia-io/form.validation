@@ -24,8 +24,8 @@ or incomplete/failed check. Successful checks produce no detail rows.
 \details{
 Summary columns are \code{input}, \code{model_version} (\code{form.version}),
 \code{rules_version}, \code{status}, \code{structure_passed}, \code{generated_at} (UTC),
-\code{errors}, \code{warnings}, \code{incomplete}, and \code{failed}.
-Errors and warnings count validation findings, not execution problems.
+\code{errors}, \code{warnings}, \code{infos}, \code{incomplete}, and \code{failed}.
+Errors, warnings and information counts describe validation findings, not execution problems.
 Direct in-memory plans have no rule version and leave that cell empty.
 
 Detail columns are \code{rule_id}, \code{kind}, \code{severity}, \code{sheet}, \code{field}, \code{row},

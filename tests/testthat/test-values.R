@@ -25,25 +25,25 @@ test_that("integer, Boolean, date and datetime types have explicit representatio
                    list(Values = data.frame(value = I(values))))
   }
   integer <- check("integer", list(1L, 2, 2.5, NaN, Inf))
-  expect_identical(integer$findings$row, c(3L, 4L, 5L))
-  expect_true(all(integer$findings$rule_id == "field/Values.value/type"))
+  expect_identical(declared_findings(integer)$row, c(3L, 4L, 5L))
+  expect_true(all(declared_findings(integer)$rule_id == "field/Values.value/type"))
   boolean <- check("boolean", list(TRUE, FALSE, "true"))
-  expect_identical(boolean$findings$row, 3L)
+  expect_identical(declared_findings(boolean)$row, 3L)
   date <- check("date", list("2026-10-02", as.Date("2026-10-02"), "2026-02-30"),
                 list(enum = list("2026-10-02")))
-  expect_identical(date$findings$row, 3L)
-  expect_identical(date$findings$rule_id, "field/Values.value/type")
+  expect_identical(declared_findings(date)$row, 3L)
+  expect_identical(declared_findings(date)$rule_id, "field/Values.value/type")
   datetime <- check("datetime", list("2026-10-02T12:00:00Z", as.POSIXct("2026-10-02 12:00:00", tz = "UTC"),
                                      "2026-10-02 12:00:00", "2026-02-30T12:00:00Z"))
-  expect_identical(datetime$findings$row, c(3L, 4L))
-  expect_identical(check("string", list(factor("x")))$findings$rule_id, "field/Values.value/type")
+  expect_identical(declared_findings(datetime)$row, c(3L, 4L))
+  expect_identical(declared_findings(check("string", list(factor("x"))))$rule_id, "field/Values.value/type")
 })
 
 test_that("enum membership is typed and empty optional values are ignored", {
   model <- field_model("integer", list(enum = list(1, 2)), mandatory = FALSE)
   result <- validate_data(validation_plan(model), list(Values = data.frame(value = c(1, 3, NA))))
-  expect_identical(result$findings$row, 2L)
-  expect_identical(result$findings$rule_id, "field/Values.value/enum")
+  expect_identical(declared_findings(result)$row, 2L)
+  expect_identical(declared_findings(result)$rule_id, "field/Values.value/enum")
 })
 
 test_that("required_field depends on the companion value in the same row", {
@@ -51,9 +51,9 @@ test_that("required_field depends on the companion value in the same row", {
   data$Observations$unit <- c(NA_character_, NA_character_)
   data$Observations$amount <- c(0, NA_real_)
   result <- validate_fixture(data)
-  expect_identical(result$findings$rule_id, "field/Observations.unit/required_field")
-  expect_identical(result$findings$row, 1L)
-  expect_identical(result$findings$expected[[1L]], "amount")
+  expect_identical(declared_findings(result)$rule_id, "field/Observations.unit/required_field")
+  expect_identical(declared_findings(result)$row, 1L)
+  expect_identical(declared_findings(result)$expected[[1L]], "amount")
   data$Observations$unit <- c("cm", "m")
   expect_true(validate_fixture(data)$valid)
 })
@@ -82,7 +82,7 @@ test_that("mandatory, type and reference precede remaining constraints regardles
   data$Observations$site <- list(NA_character_, 42)
   result <- validate_data(plan, data)
   expect_true(result$complete)
-  expect_identical(result$findings$rule_id,
+  expect_identical(declared_findings(result)$rule_id,
                    c("field/Observations.site/mandatory", "field/Observations.site/type"))
   conditional <- Filter(function(rule) identical(rule$field, "Observations.unit"), plan$rules)
   expect_identical(vapply(conditional, `[[`, character(1), "kind"),
@@ -101,10 +101,10 @@ test_that("compact references default to errors and preserve explicit warnings",
   data <- fixture_data()
   data$Observations$site <- c(NA_character_, "unknown")
   result <- validate_fixture(data, model = form.model::as_form_model(d))
-  expect_identical(result$findings$rule_id,
+  expect_identical(declared_findings(result)$rule_id,
                    c("field/Observations.site/mandatory", "field/Observations.site/reference"))
-  expect_identical(result$findings$severity, c("error", "error"))
+  expect_identical(declared_findings(result)$severity, c("error", "error"))
   d$sheets$Observations$fields$site$reference <- list(id = "sites", severity = "warning")
   result <- validate_fixture(data, model = form.model::as_form_model(d))
-  expect_identical(result$findings$severity, c("error", "warning"))
+  expect_identical(declared_findings(result)$severity, c("error", "warning"))
 })

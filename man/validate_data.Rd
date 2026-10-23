@@ -87,6 +87,10 @@ errors from a rule mark execution failed. All structural checks finish, then
 any structural error or unfinished check gates all content. Within content,
 other checks continue, including business callbacks. Warning and
 info findings do not make \code{valid} false, but incomplete execution never passes.
+After structure passes, generated table rules report the loaded row count from
+\code{start_row} as an info finding. Blank rows between populated rows produce
+warnings with physical row coordinates. Leading and trailing blank rows
+produce no row warning. These observations run before value preparation.
 }
 \section{Errors}{
 

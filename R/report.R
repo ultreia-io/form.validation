@@ -80,7 +80,7 @@ validation_report_data <- function(result, model, reference_provenance = result$
     rownames(summary) <- NULL
     if (!is.null(details)) rownames(details) <- NULL
     list(name = if (is.na(name)) "Form" else name,
-         errors = sum(data$severity == "error"), warnings = sum(data$severity == "warning"),
+         errors = sum(data$severity == "error"), warnings = sum(data$severity == "warning"), infos = sum(data$severity == "info"),
          summary = summary, details = details)
   })
   execution <- result$execution[result$execution$status %in% c("failed", "incomplete"),
@@ -104,8 +104,8 @@ validation_report_data <- function(result, model, reference_provenance = result$
 #' @return A named character vector with `summary` and `findings` paths, invisibly.
 #' @details Summary columns are `input`, `model_version` (`form.version`),
 #'   `rules_version`, `status`, `structure_passed`, `generated_at` (UTC),
-#'   `errors`, `warnings`, `incomplete`, and `failed`.
-#'   Errors and warnings count validation findings, not execution problems.
+#'   `errors`, `warnings`, `infos`, `incomplete`, and `failed`.
+#'   Errors, warnings and information counts describe validation findings, not execution problems.
 #'   Direct in-memory plans have no rule version and leave that cell empty.
 #'
 #' Detail columns are `rule_id`, `kind`, `severity`, `sheet`, `field`, `row`,
@@ -257,7 +257,7 @@ validation_result_tables <- function(result) {
   summary <- data.frame(input = result$source, model_version = result$model$form$version,
     rules_version = result$rules_version, status = result$status,
     structure_passed = result$structure_passed, generated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-    errors = sum(findings$severity == "error"), warnings = sum(findings$severity == "warning"),
+    errors = sum(findings$severity == "error"), warnings = sum(findings$severity == "warning"), infos = sum(findings$severity == "info"),
     incomplete = sum(execution$status == "incomplete"), failed = sum(execution$status == "failed"),
     stringsAsFactors = FALSE)
   details <- data.frame(rule_id = findings$rule_id, kind = rep("validation", nrow(findings)),

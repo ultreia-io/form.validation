@@ -33,6 +33,29 @@ run_builtin <- function(rule, context) {
   }
   if (!is.null(rule$field)) return(run_field(rule, context))
   layout <- sheet$layout
+  if (rule$kind == "row_count") {
+    count <- max(0L, nrow(grid) - layout$start_row + 1L)
+    return(validation_finding("Number of data rows in the table.",
+      sheet = rule$sheet, value = count))
+  }
+  if (rule$kind == "empty_rows") {
+    if (nrow(grid) < layout$start_row) return(NULL)
+    rows <- seq.int(layout$start_row, nrow(grid))
+    columns <- unique(vapply(form.model::form_fields(context$model, rule$sheet),
+      function(field) as.integer(field$column), integer(1)))
+    occupied <- rep(FALSE, length(rows))
+    for (column in columns[columns <= ncol(grid)]) {
+      values <- if (is.data.frame(grid)) grid[[column]] else grid[, column]
+      occupied <- occupied | vapply(as.list(values[rows]), function(value) {
+        length(value) > 0L && !all(is.na(value)) && !identical(value, "")
+      }, logical(1))
+    }
+    filled <- which(occupied)
+    if (length(filled) < 2L) return(NULL)
+    gaps <- which(!occupied & seq_along(rows) > min(filled) & seq_along(rows) < max(filled))
+    if (!length(gaps)) return(NULL)
+    return(validation_findings("Empty row between populated rows", row = rows[gaps], sheet = rule$sheet))
+  }
   if (rule$kind == "layout") {
     for (key in c("row_count", "column_count")) {
       actual <- if (key == "row_count") nrow(grid) else ncol(grid)

@@ -1,10 +1,10 @@
-test_that("valid data returns stable empty findings and model identity", {
+test_that("valid data returns informational findings and model identity", {
   result <- validate_fixture()
   expect_s3_class(result, "validation_result")
   expect_identical(result$status, "valid")
   expect_true(result$valid)
   expect_true(result$complete)
-  expect_equal(nrow(result$findings), 0L)
+  expect_identical(result$findings$severity, "info")
   expect_true(is.list(result$findings$value))
   expect_identical(result$model$form$id, "fixture")
   expect_output(print(result), "valid")
@@ -42,7 +42,7 @@ test_that("multi-row preambles are ignored and data retains physical coordinates
   data$Observations[1:2, ] <- rep(list("Arbitrary preamble"), 8)
   expect_true(validate_fixture(data, model = model)$valid)
   data$Observations[[3, 2]] <- -1
-  finding <- validate_fixture(data, model = model)$findings
+  finding <- declared_findings(validate_fixture(data, model = model))
   expect_identical(finding$rule_id, "field/Observations.amount/minimum")
   expect_identical(finding$row, 3L)
   expect_identical(finding$column, 2L)
@@ -57,12 +57,12 @@ test_that("multi-row preambles are ignored and data retains physical coordinates
 test_that("mandatory fields require a filled value", {
   data <- fixture_data()
   data$Cover <- matrix(NA_character_, 1, 1)
-  expect_identical(validate_fixture(data)$findings$rule_id, "field/Cover.title/mandatory")
+  expect_identical(declared_findings(validate_fixture(data))$rule_id, "field/Cover.title/mandatory")
   data$Cover <- matrix(character(), 0, 1)
-  expect_identical(validate_fixture(data)$findings$rule_id, "sheet/Cover/layout")
+  expect_identical(declared_findings(validate_fixture(data))$rule_id, "sheet/Cover/layout")
   data$Cover <- matrix("", 1, 1)
   expect_true(validate_fixture(data)$valid)
-  expect_identical(validate_fixture(data, config = list(blank_strings = TRUE))$findings$rule_id,
+  expect_identical(declared_findings(validate_fixture(data, config = list(blank_strings = TRUE)))$rule_id,
                    "field/Cover.title/mandatory")
   data$Observations <- data$Observations[FALSE, ]
   expect_true(validate_fixture(data, references = list())$valid)
@@ -120,8 +120,8 @@ test_that("A1 cell locations retain physical finding coordinates", {
   data$Cover <- matrix(vector("list", 54), 2, 27)
   data$Cover[[2, 27]] <- 42
   result <- validate_fixture(data, model = form.model::as_form_model(d))
-  expect_identical(result$findings$rule_id, "field/Cover.title/type")
-  expect_identical(result$findings$row, 2L)
-  expect_identical(result$findings$column, 27L)
-  expect_identical(result$findings$value[[1]], 42)
+  expect_identical(declared_findings(result)$rule_id, "field/Cover.title/type")
+  expect_identical(declared_findings(result)$row, 2L)
+  expect_identical(declared_findings(result)$column, 27L)
+  expect_identical(declared_findings(result)$value[[1]], 42)
 })

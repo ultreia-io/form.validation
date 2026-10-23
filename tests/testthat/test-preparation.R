@@ -19,7 +19,7 @@ test_that("preparation runs once after structure and refreshes cached field valu
   })
   expect_identical(events, c("structure", "prepare", "business"))
   expect_true(result$valid)
-  expect_identical(result$execution$rule_id, vapply(plan$rules, `[[`, character(1), "id"))
+  expect_identical(result$execution$rule_id[result$execution$rule_id %in% vapply(plan$rules, `[[`, character(1), "id")], vapply(plan$rules, `[[`, character(1), "id"))
   expect_identical(data$Cover[[1]], FALSE)
 })
 
@@ -55,7 +55,8 @@ test_that("failed preparation preserves structural results and blocks content", 
     expect_identical(result$status, "failed")
     expect_identical(result$execution$status[result$execution$rule_id == "data/prepare"], "failed")
     expect_true(all(result$execution$status[result$execution$stage != "structure" &
-      result$execution$rule_id != "data/prepare"] == "skipped"))
+      result$execution$rule_id != "data/prepare" &
+      !grepl("^sheet/.+/(row_count|empty_rows)$", result$execution$rule_id)] == "skipped"))
   }
   expect_identical(calls, 0L)
   expect_error(validate_data(plan, fixture_data(), prepare_data = TRUE), "prepare_data")

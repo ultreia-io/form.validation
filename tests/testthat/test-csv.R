@@ -1,7 +1,7 @@
 read_output <- function(path) utils::read.csv(path, colClasses = "character", check.names = FALSE,
                                                    na.strings = NULL, fileEncoding = "UTF-8")
 
-test_that("a valid input writes a summary and header-only findings", {
+test_that("a valid input writes a summary and informational findings", {
   directory <- tempfile()
   on.exit(unlink(directory, recursive = TRUE))
   result <- validate_fixture()
@@ -12,7 +12,9 @@ test_that("a valid input writes a summary and header-only findings", {
   expect_identical(summary$status, "valid")
   expect_identical(summary$rules_version, "")
   expect_identical(summary$errors, "0")
-  expect_equal(nrow(details), 0)
+  expect_identical(summary$infos, "1")
+  expect_identical(details$severity, "info")
+  expect_identical(details$value, "2")
   expect_identical(names(details), c("rule_id", "kind", "severity", "sheet", "field",
                                      "row", "column", "value", "expected", "message",
                                      "stage", "sheet_order", "layout", "field_label"))
@@ -40,6 +42,7 @@ test_that("CSV preserves values and combines validation and execution problems",
   expect_identical(summary$errors, "1")
   expect_identical(summary$incomplete, "1")
   expect_identical(summary$failed, "1")
+  details <- details[details$rule_id != "sheet/Observations/row_count", ]
   expect_identical(details$kind, c("validation", "validation", "incomplete", "failed"))
   expect_identical(details$value[[2]], "001")
   expect_identical(details$message[[2]], 'Review "é", please\nnext line')
@@ -78,9 +81,9 @@ test_that("prepared exports retain findings and add report metadata", {
   prepared <- read_output(shared[["findings"]])
   metadata <- c("sheet_order", "layout", "field_label")
   expect_identical(prepared[setdiff(names(prepared), metadata)], raw[setdiff(names(raw), metadata)])
-  expect_identical(prepared$sheet_order, c("", "2"))
-  expect_identical(prepared$layout, c("table", "table"))
-  expect_identical(prepared$field_label, c("", "site"))
+  expect_identical(prepared$sheet_order, c("2", "", "2"))
+  expect_identical(prepared$layout, c("table", "table", "table"))
+  expect_identical(prepared$field_label, c("", "", "site"))
   summary <- read_output(shared[["summary"]])
   expect_identical(summary$structure_passed, "TRUE")
   expect_identical(summary$generated_at, report$generated_at)

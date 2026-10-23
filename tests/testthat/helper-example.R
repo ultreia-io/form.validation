@@ -47,3 +47,9 @@ upstream_checks <- function() {
   sys.source(system.file("examples/business.R", package = "form.validation"), callbacks)
   list(total_count = callbacks$total_count)
 }
+
+# Keep field/custom-rule assertions independent of automatic table observations.
+declared_findings <- function(result) {
+  rows <- result$findings
+  rows[!grepl("^sheet/.+/(row_count|empty_rows)$", rows$rule_id), , drop = FALSE]
+}

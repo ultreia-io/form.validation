@@ -62,6 +62,10 @@
 #' any structural error or unfinished check gates all content. Within content,
 #' other checks continue, including business callbacks. Warning and
 #' info findings do not make `valid` false, but incomplete execution never passes.
+#' After structure passes, generated table rules report the loaded row count from
+#' `start_row` as an info finding. Blank rows between populated rows produce
+#' warnings with physical row coordinates. Leading and trailing blank rows
+#' produce no row warning. These observations run before value preparation.
 #' @section Errors:
 #' Invalid API arguments raise errors before execution. Rule errors, warnings,
 #' malformed callback results, and missing prerequisites are returned in execution
@@ -122,7 +126,8 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
     }
     structural <- vapply(rules, function(rule) rule$stage == "structure", logical(1))
     rules <- append(rules, list(list(id = "data/prepare", kind = "prepare",
-      stage = "fields", severity = "error")), after = sum(structural))
+      stage = "fields", severity = "error")), after = max(c(which(structural), which(vapply(rules, function(rule)
+        rule$kind %in% c("row_count", "empty_rows"), logical(1))), 0L)))
   }
   for (rule in rules) {
     gated <- !identical(rule$stage, "structure") && (!structure_passed || preparation_failed)

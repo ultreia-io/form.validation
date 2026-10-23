@@ -6,7 +6,7 @@ Use `feature/` branches based on `develop`. Submit pull requests to `develop` an
 
 Keep runtime dependencies minimal. Tests and examples must work offline without credentials or domain data.
 
-Edit YAML artifacts once. Edit `README.md` directly. Edit roxygen comments, then regenerate their documentation.
+Edit YAML artifacts once. Edit `README.md` directly. Edit roxygen comments, then regenerate and commit `man/*.Rd` and `NAMESPACE`.
 
 Run the commands in [DEVELOPMENT.md](DEVELOPMENT.md) before requesting review.
 

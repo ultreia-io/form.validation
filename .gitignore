@@ -9,6 +9,3 @@ docs/
 .idea/
 lib/
 build/
-
-/man/*
-!/man/.gitkeep

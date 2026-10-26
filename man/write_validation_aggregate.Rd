@@ -60,6 +60,8 @@ and \code{conversion_report} for number, integer, boolean and temporal type fail
 Attributes contain all contextual evidence report paths. Each aggregate's
 evidence includes only its forms, with counts and links scoped accordingly.
 Conversion evidence uses saved errors and warnings without altering values.
+The \code{primary_key_report} attribute lists missing-component and duplicate-key
+evidence reports, retaining the saved key values and physical Excel rows.
 }
 \description{
 Aggregate completed validation reports without running validation

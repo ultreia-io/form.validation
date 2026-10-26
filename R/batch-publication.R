@@ -53,7 +53,7 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
     file <- files[i, ]
     add_batch_breadcrumbs(file.path(stage, file$relative, reports$report_filename), file$relative, report_filename)
     evidence_labels <- c(`code-list-evidence` = "Code-list evidence", `registry-evidence` = "Registry evidence",
-      `conversion-evidence` = "Conversion errors")
+      `conversion-evidence` = "Conversion errors", `primary-key-evidence` = "Primary-key evidence")
     for (kind in names(evidence_labels)) {
       relative <- file.path(file$relative, kind)
       path <- file.path(stage, relative, reports$report_filename)
@@ -75,8 +75,9 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   reference_reports <- sum(individual_evidence == "code-list-evidence") + length(attr(pages, "reference_report"))
   registry_reports <- sum(individual_evidence == "registry-evidence") + length(attr(pages, "registry_report"))
   conversion_reports <- sum(individual_evidence == "conversion-evidence") + length(attr(pages, "conversion_report"))
+  primary_key_reports <- sum(individual_evidence == "primary-key-evidence") + length(attr(pages, "primary_key_report"))
   html <- list.files(stage, pattern = "\\.html$", recursive = TRUE, full.names = TRUE)
-  if (length(html) != nrow(descriptors) + length(pages) + reference_reports + registry_reports + conversion_reports) stop("Unexpected HTML report count")
+  if (length(html) != nrow(descriptors) + length(pages) + reference_reports + registry_reports + conversion_reports + primary_key_reports) stop("Unexpected HTML report count")
   for (path in html) {
     text <- paste(readLines(path, warn = FALSE), collapse = "\n")
     links <- regmatches(text, gregexpr('(?:href|src)="[^"]+"', text, perl = TRUE))[[1]]
@@ -107,7 +108,7 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   files <- sort(list.files(stage, recursive = TRUE, full.names = FALSE, all.files = TRUE, no.. = TRUE))
   manifest <- list(batch = basename(plan$directory), report_filename = report_filename,
     individual_reports = nrow(descriptors), aggregate_reports = length(pages),
-    reference_reports = reference_reports, registry_reports = registry_reports, conversion_reports = conversion_reports, no_inputs = as.list(setdiff(plan$model_versions, plan$files$model_version)),
+    reference_reports = reference_reports, registry_reports = registry_reports, conversion_reports = conversion_reports, primary_key_reports = primary_key_reports, no_inputs = as.list(setdiff(plan$model_versions, plan$files$model_version)),
     files = lapply(files, function(path) list(path = path, sha256 = digest::digest(file = file.path(stage, path), algo = "sha256"))))
   if (!is.null(comment) && nzchar(comment)) manifest$comment <- comment
   jsonlite::write_json(manifest, file.path(stage, "publication.json"), auto_unbox = TRUE, pretty = TRUE)

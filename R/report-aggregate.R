@@ -21,6 +21,8 @@
 #'   Attributes contain all contextual evidence report paths. Each aggregate's
 #'   evidence includes only its forms, with counts and links scoped accordingly.
 #'   Conversion evidence uses saved errors and warnings without altering values.
+#'   The `primary_key_report` attribute lists missing-component and duplicate-key
+#'   evidence reports, retaining the saved key values and physical Excel rows.
 #' @details Reads all CSV columns as text. Each directory level receives files.csv,
 #'   issues.csv and execution.csv and an HTML overview. Validation findings and
 #'   execution problems remain separate. Grouped findings show occurrences and
@@ -74,7 +76,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     result$affected_files <- tabulate(pairs$group, nbins = length(order))
     result
   }
-  files <- list(); issues <- list(); execution <- list(); reference_evidence <- list(); registry_evidence <- list(); conversion_evidence <- list()
+  files <- list(); issues <- list(); execution <- list(); reference_evidence <- list(); registry_evidence <- list(); conversion_evidence <- list(); primary_key_evidence <- list()
   for (i in seq_len(nrow(descriptors))) {
     d <- descriptors[i, , drop = FALSE]
     if (grepl("(^/|(^|/)\\.\\.(/|$))", d$directory)) stop("Unsafe descriptor path")
@@ -103,6 +105,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     reference_evidence[i] <- list(part("reference"))
     registry_evidence[i] <- list(part("registry"))
     conversion_evidence[i] <- list(part("conversion"))
+    primary_key_evidence[i] <- list(part("primary_key"))
     # Collapse each form before retaining it; the full corpus never occupies memory.
     issues[[i]] <- grouped(detail[detail$kind == "validation", , drop = FALSE], by_input = TRUE)
     execution[[i]] <- grouped(detail[detail$kind != "validation", , drop = FALSE], by_input = TRUE)
@@ -125,7 +128,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
   if (!is.null(stylesheet)) sources <- c(sources, stylesheet = stylesheet)
   if (!is.null(logo)) sources <- c(sources, logo = logo)
   asset_names <- copy_report_assets(sources, assets)
-  reference_reports <- registry_reports <- conversion_reports <- character()
+  reference_reports <- registry_reports <- conversion_reports <- primary_key_reports <- character()
   evidence_count <- function(parts) format(sum(vapply(parts, function(part)
     sum(as.numeric(part$occurrences)), numeric(1))), big.mark = ",", scientific = FALSE, trim = TRUE)
   for (group in groups) {
@@ -148,9 +151,11 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     reference_parts <- scoped_evidence(reference_evidence)
     registry_parts <- scoped_evidence(registry_evidence)
     conversion_parts <- scoped_evidence(conversion_evidence)
+    primary_key_parts <- scoped_evidence(primary_key_evidence)
     reference_count <- evidence_count(reference_parts)
     registry_count <- evidence_count(registry_parts)
     conversion_count <- evidence_count(conversion_parts)
+    primary_key_count <- evidence_count(primary_key_parts)
     evidence_assets <- paste0(prefix, "../report-assets")
     reference_report <- if (reference_count == "0") NULL else write_reference_evidence(
       reference_parts, folder, report_filename, reference_context_columns, page_title, stylesheet, logo,
@@ -160,10 +165,13 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       "registry", evidence_assets = evidence_assets, scope = group)
     conversion_report <- if (conversion_count == "0") NULL else write_conversion_evidence(conversion_parts, folder, report_filename,
       reference_context_columns, page_title, stylesheet, logo, evidence_assets = evidence_assets, scope = group)
+    primary_key_report <- if (primary_key_count == "0") NULL else write_primary_key_evidence(primary_key_parts, folder, report_filename,
+      reference_context_columns, page_title, stylesheet, logo, evidence_assets = evidence_assets, scope = group)
     relative_report <- function(path) if (length(path)) if (nzchar(group)) file.path(group, path) else path
     reference_reports <- c(reference_reports, relative_report(reference_report))
     registry_reports <- c(registry_reports, relative_report(registry_report))
     conversion_reports <- c(conversion_reports, relative_report(conversion_report))
+    primary_key_reports <- c(primary_key_reports, relative_report(primary_key_report))
     f$report <- paste0(prefix, f$report)
     write_report_csv(f, outputs[2]); write_report_csv(grouped(v), outputs[3]); write_report_csv(grouped(e), outputs[4])
     breadcrumbs <- list(list(label = "All reports", href = paste0(prefix, report_filename)))
@@ -209,10 +217,10 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       logo = if (!is.null(logo)) paste0(prefix, "report-assets/", asset_names[["logo"]]) else NULL,
       author = author))
     cards <- evidence_card_values(list(reference = reference_parts, registry = registry_parts,
-      conversion = conversion_parts), reference_report, registry_report, conversion_report)
+      conversion = conversion_parts, primary_key = primary_key_parts), reference_report, registry_report, conversion_report, primary_key_report)
     html <- sub("<!-- evidence-cards -->", paste(render_report_template("evidence-cards.html", cards), collapse = "\n"), html, fixed = TRUE)
     writeLines(html, outputs[1], useBytes = TRUE)
   }
   invisible(structure(ifelse(nzchar(groups), file.path(groups, report_filename), report_filename),
-    reference_report = reference_reports, registry_report = registry_reports, conversion_report = conversion_reports))
+    reference_report = reference_reports, registry_report = registry_reports, conversion_report = conversion_reports, primary_key_report = primary_key_reports))
 }

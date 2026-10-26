@@ -12,7 +12,7 @@
     const metadata = await response.json();
     const cases = metadata.cases;
     const caseHeading = item => (metadata.case_heading_columns || ['reference']).map(key => item[key]).join(' · ');
-    const labels = {reference: metadata.labels.reference, value: 'Submitted value'};
+    const labels = {value: 'Submitted value', ...metadata.labels};
     const overview = document.getElementById('overview');
     overview.querySelectorAll('[data-total]').forEach(node => {
       const count = Number(metadata.totals[node.dataset.total]);
@@ -25,7 +25,7 @@
     function evidence(content, update) {
       let ready = Promise.resolve(), requested, revision = 0;
       const prompt = document.createElement('p');
-      prompt.textContent = `Select a submitted value in ${metadata.labels.cases}.`;
+      prompt.textContent = `Select a case in ${metadata.labels.cases}.`;
       content.append(prompt);
       return {
         get ready() { return ready; },
@@ -48,11 +48,11 @@
               {fileLinks: true, filename: 'evidence', pageSize: 20, labels,
                 exportColumns: metadata.evidence_columns,
                 renderCell(cell, key, row) {
-                  if (key !== 'cells' || row.cells.length <= 80) return false;
+                  if (!['cells', 'rows'].includes(key) || row[key].length <= 80) return false;
                   const disclosure = document.createElement('details'), caption = document.createElement('summary');
-                  caption.textContent = `${row.cells.slice(0, 77)}…`;
+                  caption.textContent = `${row[key].slice(0, 77)}…`;
                   const locations = document.createElement('p'); locations.className = 'reference-cells';
-                  locations.textContent = row.cells;
+                  locations.textContent = row[key];
                   disclosure.append(caption, locations); cell.append(disclosure);
                   return true;
                 }});
@@ -64,10 +64,12 @@
         }
       };
     }
-    details = ui.tabs(root, [
-      {id: 'values', largeTable: cases.length >= 10000, label: `${metadata.labels.cases} (${format.format(cases.length)})`,
+    const caseTabs = metadata.case_tabs || [{id: 'values', label: metadata.labels.cases}];
+    const panels = caseTabs.map(tab => {
+      const selected = tab.key ? cases.filter(row => row[tab.key] === tab.value) : cases;
+      return {id: tab.id, largeTable: selected.length >= 10000, label: `${tab.label} (${format.format(selected.length)})`,
         render(content) {
-          const valuesTable = table(content, cases,
+          const valuesTable = table(content, selected,
             metadata.case_columns,
             {filename: metadata.labels.filename, pageSize: 20, labels,
               renderCell(cell, key, row) {
@@ -82,7 +84,9 @@
                 cell.append(button); return true;
               }});
           return valuesTable;
-        }},
+        }};
+    });
+    details = ui.tabs(root, [...panels,
       {id: 'evidence', label: 'Source evidence', disabled: true,
         disabledHint: 'Select a case to view its source evidence.', render: evidence}
     ], 'reference-details', 'Details', true);

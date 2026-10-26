@@ -170,6 +170,10 @@ bind_generated_rules <- function(plan, documents) {
     stop("Structure validation differs from model; regenerate it", call. = FALSE)
   }
   fields <- documents[[2L]]
+  fields$rules <- lapply(fields$rules, function(rule) {
+    if (identical(rule$severity, "error")) rule$severity <- NULL
+    rule
+  })
   expected <- generated_rule_entries(plan)
   if (!identical(names(fields$rules), names(expected)) || !rules_equal(fields$rules, expected)) {
     stop("Generated field validation differs from model; regenerate it", call. = FALSE)
@@ -242,8 +246,8 @@ check_generated_rules <- function(rules, path) {
     if (!"value" %in% names(rule) || length(setdiff(names(rule), c("value", "severity")))) {
       stop(path, ": generated rule requires value and optional severity: ", id, call. = FALSE)
     }
-    if (!is.null(rule$severity) && !rule$severity %in% c("warning", "info")) {
-      stop(path, ": generated severity must be warning, info or omitted: ", id, call. = FALSE)
+    if (!is.null(rule$severity) && !rule$severity %in% c("error", "warning", "info")) {
+      stop(path, ": generated severity must be error, warning, info or omitted: ", id, call. = FALSE)
     }
   }
   invisible(NULL)

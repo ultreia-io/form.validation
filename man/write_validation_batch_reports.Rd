@@ -11,7 +11,8 @@ write_validation_batch_reports(
   title = "Validation report",
   author = NULL,
   stylesheet = NULL,
-  logo = NULL
+  logo = NULL,
+  workers = 1L
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ write_validation_batch_reports(
 \item{stylesheet}{Optional path to an additional CSS file overriding the default style.}
 
 \item{logo}{Optional path to a report logo image.}
+
+\item{workers}{Number of forms to render concurrently. The default is one.}
 }
 \value{
 The reports directory, invisibly.

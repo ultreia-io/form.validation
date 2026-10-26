@@ -128,8 +128,20 @@ read_validation_batch_plan <- function(plan) {
   plan
 }
 
+#' Hash a batch artifact
+#' @param path Path to an existing file.
+#' @return A SHA-256 hexadecimal string computed from file bytes.
+#' @keywords internal
 batch_file_hash <- function(path) digest::digest(file = path, algo = "sha256")
+#' Format the current batch timestamp
+#' @return Current UTC time as `YYYY-MM-DDTHH:MM:SSZ`.
+#' @keywords internal
 batch_time <- function() format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+#' Compute the identity of a frozen batch plan
+#' @param plan Verified local `validation_batch_plan`.
+#' @return A SHA-256 string for the plan contents.
+#' @details Excludes the stored ID and local directory. Callback bodies are normalized to source form so runtime byte compilation does not change the identity.
+#' @keywords internal
 batch_plan_id <- function(plan) {
   # R may compile callbacks after execution; bytecode is not a change of policy.
   # Hash their source bodies so an unchanged plan survives reuse in one session.
@@ -139,6 +151,11 @@ batch_plan_id <- function(plan) {
   digest::digest(unclass(plan)[setdiff(names(plan), c("id", "directory"))], algo = "sha256")
 }
 
+#' Validate relative batch paths
+#' @param paths Character vector of nonempty relative paths using forward slashes.
+#' @return `NULL` on success; otherwise an error.
+#' @details Rejects absolute paths, backslashes, trailing slashes and empty, dot or parent components.
+#' @keywords internal
 check_batch_paths <- function(paths) {
   if (!is.character(paths) || anyNA(paths) || any(!nzchar(paths)) ||
       any(grepl("^[/~]|^[A-Za-z]:|\\\\|/$", paths)) ||
@@ -148,6 +165,13 @@ check_batch_paths <- function(paths) {
 }
 
 # State updates replace a complete file; interrupted writes leave the prior state readable.
+#' Replace a batch state file atomically
+#' @param value R object to serialize.
+#' @param path Destination RDS path. Parent directories are created.
+#' @param compress Compression setting passed to `saveRDS()`.
+#' @return The destination path, invisibly.
+#' @details Writes a temporary file in the destination directory, then renames it. A failed write leaves the previous state intact.
+#' @keywords internal
 write_batch_state <- function(value, path, compress = TRUE) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   temporary <- tempfile(".state-", tmpdir = dirname(path))
@@ -157,6 +181,11 @@ write_batch_state <- function(value, path, compress = TRUE) {
   invisible(path)
 }
 
+#' Create a timestamped batch logger
+#' @param directory Existing batch directory.
+#' @param filename Log filename within that directory.
+#' @return A function accepting `text`, appending timestamped lines to the file and emitting them through `message()`.
+#' @keywords internal
 batch_log <- function(directory, filename) {
   function(text) {
     line <- paste(batch_time(), text)
@@ -165,6 +194,12 @@ batch_log <- function(directory, filename) {
   }
 }
 
+#' Read a completed stage of the current batch
+#' @param plan Verified local `validation_batch_plan`.
+#' @param name Stage basename, such as `validation` or `reports`, without `.rds`.
+#' @return The saved stage state.
+#' @details Rejects missing, incomplete or mismatched states. Reads only trusted local RDS artifacts.
+#' @keywords internal
 read_batch_state <- function(plan, name) {
   path <- file.path(plan$directory, paste0(name, ".rds"))
   if (!file.exists(path)) stop("Run the ", name, " stage first", call. = FALSE)
@@ -174,6 +209,12 @@ read_batch_state <- function(plan, name) {
   state
 }
 
+#' Load a checksum-verified resource bundle
+#' @param plan Verified local `validation_batch_plan`.
+#' @param key Name in the plan resource records.
+#' @return The deserialized resource bundle.
+#' @details Verifies file existence and SHA-256 before reading trusted local RDS data.
+#' @keywords internal
 read_batch_resources <- function(plan, key) {
   resource <- plan$resources[[key]]
   path <- file.path(plan$directory, resource$file)
@@ -182,12 +223,23 @@ read_batch_resources <- function(plan, key) {
   readRDS(path)
 }
 
+#' Encode a relative report URL
+#' @param path One slash-separated relative path.
+#' @return A URL-encoded string preserving directory separators.
+#' @keywords internal
 batch_url <- function(path) {
   paste(vapply(strsplit(path, "/", fixed = TRUE)[[1L]], utils::URLencode,
     character(1), reserved = TRUE), collapse = "/")
 }
 
 # Public navigation data contains only the explicit public columns.
+#' Export public batch navigation metadata
+#' @param plan Verified local `validation_batch_plan`.
+#' @param path Destination JSON file.
+#' @param reports Completed report state, or `NULL` before reporting.
+#' @return The result of `jsonlite::write_json()`, invisibly.
+#' @details Writes selected input metadata and jobs. Report state adds statuses and encoded links. Private paths, callbacks and resources are excluded; job metadata must already be public.
+#' @keywords internal
 write_batch_plan_json <- function(plan, path, reports = NULL) {
   columns <- unique(c("relative", plan$group_columns, plan$identity_columns, "model_version"))
   files <- plan$files[intersect(columns, names(plan$files))]
@@ -203,6 +255,11 @@ write_batch_plan_json <- function(plan, path, reports = NULL) {
 }
 
 # A dead local process may leave a lock after a session crash.
+#' Acquire an exclusive local batch lock
+#' @param plan Verified local `validation_batch_plan`.
+#' @return The lock directory path; the caller must remove it on exit.
+#' @details Records host and process ID. Reclaims a lock only when its owner is a dead local process; rejects other existing owners.
+#' @keywords internal
 lock_validation_batch <- function(plan) {
   lock <- file.path(plan$directory, ".pipeline-lock")
   owner_path <- file.path(lock, "owner.rds")

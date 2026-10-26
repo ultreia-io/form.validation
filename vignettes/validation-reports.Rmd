@@ -45,8 +45,13 @@ or [aggregate existing reports](../reference/write_validation_aggregate.html).
 
 ## Review evidence
 
-Individual reports include cards for code-list, registry and conversion evidence.
+Individual reports include cards for code-list, registry, conversion and primary-key evidence.
 Zero-count cards stay disabled; no empty evidence report is generated.
+
+Primary-key evidence separates missing components from duplicate keys. Select a key to
+see the affected forms and Excel rows, or download Keys CSV and Evidence CSV.
+Duplicate occurrences count all involved rows within each form; keys shared by different
+forms are not treated as duplicates.
 
 Reference evidence uses the snapshot provenance retained in the validation result.
 For saved results without it, pass `reference_provenance` to `validation_report_data()`.

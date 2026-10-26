@@ -1,4 +1,10 @@
 # Group saved findings without changing their raw value identity.
+#' Group evidence rows by exact column values
+#' @param rows Evidence data frame.
+#' @param keys Column names defining case identity.
+#' @return List of integer row-index vectors in first-occurrence order; an empty list for no rows.
+#' @details Groups integer encodings of column values so separators in submitted text do not create collisions.
+#' @keywords internal
 reference_evidence_groups <- function(rows, keys) {
   if (!nrow(rows)) return(list())
   codes <- lapply(rows[keys], function(x) match(x, unique(x)))
@@ -8,6 +14,12 @@ reference_evidence_groups <- function(rows, keys) {
 }
 
 # Compress physical coordinates into exact A1 ranges, without truncating evidence.
+#' Compact exact Excel cell locations
+#' @param rows Positive physical Excel row numbers. Duplicates are removed.
+#' @param column One positive physical Excel column number.
+#' @return Comma-separated A1 cells and contiguous ranges.
+#' @details Sorts rows without filling gaps and rejects missing or invalid coordinates.
+#' @keywords internal
 reference_evidence_cells <- function(rows, column) {
   column <- as.integer(column)
   rows <- sort(unique(as.integer(rows)))
@@ -25,17 +37,16 @@ reference_evidence_cells <- function(rows, column) {
     paste0(prefix, rows[first], ":", prefix, rows[last])), collapse = ", ")
 }
 
-# Collect only completed built-in reference-check findings from one input.
-# Caller provenance identifies the exact available snapshot used by that input.
-collect_reference_evidence <- function(detail, provenance, report, context_columns) {
-  keep <- detail$kind == "validation" & detail$rule_id == paste0("field/", detail$field, "/reference")
-  rows <- detail[keep, , drop = FALSE]
-  if (!nrow(rows)) return(NULL)
-  rows$reference <- rows$expected
-  summarize_reference_evidence(rows, provenance, report, context_columns)
-}
-
 # Preserve snapshot identity and compress repeated cells for each submitted value.
+#' Prepare reference evidence with snapshot identity
+#' @param rows Recorded findings with a reference identifier column.
+#' @param provenance Reference records keyed by identifier, including available status and SHA-256.
+#' @param report Parent form report path relative to the current report context.
+#' @param context_columns Public metadata columns to retain.
+#' @param case_columns Additional case identity columns, such as severity and reason.
+#' @return One row per case and source location group, with exact cell ranges, occurrence counts and a parent report link.
+#' @details Requires available snapshot provenance for every reference. Hashes distinguish snapshots; no reference contents are copied.
+#' @keywords internal
 summarize_reference_evidence <- function(rows, provenance, report, context_columns, case_columns = character()) {
   references <- unique(rows$reference)
   snapshots <- lapply(references, function(id) {
@@ -59,6 +70,13 @@ summarize_reference_evidence <- function(rows, provenance, report, context_colum
 }
 
 # Export reviewer-facing columns with readable headings.
+#' Write reviewer-facing evidence CSV
+#' @param rows Data frame containing the columns intended for download.
+#' @param path Destination CSV path.
+#' @param reference_label Public heading for the reference column.
+#' @return `NULL`, invisibly, after writing the CSV file.
+#' @details Maps technical column names to readable headings and uses the shared UTF-8 BOM CSV writer.
+#' @keywords internal
 write_reference_evidence_csv <- function(rows, path, reference_label = "Code list") {
   labels <- c(input = "Reporting form", model_version = "Model version", reference = reference_label,
     value = "Submitted value", sheet = "Sheet", field = "Field", cells = "Cells",
@@ -72,6 +90,20 @@ write_reference_evidence_csv <- function(rows, path, reference_label = "Code lis
 }
 
 # Write a focused report alongside aggregate reports. All HTML lives in templates.
+#' Write code-list or registry evidence
+#' @param parts List of per-form prepared evidence data frames; empty entries may be `NULL`.
+#' @param directory Parent report directory receiving the evidence subdirectory.
+#' @param report_filename Filename for the generated HTML page and parent report links.
+#' @param context_columns Public metadata columns shown in case and source tables.
+#' @param title Parent report title, extended with the evidence label.
+#' @param stylesheet,logo Optional branding file paths, or `NULL`.
+#' @param evidence_assets Shared asset directory relative to the evidence subdirectory.
+#' @param scope Slash-separated aggregate path, or an empty string for the root.
+#' @param parent_label Label for the root or single-form parent breadcrumb.
+#' @param kind Either `code-list` or `registry`.
+#' @return Relative HTML path under `selected evidence`.
+#' @details Cases are separated by reference snapshot and value, with registry severity and reason where applicable. Writes case and evidence CSV files, metadata JSON, per-case JSON and HTML using shared assets.
+#' @keywords internal
 write_reference_evidence <- function(parts, directory, report_filename, context_columns,
                                      title, stylesheet, logo, kind = c("code-list", "registry"), evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   kind <- match.arg(kind)
@@ -144,6 +176,19 @@ write_reference_evidence <- function(parts, directory, report_filename, context_
 }
 
 # Render all evidence pages with the same external template and interactive assets.
+#' Render a shared evidence report page
+#' @param directory Parent report directory receiving the evidence subdirectory.
+#' @param folder_name Evidence subdirectory already containing its CSV and JSON data.
+#' @param report_filename Filename for the generated HTML page and parent report links.
+#' @param title Parent report title, extended with the evidence label.
+#' @param stylesheet,logo Optional branding file paths, or `NULL`.
+#' @param labels Template values for headings, counts, descriptions and CSV resource links.
+#' @param evidence_assets Shared asset directory relative to the evidence subdirectory.
+#' @param scope Slash-separated aggregate path, or an empty string for the root.
+#' @param parent_label Label for the root or single-form parent breadcrumb.
+#' @return Relative HTML path under the evidence subdirectory.
+#' @details Copies content-addressed assets, builds escaped ancestor breadcrumbs and writes the shared external template. Does not collect findings or write case data.
+#' @keywords internal
 write_evidence_page <- function(directory, folder_name, report_filename, title, stylesheet, logo, labels, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   folder <- file.path(directory, folder_name)
   sources <- stats::setNames(system.file("report",

@@ -18,7 +18,8 @@ write_validation_aggregate(
   model_versions = NULL,
   reference_provenance = NULL,
   reference_context_columns = character(),
-  report_notes = character()
+  report_notes = character(),
+  workers = 1L
 )
 }
 \arguments{
@@ -52,6 +53,8 @@ already stored in each individual report's prepared evidence.}
 
 \item{report_notes}{Public validation-policy notes shown in the Warning
 findings card on every aggregate page. Text is HTML-escaped.}
+
+\item{workers}{Number of top-level aggregate directories to render concurrently.}
 }
 \value{
 Relative aggregate HTML paths, invisibly, with a \code{reference_report}
@@ -60,6 +63,8 @@ and \code{conversion_report} for number, integer, boolean and temporal type fail
 Attributes contain all contextual evidence report paths. Each aggregate's
 evidence includes only its forms, with counts and links scoped accordingly.
 Conversion evidence uses saved errors and warnings without altering values.
+The \code{primary_key_report} attribute lists missing-component and duplicate-key
+evidence reports, retaining the saved key values and physical Excel rows.
 }
 \description{
 Aggregate completed validation reports without running validation

@@ -15,12 +15,15 @@
 #' @param reference_provenance Retained for compatibility. Snapshot identity is
 #'   already stored in each individual report's prepared evidence.
 #' @param reference_context_columns Descriptor columns to show in code summaries and source tables.
+#' @param workers Number of top-level aggregate directories to render concurrently.
 #' @return Relative aggregate HTML paths, invisibly, with a `reference_report`
 #'   attribute for code-list evidence, `registry_report` for registry evidence,
 #'   and `conversion_report` for number, integer, boolean and temporal type failures.
 #'   Attributes contain all contextual evidence report paths. Each aggregate's
 #'   evidence includes only its forms, with counts and links scoped accordingly.
 #'   Conversion evidence uses saved errors and warnings without altering values.
+#'   The `primary_key_report` attribute lists missing-component and duplicate-key
+#'   evidence reports, retaining the saved key values and physical Excel rows.
 #' @details Reads all CSV columns as text. Each directory level receives files.csv,
 #'   issues.csv and execution.csv and an HTML overview. Validation findings and
 #'   execution problems remain separate. Grouped findings show occurrences and
@@ -34,9 +37,14 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
                                        report_filename = "index.html", title = "Validation reports", notes = character(),
                                        author = NULL, stylesheet = NULL, logo = NULL, model_versions = NULL,
                                        reference_provenance = NULL, reference_context_columns = character(),
-                                       report_notes = character()) {
+                                       report_notes = character(), workers = 1L) {
   if (!is.character(report_notes) || anyNA(report_notes))
     stop("report_notes must be character text without missing values", call. = FALSE)
+  if (length(workers) != 1L || !is.numeric(workers) || is.na(workers) ||
+      !is.finite(workers) || workers < 1 || workers > .Machine$integer.max ||
+      workers != as.integer(workers))
+    stop("workers must be a positive whole number", call. = FALSE)
+  workers <- as.integer(workers)
   if (!grepl("^[A-Za-z0-9][A-Za-z0-9_.-]*\\.html$", report_filename)) stop("Invalid report filename")
   required <- unique(c("directory", "report", group_columns, identity_columns))
   required <- unique(c(required, reference_context_columns))
@@ -51,11 +59,21 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     if (nzchar(prefix) && !startsWith(descriptors$directory[i], paste0(prefix, "/"))) stop("Descriptor directory differs from grouping metadata")
     if (!grepl("^[A-Za-z0-9][A-Za-z0-9_.-]*\\.html$", descriptors$report[i])) stop("Invalid individual report filename")
   }
+  # Read report CSV without type conversion
+  # @param path CSV file with a UTF-8 BOM.
+  # @return Data frame retaining all values as text, including literal NA strings.
   read <- function(path) utils::read.csv(path, colClasses = "character", check.names = FALSE,
     na.strings = NULL, fileEncoding = "UTF-8-BOM")
+  # Encode a report link
+  # @param x One slash-separated relative path.
+  # @return URL text with encoded components and unchanged separators.
   url <- function(x) paste(vapply(strsplit(x, "/", fixed = TRUE)[[1]], utils::URLencode,
                                  character(1), reserved = TRUE), collapse = "/")
   metadata <- setdiff(names(descriptors), c("directory", "report"))
+  # Summarize findings in the current aggregate
+  # @param rows Finding rows with input identities and optional occurrence weights.
+  # @param by_input Whether to retain each form and sheet order as grouping keys.
+  # @return Grouped rows with occurrence and distinct-form counts.
   grouped <- function(rows, by_input = FALSE) {
     keys <- unique(c(identity_columns, "model_version", "rules_version", "rule_id", "kind", "severity", "stage", "sheet", "field", "column", "value", "expected", "message"))
     if (by_input) keys <- intersect(unique(c(keys, "input", "sheet_order")), names(rows))
@@ -74,7 +92,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     result$affected_files <- tabulate(pairs$group, nbins = length(order))
     result
   }
-  files <- list(); issues <- list(); execution <- list(); reference_evidence <- list(); registry_evidence <- list(); conversion_evidence <- list()
+  files <- list(); issues <- list(); execution <- list(); reference_evidence <- list(); registry_evidence <- list(); conversion_evidence <- list(); primary_key_evidence <- list()
   for (i in seq_len(nrow(descriptors))) {
     d <- descriptors[i, , drop = FALSE]
     if (grepl("(^/|(^|/)\\.\\.(/|$))", d$directory)) stop("Unsafe descriptor path")
@@ -92,6 +110,9 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     for (key in unique(c(metadata, "model_version", "rules_version"))) detail[[key]] <- rep(summary[[key]], nrow(detail))
     if (any(!detail$kind %in% c("validation", "failed", "incomplete"))) stop("Unknown finding kind")
     prepared <- read_report_evidence(file.path(directory, d$directory, "evidence.json"))
+    # Read one prepared evidence kind for this form
+    # @param kind Name of the evidence part.
+    # @return Prepared rows with descriptor metadata and rebased report links, or NULL.
     part <- function(kind) {
       rows <- prepared$parts[[kind]]
       if (is.null(rows) || !nrow(rows)) return(NULL)
@@ -103,6 +124,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     reference_evidence[i] <- list(part("reference"))
     registry_evidence[i] <- list(part("registry"))
     conversion_evidence[i] <- list(part("conversion"))
+    primary_key_evidence[i] <- list(part("primary_key"))
     # Collapse each form before retaining it; the full corpus never occupies memory.
     issues[[i]] <- grouped(detail[detail$kind == "validation", , drop = FALSE], by_input = TRUE)
     execution[[i]] <- grouped(detail[detail$kind != "validation", , drop = FALSE], by_input = TRUE)
@@ -125,10 +147,12 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
   if (!is.null(stylesheet)) sources <- c(sources, stylesheet = stylesheet)
   if (!is.null(logo)) sources <- c(sources, logo = logo)
   asset_names <- copy_report_assets(sources, assets)
-  reference_reports <- registry_reports <- conversion_reports <- character()
+  # Format the total evidence occurrence count
+  # @param parts List of prepared per-form evidence tables or NULL entries.
+  # @return A formatted count using comma thousands separators.
   evidence_count <- function(parts) format(sum(vapply(parts, function(part)
     sum(as.numeric(part$occurrences)), numeric(1))), big.mark = ",", scientific = FALSE, trim = TRUE)
-  for (group in groups) {
+  render_group <- function(group) {
     depth <- if (nzchar(group)) length(strsplit(group, "/", fixed = TRUE)[[1]]) else 0L
     selected <- if (nzchar(group)) startsWith(files$input, paste0(group, "/")) else rep(TRUE, nrow(files))
     f <- files[selected, , drop = FALSE]
@@ -141,6 +165,9 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     page_title <- if (nzchar(group)) paste(title, "\u2014", group) else title
     # Reuse the evidence collected once per form, scoped to this aggregate.
     # Source links still target the original individual reports at the root.
+    # Select evidence for the current aggregate
+    # @param parts Evidence parts in descriptor order.
+    # @return Selected parts with report links rebased from the current group.
     scoped_evidence <- function(parts) lapply(parts[which(selected)], function(part) {
       if (!is.null(part)) part$report <- paste0(prefix, part$report)
       part
@@ -148,9 +175,11 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     reference_parts <- scoped_evidence(reference_evidence)
     registry_parts <- scoped_evidence(registry_evidence)
     conversion_parts <- scoped_evidence(conversion_evidence)
+    primary_key_parts <- scoped_evidence(primary_key_evidence)
     reference_count <- evidence_count(reference_parts)
     registry_count <- evidence_count(registry_parts)
     conversion_count <- evidence_count(conversion_parts)
+    primary_key_count <- evidence_count(primary_key_parts)
     evidence_assets <- paste0(prefix, "../report-assets")
     reference_report <- if (reference_count == "0") NULL else write_reference_evidence(
       reference_parts, folder, report_filename, reference_context_columns, page_title, stylesheet, logo,
@@ -160,10 +189,12 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       "registry", evidence_assets = evidence_assets, scope = group)
     conversion_report <- if (conversion_count == "0") NULL else write_conversion_evidence(conversion_parts, folder, report_filename,
       reference_context_columns, page_title, stylesheet, logo, evidence_assets = evidence_assets, scope = group)
+    primary_key_report <- if (primary_key_count == "0") NULL else write_primary_key_evidence(primary_key_parts, folder, report_filename,
+      reference_context_columns, page_title, stylesheet, logo, evidence_assets = evidence_assets, scope = group)
+    # Locate a contextual evidence page from the root
+    # @param path Evidence report path, or NULL for an empty report.
+    # @return Root-relative path, or NULL when no report exists.
     relative_report <- function(path) if (length(path)) if (nzchar(group)) file.path(group, path) else path
-    reference_reports <- c(reference_reports, relative_report(reference_report))
-    registry_reports <- c(registry_reports, relative_report(registry_report))
-    conversion_reports <- c(conversion_reports, relative_report(conversion_report))
     f$report <- paste0(prefix, f$report)
     write_report_csv(f, outputs[2]); write_report_csv(grouped(v), outputs[3]); write_report_csv(grouped(e), outputs[4])
     breadcrumbs <- list(list(label = "All reports", href = paste0(prefix, report_filename)))
@@ -209,10 +240,36 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       logo = if (!is.null(logo)) paste0(prefix, "report-assets/", asset_names[["logo"]]) else NULL,
       author = author))
     cards <- evidence_card_values(list(reference = reference_parts, registry = registry_parts,
-      conversion = conversion_parts), reference_report, registry_report, conversion_report)
+      conversion = conversion_parts, primary_key = primary_key_parts), reference_report, registry_report, conversion_report, primary_key_report)
     html <- sub("<!-- evidence-cards -->", paste(render_report_template("evidence-cards.html", cards), collapse = "\n"), html, fixed = TRUE)
     writeLines(html, outputs[1], useBytes = TRUE)
+    list(page = if (nzchar(group)) file.path(group, report_filename) else report_filename,
+      reference_report = relative_report(reference_report), registry_report = relative_report(registry_report),
+      conversion_report = relative_report(conversion_report), primary_key_report = relative_report(primary_key_report))
   }
-  invisible(structure(ifelse(nzchar(groups), file.path(groups, report_filename), report_filename),
-    reference_report = reference_reports, registry_report = registry_reports, conversion_report = conversion_reports))
+  if (workers == 1L || length(groups) == 1L) {
+    rendered <- lapply(groups, render_group)
+  } else {
+    # Each worker owns one top-level directory and every aggregate below it.
+    top <- unique(sub("/.*$", "", groups[nzchar(groups)]))
+    tasks <- lapply(top, function(path) groups[groups == path | startsWith(groups, paste0(path, "/"))])
+    render_directory <- function(paths) stats::setNames(lapply(paths, render_group), paths)
+    if (.Platform$OS.type == "windows") {
+      cluster <- parallel::makePSOCKcluster(min(workers, length(tasks)))
+      on.exit(parallel::stopCluster(cluster), add = TRUE)
+      finished <- parallel::parLapplyLB(cluster, tasks, render_directory)
+    } else {
+      finished <- parallel::mclapply(tasks, render_directory,
+        mc.cores = min(workers, length(tasks)), mc.preschedule = FALSE)
+    }
+    if (any(vapply(finished, inherits, logical(1), "try-error")))
+      stop("Aggregate directory worker failed", call. = FALSE)
+    rendered <- c(do.call(c, finished), stats::setNames(list(render_group("")), ""))
+    rendered <- rendered[match(groups, names(rendered))]
+  }
+  pages <- vapply(rendered, `[[`, character(1), "page")
+  paths <- function(key) as.character(unlist(lapply(rendered, `[[`, key), use.names = FALSE))
+  invisible(structure(unname(pages),
+    reference_report = paths("reference_report"), registry_report = paths("registry_report"),
+    conversion_report = paths("conversion_report"), primary_key_report = paths("primary_key_report")))
 }

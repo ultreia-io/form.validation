@@ -26,9 +26,11 @@ sheet and field checks. Append explicit custom rules without modifying the model
 \details{
 Supported declarations include declared sheets, sheet order,
 row/column counts, table start rows, mandatory fields,
-all nine field types, enums, bounds, patterns, uniqueness, reference membership,
+all nine field types, enums, bounds, patterns, uniqueness, code-list membership,
+registry matching,
 and same-sheet conditional requiredness. Generated content rules also include
 table row counts (info) and internal empty-row checks (warning).
+Declared primary keys generate presence and composite uniqueness rules (error).
 
 Uniqueness applies only to table fields. Unsupported schema versions, types, layouts, or constraints
 are explicit generation errors; they are never silently discarded.

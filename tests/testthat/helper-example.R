@@ -31,7 +31,11 @@ validate_fixture <- function(data = fixture_data(), references = fixture_referen
 }
 
 upstream_model <- function() form.model::read_form_model("examples/survey-form.yaml", "form.model")
-upstream_references <- function() list(observers = list(values = "ALICE"), stations = list(values = c("001", "002")))
+upstream_references <- function() list(
+  observers = list(values = "ALICE"),
+  stations = list(values = c("001", "002")),
+  "contacts.email" = list(values = "alice@example.org")
+)
 upstream_data <- function() {
   data <- list(Metadata = matrix(vector("list", 15), 5, 3),
                Observations = matrix(vector("list", 77), 7, 11))

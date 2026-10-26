@@ -1,3 +1,12 @@
+# form.validation 0.4.0
+
+* Validate table primary keys and report missing or duplicate keys as evidence.
+* Generate code-list and registry checks from model declarations.
+* Run batch validation, individual reports and aggregate publication in parallel when requested.
+* Update `form.model` from 0.3.1 to 0.4.0.
+* Use `form.references` to load verified reference data in the survey example.
+* Clarify internal validation and report documentation.
+
 # form.validation 0.3.0
 
 * Add table row counts, internal blank-row warnings and Information findings cards.

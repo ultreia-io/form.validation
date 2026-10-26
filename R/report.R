@@ -86,7 +86,7 @@ validation_report_data <- function(result, model, reference_provenance = result$
   execution <- result$execution[result$execution$status %in% c("failed", "incomplete"),
     c("severity", "stage", "sheet", "field", "rule_id", "status", "message"), drop = FALSE]
   execution$stage <- report_stage_labels(execution$stage)
-  evidence <- prepare_report_evidence(tables, reference_provenance, context)
+  evidence <- prepare_report_evidence(tables, reference_provenance, context, result$findings)
   structure(list(tables = tables, evidence = evidence, summary = tables$summary, structure_passed = result$structure_passed,
                  sheets = Filter(Negate(is.null), sections), execution = execution,
                  generated_at = tables$summary$generated_at, metadata = result$metadata),

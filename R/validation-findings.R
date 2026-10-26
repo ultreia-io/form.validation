@@ -57,6 +57,9 @@ validation_finding <- function(message, sheet = NA_character_, field = NA_charac
 validation_findings <- function(message, row, sheet = NA_character_, field = NA_character_,
                                 column = NA_integer_, value = list(NULL), expected = list(NULL)) {
   n <- length(row)
+  # Recycle a finding column to the row count
+  # @param x Vector or list of length one or the target finding count.
+  # @return Unnamed values matching the finding count; other lengths raise an error.
   recycle <- function(x) {
     if (length(x) == n) return(unname(x))
     if (length(x) == 1L) return(rep(x, n))

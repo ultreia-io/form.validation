@@ -78,6 +78,10 @@ registry_index <- function(values, type = "string", matching = "exact", aliases 
   }
   exact <- table(vapply(values, registry_key, character(1)))
   normalized <- if (matching == "name") table(normalized_name_key(vapply(values, identity, character(1)))) else integer()
+  # Resolve one registry value through aliases
+  # @param value Text value to look up.
+  # @param seen Alias values already visited while resolving this chain.
+  # @return Matching registry row count; cyclic aliases raise an error.
   resolve <- function(value, seen = character()) {
     count <- registry_count(exact, registry_key(value))
     if (count > 0L) return(count)

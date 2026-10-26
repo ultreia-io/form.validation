@@ -32,6 +32,9 @@ run_builtin <- function(rule, context) {
     return(NULL)
   }
   if (!is.null(rule$field)) return(run_field(rule, context))
+  if (rule$kind %in% c("primary_key_present", "primary_key_unique")) {
+    return(run_primary_key(rule, context))
+  }
   layout <- sheet$layout
   if (rule$kind == "row_count") {
     count <- max(0L, nrow(grid) - layout$start_row + 1L)
@@ -77,6 +80,41 @@ run_builtin <- function(rule, context) {
     return(bind_findings(findings))
   }
   stop("Unsupported generated rule kind: ", rule$kind, call. = FALSE)
+}
+
+#' Execute an explicit primary-key rule
+#' @param rule Generated descriptor with ordered key fields and local field names.
+#' @param context Validation inputs and a cache cleared after preparation.
+#' @return One finding per affected physical row, or an empty finding table.
+#' @details Presence uses the configured missing-value policy. Uniqueness compares
+#'   complete, correctly typed keys using native data-frame duplicate detection,
+#'   without concatenating components. Every row of a duplicate group is reported.
+#' @keywords internal
+run_primary_key <- function(rule, context) {
+  cache_key <- paste0("primary_key/", rule$sheet)
+  if (!exists(cache_key, context$cache, inherits = FALSE)) {
+    cells <- lapply(rule$key_fields, prepared_field, context = context)
+    names(cells) <- unlist(rule$value, use.names = FALSE)
+    context$cache[[cache_key]] <- list(cells = cells, rows = cells[[1L]]$rows,
+      complete = Reduce(`&`, lapply(cells, `[[`, "filled")),
+      typed = Reduce(`&`, lapply(cells, `[[`, "typed")))
+  }
+  key <- context$cache[[cache_key]]
+  if (rule$kind == "primary_key_present") {
+    bad <- which(!key$complete)
+    message <- "Primary key contains missing values."
+  } else {
+    eligible <- which(key$complete & key$typed)
+    columns <- lapply(key$cells, function(cells) {
+      cells$values[match(eligible, cells$eligible)]
+    })
+    keys <- as.data.frame(columns, optional = TRUE, stringsAsFactors = FALSE)
+    bad <- eligible[duplicated(keys) | duplicated(keys, fromLast = TRUE)]
+    message <- "Primary key is not unique."
+  }
+  values <- lapply(bad, function(i) lapply(key$cells, function(cells) cells$original[[i]]))
+  validation_findings(message, row = key$rows[bad], sheet = rule$sheet,
+    value = values, expected = list(list(primary_key = unlist(rule$value, use.names = FALSE))))
 }
 
 #' Prepare code-list keys for reuse across submissions
@@ -172,7 +210,7 @@ snapshot_keys <- function(id, snapshot) {
 #' @param context Explicit execution inputs.
 #' @return Finding rows in physical row order, or an empty finding data frame.
 #' @details Incorrectly typed cells are reported by their type check, without
-#'   cascading bound, pattern, reference, or uniqueness errors.
+#'   cascading bound, pattern, code-list, registry, or uniqueness errors.
 #' @keywords internal
 run_field <- function(rule, context) {
   field <- context$fields[[rule$field]]
@@ -209,10 +247,45 @@ run_field <- function(rule, context) {
   } else if (kind == "pattern") {
     bad <- eligible[!grepl(value, values, perl = TRUE)]
     problem <- "Value does not match pattern"; expected <- value
-  } else if (kind == "reference") {
+  } else if (kind %in% c("reference", "code_list")) {
     keys <- if (length(eligible)) reference_keys(value, context) else character()
     bad <- eligible[!values %in% keys]
     problem <- paste("Value not found in code list", value); expected <- value
+  } else if (kind == "registry") {
+    if (!length(eligible)) return(empty_findings())
+    id <- if (is.null(value$column)) value$id else paste(value$id, value$column, sep = ".")
+    snapshot <- context$references[[id]]
+    if (is.null(snapshot)) validation_incomplete(paste("Missing registry snapshot:", id))
+    if (!is.list(snapshot) || is.null(snapshot$values) ||
+        !(is.atomic(snapshot$values) || is.list(snapshot$values)))
+      stop("Registry snapshot needs values: ", id, call. = FALSE)
+    aliases <- if (is.null(snapshot$aliases)) character() else snapshot$aliases
+    index <- NULL
+    for (candidate in snapshot$indexes) {
+      if (identical(candidate$type, field$type) &&
+          identical(candidate$matching, value$matching) &&
+          identical(candidate$aliases, aliases)) {
+        index <- candidate
+        break
+      }
+    }
+    if (is.null(index)) {
+      cache_key <- paste0("registry/", rule$id)
+      if (exists(cache_key, context$cache, inherits = FALSE)) index <- context$cache[[cache_key]]
+      else {
+        index <- registry_index(snapshot$values, field$type, value$matching, aliases)
+        context$cache[[cache_key]] <- index
+      }
+    }
+    counts <- registry_match_counts(index, cells$original[eligible])
+    selected <- which(counts != 1L)
+    bad <- eligible[selected]
+    messages <- ifelse(counts[selected] == 0L,
+      paste("Value not found in registry", id),
+      paste("Value has", counts[selected], "matches in registry", paste0(id, "; expected exactly one")))
+    return(validation_findings(messages, row = cells$rows[bad], sheet = field$sheet,
+      field = field$id, column = cells$column, value = cells$original[bad],
+      expected = list(list(reference = id, matches = 1L))))
   } else if (kind == "unique") {
     bad <- eligible[duplicated(values)]
     problem <- "Duplicate field value"; expected <- "unique"

@@ -57,7 +57,10 @@ write_validation_rules <- function(model, structure_path, generated_path,
   lines <- vapply(names(rules), function(id) {
     rule <- rules[[id]]
     value <- flow_rule_value(rule$value)
-    if (!is.null(rule$severity)) value <- paste0("{value: ", value, ", severity: ", rule$severity, "}")
+    if (!is.null(rule$severity) || !is.null(names(rule$value))) {
+      value <- paste0("{value: ", value,
+        if (!is.null(rule$severity)) paste0(", severity: ", rule$severity), "}")
+    }
     paste0("  ", id, ": ", value)
   }, character(1))
   yaml::write_yaml(structure, structure_path, fileEncoding = "UTF-8")
@@ -72,7 +75,12 @@ write_validation_rules <- function(model, structure_path, generated_path,
 #' @keywords internal
 flow_rule_value <- function(value) {
   if (is.null(value)) return("null")
-  if (is.list(value)) return(paste0("[", paste(vapply(value, flow_rule_value, character(1)), collapse = ", "), "]"))
+  if (is.list(value)) {
+    if (!is.null(names(value))) return(paste0("{", paste(paste0(
+      vapply(names(value), flow_rule_value, character(1)), ": ",
+      vapply(value, flow_rule_value, character(1))), collapse = ", "), "}"))
+    return(paste0("[", paste(vapply(value, flow_rule_value, character(1)), collapse = ", "), "]"))
+  }
   if (is.logical(value)) return(if (value) "true" else "false")
   if (is.character(value)) return(encodeString(value, quote = '"'))
   trimws(yaml::as.yaml(value, precision = 17))

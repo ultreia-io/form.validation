@@ -18,7 +18,8 @@ This guide demonstrates the bundled survey example, using its form definition, v
 
 You will load the rules, validate sample data, inspect findings, and export CSV and HTML reports.
 
-`form.model` supplies the survey definition; `form.validation` supplies its validation rules.
+`form.model` supplies the survey definition, `form.references` supplies verified reference data,
+and `form.validation` supplies the validation rules.
 
 ## Load the validation plan
 
@@ -41,7 +42,40 @@ For your own form, use `write_validation_rules()` to generate its structure and 
 
 Keep handwritten business rules separate; regeneration preserves them.
 
-## Supply data and references
+## Load verified references
+
+The survey model declares two code lists and one registry. Load only those tables
+from the installed `form.references` example; the same calls accept an HTTP source.
+
+```{r}
+reference_directory <- system.file("examples", package = "form.references")
+cache <- tempfile("survey-references-")
+code_list_source <- form.references::reference_source(reference_directory, cache)
+registry_source <- form.references::reference_source(
+  reference_directory, cache, catalogue = "registries"
+)
+code_lists <- form.references::get_form_code_lists(model, code_list_source)
+registries <- form.references::get_form_registries(model, registry_source)
+references <- prepare_validation_references(list(
+  observers = list(values = code_lists$data$observers$code),
+  stations = list(values = code_lists$data$stations$code),
+  "contacts.email" = list(values = registries$data$contacts$email)
+))
+```
+
+Keep the verified CSV hashes with the snapshots so evidence reports can identify
+the exact reference files used for validation.
+
+```{r}
+catalogue_hash <- function(loaded, id) loaded$catalogue$sha256[[match(id, loaded$catalogue$id)]]
+attr(references, "provenance") <- list(
+  observers = list(status = "available", sha256 = catalogue_hash(code_lists, "observers")),
+  stations = list(status = "available", sha256 = catalogue_hash(code_lists, "stations")),
+  "contacts.email" = list(status = "available", sha256 = catalogue_hash(registries, "contacts"))
+)
+```
+
+## Supply data
 
 Provide named worksheet grids with physical row and column positions intact.
 
@@ -64,13 +98,9 @@ observations[7, ] <- list(
   -21, 56, "OBS-002", 2L, "ALICE"
 )
 data <- list(Metadata = metadata, Observations = observations)
-references <- list(
-  observers = list(values = "ALICE"),
-  stations = list(values = c("001", "002"))
-)
 ```
 
-Reference values are supplied explicitly. The engine does not fetch code lists or registries.
+The loader downloads and verifies references. The validation engine receives their values explicitly.
 
 For Excel files, `read_validation_workbook()` reads grids while preserving cell types and positions.
 
@@ -120,6 +150,7 @@ See `?validate_data`, `?write_validation_results`, and `?write_validation_report
 
 ```{r cleanup, include=FALSE}
 unlink(output, recursive = TRUE)
+unlink(cache, recursive = TRUE)
 ```
 
 ## Read next

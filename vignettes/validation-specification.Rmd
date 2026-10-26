@@ -52,12 +52,41 @@ Rules report errors by default. To report a warning instead, supply `value` and 
 
 ```yaml
 rules:
-  field/Observations.station/reference: {value: stations, severity: warning}
+  field/Observations.station/code_list: {value: stations, severity: warning}
 ```
 
 Change generated rules by editing the form model and regenerating them.
 
+A field's `registry` declaration generates a registry check. Its value records
+the table ID, column and matching mode; the supplied column snapshot
+must contain exactly one match for each submitted value.
+Supply aliases with the registry snapshot when alternative names are accepted.
+
 For custom R callbacks, follow [Authoring validation rules](rules-authoring.html).
+
+## Primary keys
+
+A table's `primary_key` declaration generates two explicit content rules:
+
+```yaml
+rules:
+  sheet/Observations/primary_key_present: [station, observation_id]
+  sheet/Observations/primary_key_unique: [station, observation_id]
+```
+
+Both report errors. `severity: error` can also be written explicitly with the `value` mapping syntax.
+
+Presence reports each row with a missing component, using the configured missing-value policy.
+
+Uniqueness reports every row sharing a complete, correctly typed key, including the first occurrence.
+
+Incomplete keys are handled by presence; incorrectly typed components remain the responsibility of type checks.
+
+Checks run after value preparation. Findings retain physical Excel rows and named key values.
+
+The engine caches key fields and compares tuples without joining values with separators.
+
+Regenerate rules after changing a key. The loader rejects generated rules that no longer match the model.
 
 ## Interpret the result
 

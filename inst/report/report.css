@@ -9,7 +9,7 @@ button, input, select { font: inherit; padding: .35rem .5rem; border: 1px solid 
 button { cursor: pointer; background: #f1f6f6; color: #15494b; }
 button:disabled { cursor: default; opacity: .45; }
 button[aria-selected=true] { background: #087e83; color: white; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #e4a72c; }
+button[role=tab]:focus, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #e4a72c; }
 .table-scroll { overflow: auto; }
 table { border-collapse: collapse; width: 100%; font-size: .9rem; }
 th, td { border: 1px solid #d7e1e4; padding: .45rem; text-align: left; vertical-align: top; white-space: pre-wrap; }

@@ -4,12 +4,15 @@
 \alias{validate_batch}
 \title{Validate every input in a saved batch plan}
 \usage{
-validate_batch(plan, resume = TRUE)
+validate_batch(plan, resume = TRUE, workers = 1L)
 }
 \arguments{
 \item{plan}{A \code{validation_batch_plan}, its directory or its local \code{plan.rds} file.}
 
 \item{resume}{Reuse completed, checksum-verified results after an interruption.}
+
+\item{workers}{Number of forms to validate concurrently. The default is one.
+Parallel validation uses forked processes on Unix and socket workers on Windows.}
 }
 \value{
 Validation stage state, invisibly.
@@ -18,8 +21,9 @@ Validation stage state, invisibly.
 Validate every input in a saved batch plan
 }
 \details{
-Reads only planned inputs and frozen resources. Saves each complete
-typed result and its form definition before moving to the next input.
+Reads only planned inputs and frozen resources. Each form saves its
+typed result and definition independently. The parent checkpoints outcomes
+as workers finish on Unix, or after each small worker group on Windows.
 No report tables, CSV files or HTML pages are generated. Reader failures are
 ordinary failed validation results; infrastructure failures keep the stage
 incomplete and can be retried. Result RDS files are uncompressed for fast reuse.

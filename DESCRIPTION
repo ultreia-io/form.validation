@@ -1,6 +1,6 @@
 Package: form.validation
 Title: Validate Submitted Data Against Neutral Form Models
-Version: 0.3.0
+Version: 0.4.0
 Authors@R:
     person("Tony", "Chemit", role = c("aut", "cre"),
            email = "dev@tchemit.fr")

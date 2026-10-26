@@ -18,7 +18,8 @@ write_validation_aggregate(
   model_versions = NULL,
   reference_provenance = NULL,
   reference_context_columns = character(),
-  report_notes = character()
+  report_notes = character(),
+  workers = 1L
 )
 }
 \arguments{
@@ -52,6 +53,8 @@ already stored in each individual report's prepared evidence.}
 
 \item{report_notes}{Public validation-policy notes shown in the Warning
 findings card on every aggregate page. Text is HTML-escaped.}
+
+\item{workers}{Number of top-level aggregate directories to render concurrently.}
 }
 \value{
 Relative aggregate HTML paths, invisibly, with a \code{reference_report}

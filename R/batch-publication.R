@@ -3,6 +3,7 @@
 #' @param output New directory, defaulting to `aggregated_<batch>` beside the batch.
 #' @inheritParams write_validation_aggregate
 #' @param comment Optional plain-text publication note for the batch catalog.
+#' @param workers Number of top-level aggregate directories to build concurrently.
 #' @return The prepared directory, invisibly. No upload is performed.
 #' @details Uses the saved inventory and report manifest. Copies verified reports,
 #'   adds ancestor navigation, aggregates, evidence and a portable `plan.json`.
@@ -13,9 +14,13 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
                                          title = "Validation reports", author = NULL,
                                          stylesheet = NULL, logo = NULL,
                                          reference_context_columns = character(), report_notes = character(),
-                                         comment = NULL) {
+                                         comment = NULL, workers = 1L) {
   if (!is.null(comment) && (!is.character(comment) || length(comment) != 1L || is.na(comment)))
     stop("comment must be a single text value or NULL", call. = FALSE)
+  if (length(workers) != 1L || !is.numeric(workers) || is.na(workers) ||
+      !is.finite(workers) || workers < 1 || workers > .Machine$integer.max ||
+      workers != as.integer(workers))
+    stop("workers must be a positive whole number", call. = FALSE)
   plan <- read_validation_batch_plan(plan)
   check_batch_report_filename(report_filename)
   lock <- lock_validation_batch(plan)
@@ -37,7 +42,9 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
     dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
     if (!file.copy(source, target, copy.date = TRUE)) stop("Cannot copy ", source, call. = FALSE)
   }
-  for (relative in names(reports$artifacts)) {
+  report_files <- names(reports$artifacts)
+  phase_started <- proc.time()[["elapsed"]]
+  for (relative in report_files) {
     source <- file.path(plan$directory, "reports", relative)
     if (!file.exists(source) || !identical(batch_file_hash(source), reports$artifacts[[relative]]))
       stop("Report artifact is missing or changed: ", relative, call. = FALSE)
@@ -66,12 +73,17 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   }
   write_batch_plan_json(plan, file.path(stage, "plan.json"), reports)
   for (name in c("validation.log", "report.log")) copy(file.path(plan$directory, name), file.path("logs", name))
+  message(sprintf("Publication copy and navigation: %.1fs", proc.time()[["elapsed"]] - phase_started))
+  phase_started <- proc.time()[["elapsed"]]
   pages <- write_validation_aggregate(descriptors, stage,
     group_columns = plan$group_columns, identity_columns = plan$identity_columns,
     report_filename = report_filename, title = title, author = author, stylesheet = stylesheet, logo = logo,
     model_versions = plan$model_versions, reference_provenance = if (length(Filter(length, provenance))) provenance else NULL,
-    reference_context_columns = reference_context_columns, report_notes = report_notes)
-  individual_evidence <- basename(dirname(names(reports$artifacts)[basename(names(reports$artifacts)) == reports$report_filename]))
+    reference_context_columns = reference_context_columns, report_notes = report_notes,
+    workers = as.integer(workers))
+  message(sprintf("Aggregate reports: %.1fs", proc.time()[["elapsed"]] - phase_started))
+  phase_started <- proc.time()[["elapsed"]]
+  individual_evidence <- basename(dirname(report_files[basename(report_files) == reports$report_filename]))
   reference_reports <- sum(individual_evidence == "code-list-evidence") + length(attr(pages, "reference_report"))
   registry_reports <- sum(individual_evidence == "registry-evidence") + length(attr(pages, "registry_report"))
   conversion_reports <- sum(individual_evidence == "conversion-evidence") + length(attr(pages, "conversion_report"))
@@ -112,6 +124,7 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
     files = lapply(files, function(path) list(path = path, sha256 = digest::digest(file = file.path(stage, path), algo = "sha256"))))
   if (!is.null(comment) && nzchar(comment)) manifest$comment <- comment
   jsonlite::write_json(manifest, file.path(stage, "publication.json"), auto_unbox = TRUE, pretty = TRUE)
+  message(sprintf("Publication checks and inventory: %.1fs", proc.time()[["elapsed"]] - phase_started))
   if (!file.rename(stage, output)) stop("Cannot finalize publication directory: ", output)
   invisible(normalizePath(output, mustWork = TRUE))
 }

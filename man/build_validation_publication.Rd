@@ -14,7 +14,8 @@ build_validation_publication(
   logo = NULL,
   reference_context_columns = character(),
   report_notes = character(),
-  comment = NULL
+  comment = NULL,
+  workers = 1L
 )
 }
 \arguments{
@@ -38,6 +39,8 @@ build_validation_publication(
 findings card on every aggregate page. Text is HTML-escaped.}
 
 \item{comment}{Optional plain-text publication note for the batch catalog.}
+
+\item{workers}{Number of top-level aggregate directories to build concurrently.}
 }
 \value{
 The prepared directory, invisibly. No upload is performed.

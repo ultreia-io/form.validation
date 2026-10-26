@@ -59,9 +59,11 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 #'   use [`write_validation_rules()`][form.validation::write_validation_rules] and [`read_validation_rules()`][form.validation::read_validation_rules] for versioned files.
 #' @details Supported declarations include declared sheets, sheet order,
 #'   row/column counts, table start rows, mandatory fields,
-#'   all nine field types, enums, bounds, patterns, uniqueness, reference membership,
+#'   all nine field types, enums, bounds, patterns, uniqueness, code-list membership,
+#'   registry matching,
 #'   and same-sheet conditional requiredness. Generated content rules also include
 #'   table row counts (info) and internal empty-row checks (warning).
+#'   Declared primary keys generate presence and composite uniqueness rules (error).
 #'
 #' Uniqueness applies only to table fields. Unsupported schema versions, types, layouts, or constraints
 #' are explicit generation errors; they are never silently discarded.
@@ -103,21 +105,33 @@ validation_plan <- function(model, rules = list()) {
       }
       unsupported <- setdiff(names(field),
                              c("id", "name", "sheet", "location", "row", "column", "type",
-                               "mandatory", "enum", "minimum", "maximum", "pattern", "unique", "reference", "required_field"))
+                               "mandatory", "enum", "minimum", "maximum", "pattern", "unique",
+                               "reference", "code_list", "registry", "required_field"))
       if (length(unsupported)) stop("Unsupported constraints: ", paste(unsupported, collapse = ", "), call. = FALSE)
       if (isTRUE(field$unique) && layout$kind != "table") {
         stop("unique is only supported for table fields: ", field$id, call. = FALSE)
       }
       kinds <- c(if (field$mandatory) "mandatory",
                  if (!is.null(field$required_field)) "required_field", "type",
-                 intersect(c("reference", "enum", "minimum", "maximum", "pattern", "unique"),
+                 intersect(c("reference", "code_list", "registry", "enum", "minimum", "maximum", "pattern", "unique"),
                            names(field)))
       for (kind in kinds) {
         if (kind == "unique" && !isTRUE(field$unique)) next
-        severity <- if (kind == "reference") field$reference$severity else "error"
+        severity <- if (kind %in% c("reference", "code_list", "registry")) field[[kind]]$severity else "error"
         rule <- rule_record(paste("field", field$id, kind, sep = "/"), kind,
                             severity, sheet_name, field$id, stage = "fields")
-        rule$value <- if (kind == "reference") field$reference$id else field[[kind]]
+        rule$value <- if (kind %in% c("reference", "code_list")) field[[kind]]$id else
+          if (kind == "registry") Filter(Negate(is.null), field$registry[c("id", "column", "matching")]) else field[[kind]]
+        generated[[length(generated) + 1L]] <- rule
+      }
+    }
+    if (!is.null(sheet$primary_key)) {
+      key_ids <- paste(sheet_name, unlist(sheet$primary_key, use.names = FALSE), sep = ".")
+      for (kind in c("primary_key_present", "primary_key_unique")) {
+        rule <- rule_record(paste("sheet", sheet_name, kind, sep = "/"), kind,
+                            sheet = sheet_name, stage = "fields")
+        rule$value <- sheet$primary_key
+        rule$key_fields <- fields[key_ids]
         generated[[length(generated) + 1L]] <- rule
       }
     }

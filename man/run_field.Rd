@@ -19,6 +19,6 @@ Execute a generated field check
 }
 \details{
 Incorrectly typed cells are reported by their type check, without
-cascading bound, pattern, reference, or uniqueness errors.
+cascading bound, pattern, code-list, registry, or uniqueness errors.
 }
 \keyword{internal}

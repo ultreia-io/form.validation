@@ -43,7 +43,7 @@ result <- validate_data(plan, data)
 result$findings
 ```
 
-Supply reference snapshots when the model declares code lists.
+Supply reference snapshots when the model declares code lists or registries.
 
 The [Getting started
 guide](https://ultreia-io.github.io/form.validation/articles/form.validation.html)
@@ -52,7 +52,7 @@ provides a complete survey example.
 ## What it does
 
 - Check workbook structure before submitted values.
-- Apply field types, constraints and reference membership.
+- Apply field types, constraints, code-list membership and registry matching.
 - Run explicitly supplied custom checks.
 - Record findings with physical cell locations.
 - Export CSV results and HTML reports.

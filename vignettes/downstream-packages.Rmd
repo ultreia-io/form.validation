@@ -13,7 +13,7 @@ It uses the survey files and `total_count` callback from [Authoring validation r
 
 ## 1. Add dependencies and resources
 
-Declare `form.model` and `form.validation` in your package's `Imports`.
+Declare `form.model`, `form.references` and `form.validation` in your package's `Imports`.
 
 Store the survey files and callback in these locations:
 
@@ -42,16 +42,29 @@ plan <- form.validation::load_validation_plan(
 
 You can reuse this plan for submissions using the same form and rules.
 
-## 3. Supply the reference values
+## 3. Load the required references
 
-Prepare the code lists required by the survey. Replace these example values with your application's reference data:
+Use the verified survey catalogues here. Replace `source_directory` with your
+own reference URL or directory when adapting the example.
 
 ```r
+source_directory <- system.file("examples", package = "form.references")
+cache <- file.path(tempdir(), "survey-references")
+code_list_source <- form.references::reference_source(source_directory, cache)
+registry_source <- form.references::reference_source(
+  source_directory, cache, catalogue = "registries"
+)
+code_lists <- form.references::get_form_code_lists(plan$model, code_list_source)
+registries <- form.references::get_form_registries(plan$model, registry_source)
 references <- form.validation::prepare_validation_references(list(
-  observers = list(values = "ALICE"),
-  stations = list(values = c("001", "002"))
+  observers = list(values = code_lists$data$observers$code),
+  stations = list(values = code_lists$data$stations$code),
+  "contacts.email" = list(values = registries$data$contacts$email)
 ))
 ```
+
+The [Getting started guide](form.validation.html) also shows how to retain
+catalogue checksums for code-list and registry evidence reports.
 
 ## 4. Validate a submission
 

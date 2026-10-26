@@ -13,10 +13,11 @@ rules:
   field/Metadata.date/mandatory: true
   field/Metadata.date/type: "date"
   field/Metadata.contact_email/type: "email"
+  field/Metadata.contact_email/registry: {value: {"id": "contacts", "column": "email", "matching": "exact"}, severity: warning}
   field/Metadata.comment/type: "string"
   field/Observations.station/mandatory: true
   field/Observations.station/type: "string"
-  field/Observations.station/reference: "stations"
+  field/Observations.station/code_list: "stations"
   field/Observations.count/mandatory: true
   field/Observations.count/type: "integer"
   field/Observations.count/minimum: 0
@@ -33,8 +34,9 @@ rules:
   field/Observations.longitude/type: "longitude"
   field/Observations.observation_id/type: "string"
   field/Observations.observation_id/pattern: "^OBS-[0-9]{3}$"
-  field/Observations.observation_id/unique: true
   field/Observations.quality/type: "integer"
   field/Observations.quality/enum: [1, 2, 3]
   field/Observations.observer/type: "string"
-  field/Observations.observer/reference: {value: "observers", severity: warning}
+  field/Observations.observer/code_list: {value: "observers", severity: warning}
+  sheet/Observations/primary_key_present: ["station", "observation_id"]
+  sheet/Observations/primary_key_unique: ["station", "observation_id"]

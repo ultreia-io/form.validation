@@ -59,11 +59,21 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     if (nzchar(prefix) && !startsWith(descriptors$directory[i], paste0(prefix, "/"))) stop("Descriptor directory differs from grouping metadata")
     if (!grepl("^[A-Za-z0-9][A-Za-z0-9_.-]*\\.html$", descriptors$report[i])) stop("Invalid individual report filename")
   }
+  # Read report CSV without type conversion
+  # @param path CSV file with a UTF-8 BOM.
+  # @return Data frame retaining all values as text, including literal NA strings.
   read <- function(path) utils::read.csv(path, colClasses = "character", check.names = FALSE,
     na.strings = NULL, fileEncoding = "UTF-8-BOM")
+  # Encode a report link
+  # @param x One slash-separated relative path.
+  # @return URL text with encoded components and unchanged separators.
   url <- function(x) paste(vapply(strsplit(x, "/", fixed = TRUE)[[1]], utils::URLencode,
                                  character(1), reserved = TRUE), collapse = "/")
   metadata <- setdiff(names(descriptors), c("directory", "report"))
+  # Summarize findings in the current aggregate
+  # @param rows Finding rows with input identities and optional occurrence weights.
+  # @param by_input Whether to retain each form and sheet order as grouping keys.
+  # @return Grouped rows with occurrence and distinct-form counts.
   grouped <- function(rows, by_input = FALSE) {
     keys <- unique(c(identity_columns, "model_version", "rules_version", "rule_id", "kind", "severity", "stage", "sheet", "field", "column", "value", "expected", "message"))
     if (by_input) keys <- intersect(unique(c(keys, "input", "sheet_order")), names(rows))
@@ -100,6 +110,9 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     for (key in unique(c(metadata, "model_version", "rules_version"))) detail[[key]] <- rep(summary[[key]], nrow(detail))
     if (any(!detail$kind %in% c("validation", "failed", "incomplete"))) stop("Unknown finding kind")
     prepared <- read_report_evidence(file.path(directory, d$directory, "evidence.json"))
+    # Read one prepared evidence kind for this form
+    # @param kind Name of the evidence part.
+    # @return Prepared rows with descriptor metadata and rebased report links, or NULL.
     part <- function(kind) {
       rows <- prepared$parts[[kind]]
       if (is.null(rows) || !nrow(rows)) return(NULL)
@@ -152,6 +165,9 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     page_title <- if (nzchar(group)) paste(title, "\u2014", group) else title
     # Reuse the evidence collected once per form, scoped to this aggregate.
     # Source links still target the original individual reports at the root.
+    # Select evidence for the current aggregate
+    # @param parts Evidence parts in descriptor order.
+    # @return Selected parts with report links rebased from the current group.
     scoped_evidence <- function(parts) lapply(parts[which(selected)], function(part) {
       if (!is.null(part)) part$report <- paste0(prefix, part$report)
       part
@@ -175,6 +191,9 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       reference_context_columns, page_title, stylesheet, logo, evidence_assets = evidence_assets, scope = group)
     primary_key_report <- if (primary_key_count == "0") NULL else write_primary_key_evidence(primary_key_parts, folder, report_filename,
       reference_context_columns, page_title, stylesheet, logo, evidence_assets = evidence_assets, scope = group)
+    # Locate a contextual evidence page from the root
+    # @param path Evidence report path, or NULL for an empty report.
+    # @return Root-relative path, or NULL when no report exists.
     relative_report <- function(path) if (length(path)) if (nzchar(group)) file.path(group, path) else path
     f$report <- paste0(prefix, f$report)
     write_report_csv(f, outputs[2]); write_report_csv(grouped(v), outputs[3]); write_report_csv(grouped(e), outputs[4])

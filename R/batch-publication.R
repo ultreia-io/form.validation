@@ -37,6 +37,10 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   stage <- tempfile(".publication-", tmpdir = dirname(output))
   dir.create(stage)
   on.exit(unlink(stage, recursive = TRUE), add = TRUE)
+  # Copy one artifact into the publication stage
+  # @param source Existing artifact file.
+  # @param relative Destination path relative to the staging directory.
+  # @return NULL after copying, or an error if copying fails.
   copy <- function(source, relative) {
     target <- file.path(stage, relative)
     dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
@@ -130,6 +134,15 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
 }
 
 # Add ancestor navigation only to the staged publication copy.
+#' Add ancestor navigation to a publication copy
+#' @param path HTML file to update in place.
+#' @param relative Report directory relative to the publication root.
+#' @param report_filename HTML filename used by ancestor aggregates.
+#' @param current_label Current-page label, or `NULL` to use the final path component.
+#' @param parent_filename HTML filename used by the immediate parent.
+#' @return `NULL`, invisibly, after writing the updated HTML.
+#' @details Replaces existing parent or breadcrumb navigation. Links are encoded, labels escaped and the current page remains unlinked.
+#' @keywords internal
 add_batch_breadcrumbs <- function(path, relative, report_filename, current_label = NULL, parent_filename = report_filename) {
   parts <- strsplit(relative, "/", fixed = TRUE)[[1L]]
   depth <- length(parts)
@@ -146,6 +159,11 @@ add_batch_breadcrumbs <- function(path, relative, report_filename, current_label
   writeLines(html, path, useBytes = TRUE)
 }
 
+#' Validate an HTML report filename
+#' @param filename Single filename without a directory.
+#' @return `NULL` on success; otherwise an error.
+#' @details Requires an alphanumeric first character, a `.html` suffix and only letters, digits, underscores, dots or hyphens.
+#' @keywords internal
 check_batch_report_filename <- function(filename) {
   if (!is.character(filename) || length(filename) != 1L || is.na(filename) ||
       !grepl("^[A-Za-z0-9][A-Za-z0-9_.-]*\\.html$", filename))

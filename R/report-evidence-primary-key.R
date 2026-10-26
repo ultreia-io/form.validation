@@ -1,4 +1,12 @@
 # Retain the saved key findings and their physical rows; never rerun key checks.
+#' Collect recorded primary-key failures
+#' @param detail Formatted finding rows with kind, rule, value, expectation, location and public metadata columns.
+#' @param findings Original findings corresponding to detail, with structured key values and expectations.
+#' @param report Parent form report path relative to the current report context.
+#' @param context_columns Public metadata columns to retain.
+#' @return A compact evidence data frame, or `NULL` when no key findings exist.
+#' @details Separates missing components and duplicate keys. Preserves declared component order and physical row ranges; every involved duplicate row contributes an occurrence. No key check is rerun.
+#' @keywords internal
 collect_primary_key_evidence <- function(detail, findings, report, context_columns) {
   checks <- c("primary_key_present", "primary_key_unique")
   ids <- unlist(lapply(checks, function(check) paste0("sheet/", unique(detail$sheet), "/", check)))
@@ -29,6 +37,19 @@ collect_primary_key_evidence <- function(detail, findings, report, context_colum
 }
 
 # Reuse one form's evidence at every aggregate level, preserving form-local failures.
+#' Write primary-key evidence
+#' @param parts List of per-form prepared evidence data frames; empty entries may be `NULL`.
+#' @param directory Parent report directory receiving the evidence subdirectory.
+#' @param report_filename Filename for the generated HTML page and parent report links.
+#' @param context_columns Public metadata columns shown in case and source tables.
+#' @param title Parent report title, extended with the evidence label.
+#' @param stylesheet,logo Optional branding file paths, or `NULL`.
+#' @param evidence_assets Shared asset directory relative to the evidence subdirectory.
+#' @param scope Slash-separated aggregate path, or an empty string for the root.
+#' @param parent_label Label for the root or single-form parent breadcrumb.
+#' @return Relative HTML path under `primary-key-evidence`. Returns `NULL` without writing files when all parts are empty.
+#' @details Creates missing-component and duplicate-key tabs. Duplicate findings remain scoped to each source form; shared values across forms do not imply new duplicates. Writes case and evidence CSV files, metadata JSON, per-case JSON and HTML using shared assets.
+#' @keywords internal
 write_primary_key_evidence <- function(parts, directory, report_filename, context_columns, title,
                                        stylesheet, logo, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   parts <- Filter(Negate(is.null), parts)

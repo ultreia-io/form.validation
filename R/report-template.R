@@ -1,8 +1,17 @@
 # Render installed HTML templates with escaped scalar placeholders.
 # NULL omits a complete template line; substitution never reprocesses inserted values.
+#' Render an installed HTML template
+#' @param name Filename under the installed `report` directory.
+#' @param values Named list of scalar character values or `NULL`.
+#' @return Character vector of rendered HTML lines.
+#' @details Escapes HTML characters. A NULL placeholder removes its complete line. Unknown placeholders and invalid values fail; inserted text is never processed again.
+#' @keywords internal
 render_report_template <- function(name, values) {
   template <- readLines(system.file("report", name, package = "form.validation", mustWork = TRUE),
                         warn = FALSE, encoding = "UTF-8")
+  # Escape one template value
+  # @param value One nonmissing character string.
+  # @return HTML-escaped scalar text.
   escape <- function(value) {
     if (!is.character(value) || length(value) != 1L || is.na(value)) stop("Template values must be scalar text")
     for (pair in list(c("&", "&amp;"), c("<", "&lt;"), c(">", "&gt;"), c('"', "&quot;")))

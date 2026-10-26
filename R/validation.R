@@ -109,6 +109,9 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
                   fields = form.model::form_fields(plan$model), data = data,
                   references = references, config = config,
                   cache = new.env(parent = emptyenv()))
+  # Expose cached field data to a callback
+  # @param id Declared fully qualified field identifier.
+  # @return Field metadata and prepared values from the current execution context.
   field_values <- function(id) {
     text_value(id, "field ID")
     field <- context$fields[[id]]

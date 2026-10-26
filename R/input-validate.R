@@ -20,6 +20,10 @@ validate_workbook <- function(path, plan, references = list(), source = path, co
       (!is.null(prepare_data) && !is.function(prepare_data)))
     stop("Invalid reader, preparation function or logger", call. = FALSE)
   conversion_elapsed <- 0
+  # Time and log a workbook processing stage
+  # @param stage Stage label used in the timing log.
+  # @param expression Delayed expression to evaluate.
+  # @return The expression result; elapsed time is logged even when evaluation fails.
   timed <- function(stage, expression) {
     started <- proc.time()[["elapsed"]]
     on.exit({

@@ -33,7 +33,7 @@ prepare_report_evidence <- function(tables, provenance, context, findings) {
   for (key in c("input", "model_version", "rules_version")) detail[[key]] <- rep(tables$summary[[key]], nrow(detail))
   for (key in names(context)) detail[[key]] <- rep(context[[key]], nrow(detail))
   parts <- list(
-    reference = if (!is.null(provenance)) collect_reference_evidence(detail, provenance, "", names(context)) else NULL,
+    reference = if (!is.null(provenance)) collect_code_list_evidence(detail, provenance, "", names(context)) else NULL,
     registry = if (!is.null(provenance)) collect_registry_evidence(detail, provenance, "", names(context)) else NULL,
     conversion = collect_conversion_evidence(detail, "", names(context)),
     primary_key = collect_primary_key_evidence(detail, findings, "", names(context)))

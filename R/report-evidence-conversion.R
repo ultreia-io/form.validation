@@ -1,5 +1,12 @@
 # Collect recorded type failures only; never parse, trim or coerce submitted values.
 # Coordinate types combine numeric and range validation and are deliberately excluded.
+#' Collect recorded type-conversion failures
+#' @param detail Formatted finding rows with kind, rule, value, expectation, location and public metadata columns.
+#' @param report Parent form report path relative to the current report context.
+#' @param context_columns Public metadata columns to retain.
+#' @return A compact evidence data frame, or `NULL` when no supported type findings exist.
+#' @details Includes number, integer, boolean and temporal errors or warnings. Excludes coordinate range checks and never converts or trims saved values.
+#' @keywords internal
 collect_conversion_evidence <- function(detail, report, context_columns) {
   types <- c("number", "integer", "boolean", "date", "datetime", "time")
   keep <- detail$kind == "validation" & detail$severity %in% c("error", "warning") &
@@ -19,6 +26,19 @@ collect_conversion_evidence <- function(detail, report, context_columns) {
 }
 
 # Group conversion cases by model, field and unchanged submitted value.
+#' Write conversion evidence
+#' @param parts List of per-form prepared evidence data frames; empty entries may be `NULL`.
+#' @param directory Parent report directory receiving the evidence subdirectory.
+#' @param report_filename Filename for the generated HTML page and parent report links.
+#' @param context_columns Public metadata columns shown in case and source tables.
+#' @param title Parent report title, extended with the evidence label.
+#' @param stylesheet,logo Optional branding file paths, or `NULL`.
+#' @param evidence_assets Shared asset directory relative to the evidence subdirectory.
+#' @param scope Slash-separated aggregate path, or an empty string for the root.
+#' @param parent_label Label for the root or single-form parent breadcrumb.
+#' @return Relative HTML path under `conversion-evidence`.
+#' @details Cases retain model, field, expected type, value and severity. Values are not converted. Writes case and evidence CSV files, metadata JSON, per-case JSON and HTML using shared assets.
+#' @keywords internal
 write_conversion_evidence <- function(parts, directory, report_filename, context_columns, title, stylesheet, logo, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   folder_name <- "conversion-evidence"
   folder <- file.path(directory, folder_name)
@@ -43,6 +63,9 @@ write_conversion_evidence <- function(parts, directory, report_filename, context
     row$evidence_file <- paste0("evidence/", row$case_id, ".json")
     row[summary_columns]
   }))
+  # Shorten displayed field identifiers
+  # @param rows Case or evidence rows with sheet and field columns.
+  # @return Rows with a matching sheet prefix removed from field labels.
   shorten <- function(rows) {
     prefix <- paste0(rows$sheet, ".")
     rows$field <- ifelse(nzchar(rows$sheet) & startsWith(rows$field, prefix),

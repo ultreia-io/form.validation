@@ -1,4 +1,10 @@
 # Share content-addressed assets across individual and aggregate reports.
+#' Copy content-addressed report assets
+#' @param sources Named vector of existing source file paths.
+#' @param directory Destination asset directory, created if needed.
+#' @return Named filenames using an MD5 content hash and the original extension.
+#' @details Reuses identical files and rejects conflicting contents. Returned names retain the source names for template lookup.
+#' @keywords internal
 copy_report_assets <- function(sources, directory) {
   if (any(!file.exists(sources))) stop("Report asset does not exist", call. = FALSE)
   if (!dir.exists(directory) && !dir.create(directory, recursive = TRUE) && !dir.exists(directory))

@@ -184,6 +184,9 @@ write_evidence_page <- function(directory, folder_name, report_filename, title, 
   if (is.null(labels$secondary_file)) {
     labels[c("secondary_file", "secondary_label", "secondary_description")] <- list(NULL, NULL, NULL)
   }
+  if (is.null(labels$tertiary_file)) {
+    labels[c("tertiary_file", "tertiary_label", "tertiary_description")] <- list(NULL, NULL, NULL)
+  }
   sources <- stats::setNames(system.file("report",
     c("report.css", "overview.css", "report-ui.js", "csv-worker.js", "report-table.js", "reference-evidence.js"),
     package = "form.validation", mustWork = TRUE),
@@ -195,7 +198,7 @@ write_evidence_page <- function(directory, folder_name, report_filename, title, 
   names(assets) <- names(sources)
   counts <- summary$totals
   counts$categories <- counts[[labels$category_total]]
-  table_counts <- c(list(values = 0, missing = 0, duplicates = 0), summary$tables)
+  table_counts <- c(list(values = 0, missing = 0, duplicates = 0, parents = 0), summary$tables)
   table_counts <- table_counts[!duplicated(names(table_counts), fromLast = TRUE)]
   values <- c(report_count_values(counts), report_count_values(table_counts),
     list(filters_hidden = if (is.null(summary$filter_cards)) "hidden" else ""),

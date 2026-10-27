@@ -23,7 +23,7 @@
 prepare_report_evidence <- function(tables, provenance, context, findings) {
   if (!is.list(context) || (length(context) && (is.null(names(context)) ||
       any(!nzchar(names(context))) || anyDuplicated(names(context))))) stop("context must be a named list")
-  reserved <- c(names(tables$details), names(tables$summary), "report", "cells", "occurrences", "snapshot_sha256", "rows", "key_fields", "problem")
+  reserved <- c(names(tables$details), names(tables$summary), "report", "cells", "occurrences", "snapshot_sha256", "rows", "key_fields", "parent_sheet", "problem")
   if (length(intersect(names(context), reserved))) stop("Context names conflict with report columns")
   if (any(!vapply(context, function(x) is.character(x) && length(x) == 1L && !is.na(x), logical(1))))
     stop("Context values must be scalar text")

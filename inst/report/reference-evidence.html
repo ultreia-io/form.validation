@@ -19,7 +19,7 @@
       <button type="button" hidden>Retry</button>
     </div>
   </template>
-  <main data-evidence-label="{{evidence_label}}" data-report-kind="{{report_kind}}" data-values="{{values_value}}" data-missing="{{missing_value}}" data-duplicates="{{duplicates_value}}">
+  <main data-evidence-label="{{evidence_label}}" data-report-kind="{{report_kind}}" data-values="{{values_value}}" data-missing="{{missing_value}}" data-duplicates="{{duplicates_value}}" data-parents="{{parents_value}}">
     <img class="report-logo" src="{{logo}}" alt="Report logo">
     <div class="report-navigation">
       <nav aria-label="Breadcrumb"><!-- evidence-breadcrumbs --> <span aria-current="page">{{evidence_label}}</span></nav>
@@ -48,6 +48,7 @@
       <div class="resource-links">
         <div><a href="{{summary_file}}" download>↓ {{summary_label}}</a><p>{{summary_description}}</p></div>
         <div><a href="{{secondary_file}}" download>↓ {{secondary_label}}</a><p>{{secondary_description}}</p></div>
+        <div><a href="{{tertiary_file}}" download>↓ {{tertiary_label}}</a><p>{{tertiary_description}}</p></div>
         <div><a href="evidence.csv" download>↓ Evidence CSV</a><p>All affected forms and source locations</p></div>
       </div>
     </section>

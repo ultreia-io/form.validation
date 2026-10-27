@@ -23,6 +23,8 @@ The `report` directory contains the HTML page, CSV downloads and supporting asse
 
 Open the report through a web server. Opening the HTML directly from disk may prevent its data from loading.
 
+Card counts are included in the HTML for individual, aggregate and evidence reports; tables load when needed.
+
 1. Check the validation status and finding counts at the top of the page.
 2. Use the detail tabs and filters to inspect findings and unfinished checks.
 3. Download the CSV files from Resources when you need to review the data outside the browser.
@@ -48,8 +50,12 @@ or [aggregate existing reports](../reference/write_validation_aggregate.html).
 Individual reports include cards for code-list, registry, conversion and primary-key evidence.
 Zero-count cards stay disabled; no empty evidence report is generated.
 
-Primary-key evidence separates missing components from duplicate keys. Select a key to
-see the affected forms and Excel rows, or download Keys CSV and Evidence CSV.
+Extra reports read their summary CSV directly for interactive tables and downloads.
+Counts are rendered directly in HTML. Download Evidence CSV for affected forms and exact source locations.
+
+Primary-key evidence separates missing components, duplicate keys and missing parent keys into three tables.
+Each table has its own CSV; missing parent keys identify both the child and parent sheets.
+The combined Evidence CSV identifies the problem and affected Excel rows.
 Duplicate occurrences count all involved rows within each form; keys shared by different
 forms are not treated as duplicates.
 
@@ -57,5 +63,5 @@ Reference evidence uses the snapshot provenance retained in the validation resul
 For saved results without it, pass `reference_provenance` to `validation_report_data()`.
 
 The report writes prepared evidence to `evidence.json` alongside its CSV files.
-Keep this file when copying reports for aggregation: aggregates reuse it without
-extracting evidence again from findings. Regenerate older reports before aggregating them.
+Keep this file locally for aggregation: aggregates reuse it without extracting evidence again from findings.
+The publication builder removes it from the served copy. Regenerate older reports before aggregating them.

@@ -21,7 +21,7 @@ build_validation_publication(
 \arguments{
 \item{plan}{A \code{validation_batch_plan}, its directory or its local \code{plan.rds} file.}
 
-\item{output}{New directory, defaulting to \verb{aggregated_<batch>} beside the batch.}
+\item{output}{New directory, defaulting to \code{publication} inside the batch.}
 
 \item{report_filename}{Aggregate HTML filename, default \code{index.html}.}
 
@@ -50,7 +50,8 @@ Build a publication tree from a completed validation batch
 }
 \details{
 Uses the saved inventory and report manifest. Copies verified reports,
-adds ancestor navigation, aggregates, evidence and a portable \code{plan.json}.
-Private results and resources are excluded. Local links and artifact counts
+adds ancestor navigation, aggregates and evidence reports. The manifest
+\verb{<output>.json} and portable \verb{<output>-plan.json} stay beside the served directory.
+Private results, resources and prepared evidence JSON are excluded. Local links and artifact counts
 are checked before the staged directory is finalized.
 }

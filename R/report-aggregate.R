@@ -210,17 +210,19 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     totals <- data.frame(files = nrow(f), structure_passed = sum(toupper(f$structure_passed) == "TRUE"),
       structure_blocked = sum(toupper(f$structure_passed) == "FALSE"), errors = sum(as.numeric(f$errors)),
       warnings = sum(as.numeric(f$warnings)), infos = sum(as.numeric(f$infos)), incomplete_checks = sum(as.numeric(f$incomplete)), failed_checks = sum(as.numeric(f$failed)))
-    statuses <- as.data.frame(base::table(f$status), stringsAsFactors = FALSE); names(statuses) <- c("Status", "Files")
     version_counts <- data.frame(version = model_versions,
       files = vapply(model_versions, function(version) sum(f$model_version == version), integer(1)))
     sheet_rows <- rbind(v, e)
     sheet_order <- if ("sheet_order" %in% names(sheet_rows))
       unique(sheet_rows$sheet[order(suppressWarnings(as.numeric(sheet_rows$sheet_order)), na.last = TRUE)]) else unique(sheet_rows$sheet)
     sheet_order <- sheet_order[!is.na(sheet_order) & nzchar(sheet_order)]
-    jsonlite::write_json(list(title = page_title, breadcrumbs = breadcrumbs, children = children,
-      totals = totals, statuses = statuses, versions = version_counts, sheet_order = as.list(sheet_order), notes = as.list(if (!depth) notes else character()),
-      no_inputs = !nrow(f)), file.path(folder, "aggregate.json"), auto_unbox = TRUE, pretty = TRUE)
-    html <- render_report_template("aggregate.html", list(title = page_title,
+    # Navigation and table order belong to the HTML, not a separate browser payload.
+    unlink(file.path(folder, "aggregate.json"))
+    status_counts <- stats::setNames(lapply(c("valid", "invalid", "incomplete", "failed"),
+      function(status) sum(f$status == status)), paste0("status_", c("valid", "invalid", "incomplete", "failed")))
+    html <- render_report_template("aggregate.html", c(report_count_values(c(as.list(totals), status_counts)), list(title = page_title,
+      current_label = breadcrumbs[[length(breadcrumbs)]]$label,
+      children_hidden = if (length(children)) "" else "hidden",
       report_notes = if (length(report_notes)) paste(report_notes, collapse = "\n") else NULL,
       generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC", tz = "UTC"),
       style = paste0(prefix, "report-assets/", asset_names[["style"]]),
@@ -238,7 +240,23 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       overview_style = paste0(prefix, "report-assets/", asset_names[["overview_style"]]),
       stylesheet = if (!is.null(stylesheet)) paste0(prefix, "report-assets/", asset_names[["stylesheet"]]) else NULL,
       logo = if (!is.null(logo)) paste0(prefix, "report-assets/", asset_names[["logo"]]) else NULL,
-      author = author))
+      author = author)))
+    breadcrumb_html <- vapply(utils::head(breadcrumbs, -1L), function(item)
+      paste(render_report_template("breadcrumb-link.html", item), collapse = "\n"), character(1))
+    html <- sub("<!-- aggregate-breadcrumbs -->", paste(breadcrumb_html, collapse = "\n"), html, fixed = TRUE)
+    child_html <- vapply(children, function(item)
+      paste(render_report_template("aggregate-child.html", item), collapse = "\n"), character(1))
+    html <- sub("<!-- aggregate-children -->", paste(child_html, collapse = "\n"), html, fixed = TRUE)
+    sheet_html <- vapply(sheet_order, function(sheet)
+      paste(render_report_template("aggregate-sheet.html", list(sheet = sheet)), collapse = "\n"), character(1))
+    html <- sub("<!-- aggregate-sheets -->", paste(sheet_html, collapse = "\n"), html, fixed = TRUE)
+    note_html <- vapply(if (!depth) notes else character(), function(note)
+      paste(render_report_template("aggregate-note.html", list(note = note)), collapse = "\n"), character(1))
+    html <- sub("<!-- aggregate-notes -->", paste(note_html, collapse = "\n"), html, fixed = TRUE)
+    versions_html <- vapply(seq_len(nrow(version_counts)), function(i) paste(render_report_template(
+      "overview-version-card.html", c(list(version = version_counts$version[i]),
+        report_count_values(list(files = version_counts$files[i])))), collapse = "\n"), character(1))
+    html <- sub("<!-- version-cards -->", paste(versions_html, collapse = "\n"), html, fixed = TRUE)
     cards <- evidence_card_values(list(reference = reference_parts, registry = registry_parts,
       conversion = conversion_parts, primary_key = primary_key_parts), reference_report, registry_report, conversion_report, primary_key_report)
     html <- sub("<!-- evidence-cards -->", paste(render_report_template("evidence-cards.html", cards), collapse = "\n"), html, fixed = TRUE)

@@ -19,40 +19,39 @@
         <button type="button" hidden>Retry</button>
       </div>
     </template>
-  <main>
+  <main data-files="{{files_value}}">
     <img class="report-logo" src="{{logo}}" alt="Report logo">
     <div class="report-navigation">
-      <nav id="breadcrumbs" aria-label="Breadcrumb"></nav>
+      <nav id="breadcrumbs" aria-label="Breadcrumb"><!-- aggregate-breadcrumbs --><span aria-current="page">{{current_label}}</span></nav>
       <span class="report-generated">Generated {{generated_at}}</span>
     </div>
     <h1>{{title}}</h1>
     <p class="author">{{author}}</p>
     <div id="loading"></div>
     <section id="overview" class="report-overview">
-      <div id="overview-notes"></div>
+      <div id="overview-notes"><!-- aggregate-notes --></div>
       <h3>Forms by model version</h3>
-      <div id="overview-versions" class="overview-cards overview-versions" aria-label="Forms by model version"></div>
-      <template id="overview-version-card">
-        <div class="overview-card"><strong></strong><span></span></div>
-      </template>
+      <div id="overview-versions" class="overview-cards overview-versions" aria-label="Forms by model version">
+        <!-- version-cards -->
+      </div>
       <h3>Forms by validation status</h3>
       <div class="overview-cards" aria-label="Overall form status">
-        <div class="overview-card" data-tone="neutral"><strong data-status="valid">—</strong><span><span aria-hidden="true">✅</span>Valid forms</span></div>
-        <div class="overview-card" data-tone="error"><strong data-status="invalid">—</strong><span><span aria-hidden="true">🔴</span>Invalid forms</span></div>
-        <div class="overview-card" data-tone="attention"><strong data-status="incomplete">—</strong><span><span aria-hidden="true">⏳</span>Incomplete forms</span></div>
-        <div class="overview-card" data-tone="error"><strong data-status="failed">—</strong><span><span aria-hidden="true">❌</span>Failed forms</span></div>
+        <div class="overview-card" data-tone="neutral" data-empty="{{status_valid_empty}}"><strong data-status="valid" data-value="{{status_valid_value}}">{{status_valid_count}}</strong><span><span aria-hidden="true">✅</span>Valid forms</span></div>
+        <div class="overview-card" data-tone="error" data-empty="{{status_invalid_empty}}"><strong data-status="invalid" data-value="{{status_invalid_value}}">{{status_invalid_count}}</strong><span><span aria-hidden="true">🔴</span>Invalid forms</span></div>
+        <div class="overview-card" data-tone="attention" data-empty="{{status_incomplete_empty}}"><strong data-status="incomplete" data-value="{{status_incomplete_value}}">{{status_incomplete_count}}</strong><span><span aria-hidden="true">⏳</span>Incomplete forms</span></div>
+        <div class="overview-card" data-tone="error" data-empty="{{status_failed_empty}}"><strong data-status="failed" data-value="{{status_failed_value}}">{{status_failed_count}}</strong><span><span aria-hidden="true">❌</span>Failed forms</span></div>
       </div>
       <h3>Validation findings and unfinished checks</h3>
       <div class="overview-cards" aria-label="Findings and unfinished check counts">
-        <div class="overview-card" data-tone="error"><strong data-total="errors">—</strong><span><span class="severity-dot" data-severity="error" aria-hidden="true"></span>Error findings</span></div>
-        <div class="overview-card" data-tone="attention">
-          <strong data-total="warnings">—</strong>
+        <div class="overview-card" data-tone="error" data-empty="{{errors_empty}}"><strong data-total="errors" data-value="{{errors_value}}">{{errors_count}}</strong><span><span class="severity-dot" data-severity="error" aria-hidden="true"></span>Error findings</span></div>
+        <div class="overview-card" data-tone="attention" data-empty="{{warnings_empty}}">
+          <strong data-total="warnings" data-value="{{warnings_value}}">{{warnings_count}}</strong>
           <span><span class="severity-dot" data-severity="warning" aria-hidden="true"></span>Warning findings</span>
           <small id="warning-policy" class="overview-notes">{{report_notes}}</small>
         </div>
-        <div class="overview-card" data-tone="info"><strong data-total="infos">—</strong><span><span class="severity-dot" data-severity="info" aria-hidden="true"></span>Information findings</span></div>
-        <div class="overview-card" data-tone="attention"><strong data-total="incomplete_checks">—</strong><span><span aria-hidden="true">⏳</span>Incomplete checks</span></div>
-        <div class="overview-card" data-tone="error"><strong data-total="failed_checks">—</strong><span><span aria-hidden="true">❌</span>Failed checks</span></div>
+        <div class="overview-card" data-tone="info" data-empty="{{infos_empty}}"><strong data-total="infos" data-value="{{infos_value}}">{{infos_count}}</strong><span><span class="severity-dot" data-severity="info" aria-hidden="true"></span>Information findings</span></div>
+        <div class="overview-card" data-tone="attention" data-empty="{{incomplete_checks_empty}}"><strong data-total="incomplete_checks" data-value="{{incomplete_checks_value}}">{{incomplete_checks_count}}</strong><span><span aria-hidden="true">⏳</span>Incomplete checks</span></div>
+        <div class="overview-card" data-tone="error" data-empty="{{failed_checks_empty}}"><strong data-total="failed_checks" data-value="{{failed_checks_value}}">{{failed_checks_count}}</strong><span><span aria-hidden="true">❌</span>Failed checks</span></div>
       </div>
       <h3>Evidence reports</h3>
       <!-- evidence-cards -->
@@ -65,7 +64,11 @@
         </div>
       </section>
     </section>
-    <nav id="aggregate-children" aria-label="Child report groups"></nav>
+    <nav id="aggregate-children" aria-label="Child report groups" {{children_hidden}}>
+      <h2>Browse reports</h2>
+      <ul><!-- aggregate-children --></ul>
+    </nav>
+    <template id="aggregate-sheets"><!-- aggregate-sheets --></template>
     <noscript>JavaScript is required for report tables. Download the CSV files to inspect the data.</noscript>
 
     <div id="aggregate"></div>

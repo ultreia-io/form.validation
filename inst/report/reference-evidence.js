@@ -10,7 +10,8 @@
     conversion: [{id: 'values', label: 'Values to review', file: 'values.csv'}],
     'primary-key': [
       {id: 'missing', label: 'Missing components', file: 'missing-components.csv'},
-      {id: 'duplicates', label: 'Duplicate keys', file: 'duplicate-keys.csv'}
+      {id: 'duplicates', label: 'Duplicate keys', file: 'duplicate-keys.csv'},
+      {id: 'parents', label: 'Missing parent keys', file: 'missing-parent-keys.csv'}
     ]
   };
   // Keep readable CSV headings in the UI while using the shared table's field keys.

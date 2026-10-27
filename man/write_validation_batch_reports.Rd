@@ -12,7 +12,8 @@ write_validation_batch_reports(
   author = NULL,
   stylesheet = NULL,
   logo = NULL,
-  workers = 1L
+  workers = 1L,
+  reference_context_columns = NULL
 )
 }
 \arguments{
@@ -31,6 +32,9 @@ write_validation_batch_reports(
 \item{logo}{Optional path to a report logo image.}
 
 \item{workers}{Number of forms to render concurrently. The default is one.}
+
+\item{reference_context_columns}{Public input columns shown in evidence tables.
+Defaults to the batch grouping and identity columns.}
 }
 \value{
 The reports directory, invisibly.

@@ -14,7 +14,7 @@ window.ValidationReportTable = (() => {
   const ui = window.ValidationReportUI;
   function table(parent, data, columns, options = {}) {
     const {fileLinks = false, pageSize: initialSize = 20, filename = 'files', scope, labels: customLabels = {}, renderCell,
-      exportColumns = columns} = options;
+      exportColumns = columns, exportRows = rows => rows} = options;
     let pageSize = initialSize;
     if (!data.length) { el('p', 'None.', parent); return; }
     let filterTimer;
@@ -99,7 +99,7 @@ window.ValidationReportTable = (() => {
       if (filterTimer !== undefined) render();
       const quote = value => '"' + String(value ?? '').replaceAll('"', '""') + '"';
       const content = [exportColumns.map(key => quote(labelFor(key))).join(','),
-        ...selected.map(row => exportColumns.map(key => quote(row[key])).join(','))].join('\r\n');
+        ...exportRows(selected).map(row => exportColumns.map(key => quote(row[key])).join(','))].join('\r\n');
       const url = URL.createObjectURL(new Blob(['\uFEFF', content], {type: 'text/csv;charset=utf-8'}));
       const link = el('a'); link.href = url; link.download = filename + '.csv'; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);

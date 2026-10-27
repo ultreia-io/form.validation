@@ -43,6 +43,6 @@ Relative HTML path under \code{primary-key-evidence}. Returns \code{NULL} withou
 Write primary-key evidence
 }
 \details{
-Missing-component, duplicate-key and missing-parent-key tabs read separate summary CSV files without a Problem column. Detailed evidence is a combined CSV download retaining that column. Duplicate findings remain scoped to each source form; shared values across forms do not imply new duplicates. Counts are rendered directly in HTML.
+Missing-component, duplicate-key and missing-parent-key tabs read separate source CSV files without a Problem column. Browser tables group their rows; downloads retain form names and row locations. Detailed evidence is a combined CSV download retaining that column. Duplicate findings remain scoped to each source form; shared values across forms do not imply new duplicates. Counts are rendered directly in HTML.
 }
 \keyword{internal}

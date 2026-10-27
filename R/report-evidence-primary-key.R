@@ -52,7 +52,7 @@ collect_primary_key_evidence <- function(detail, findings, report, context_colum
 #' @param scope Slash-separated aggregate path, or an empty string for the root.
 #' @param parent_label Label for the root or single-form parent breadcrumb.
 #' @return Relative HTML path under `primary-key-evidence`. Returns `NULL` without writing files when all parts are empty.
-#' @details Missing-component, duplicate-key and missing-parent-key tabs read separate summary CSV files without a Problem column. Detailed evidence is a combined CSV download retaining that column. Duplicate findings remain scoped to each source form; shared values across forms do not imply new duplicates. Counts are rendered directly in HTML.
+#' @details Missing-component, duplicate-key and missing-parent-key tabs read separate source CSV files without a Problem column. Browser tables group their rows; downloads retain form names and row locations. Detailed evidence is a combined CSV download retaining that column. Duplicate findings remain scoped to each source form; shared values across forms do not imply new duplicates. Counts are rendered directly in HTML.
 #' @keywords internal
 write_primary_key_evidence <- function(parts, directory, report_filename, context_columns, title,
                                        stylesheet, logo, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
@@ -82,10 +82,11 @@ write_primary_key_evidence <- function(parts, directory, report_filename, contex
   missing <- cases$problem == "Missing components"
   duplicates <- cases$problem == "Duplicate keys"
   parents <- cases$problem == "Missing parent keys"
-  write_reference_evidence_csv(cases[missing, case_columns], file.path(folder, "missing-components.csv"))
-  write_reference_evidence_csv(cases[duplicates, case_columns], file.path(folder, "duplicate-keys.csv"))
-  parent_columns <- append(case_columns, "parent_sheet", after = 1L)
-  write_reference_evidence_csv(cases[parents, parent_columns], file.path(folder, "missing-parent-keys.csv"))
+  download_columns <- c("input", case_columns[!case_columns %in% "affected_files"], "rows")
+  write_reference_evidence_csv(detail[detail$problem == "Missing components", download_columns], file.path(folder, "missing-components.csv"))
+  write_reference_evidence_csv(detail[detail$problem == "Duplicate keys", download_columns], file.path(folder, "duplicate-keys.csv"))
+  parent_columns <- append(download_columns, "parent_sheet", after = 2L)
+  write_reference_evidence_csv(detail[detail$problem == "Missing parent keys", parent_columns], file.path(folder, "missing-parent-keys.csv"))
   write_reference_evidence_csv(detail[evidence_columns], file.path(folder, "evidence.csv"))
   summary <- list(
     tables = list(missing = sum(missing), duplicates = sum(duplicates), parents = sum(parents)),

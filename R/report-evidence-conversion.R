@@ -37,7 +37,7 @@ collect_conversion_evidence <- function(detail, report, context_columns) {
 #' @param scope Slash-separated aggregate path, or an empty string for the root.
 #' @param parent_label Label for the root or single-form parent breadcrumb.
 #' @return Relative HTML path under `conversion-evidence`.
-#' @details Cases retain model, field, expected type, value and severity. Values are not converted. The browser reads values.csv; evidence.csv provides source details for download. Counts are rendered directly in HTML.
+#' @details Cases retain model, field, expected type, value and severity. Values are not converted. The browser groups source rows from values.csv; downloads retain form names and cell locations. Counts are rendered directly in HTML.
 #' @keywords internal
 write_conversion_evidence <- function(parts, directory, report_filename, context_columns, title, stylesheet, logo, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   folder_name <- "conversion-evidence"
@@ -72,7 +72,7 @@ write_conversion_evidence <- function(parts, directory, report_filename, context
   cases <- shorten(cases)
   detail <- shorten(detail)
   evidence_columns <- c("input", "model_version", "sheet", "field", "expected_type", "value", "severity", "cells", "occurrences")
-  write_reference_evidence_csv(cases[case_columns], file.path(folder, "values.csv"))
+  write_reference_evidence_csv(detail[c("input", case_columns[!case_columns %in% "affected_files"], "cells")], file.path(folder, "values.csv"))
   write_reference_evidence_csv(detail[evidence_columns], file.path(folder, "evidence.csv"))
   summary <- list(
     tables = list(values = nrow(cases)),

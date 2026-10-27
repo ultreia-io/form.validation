@@ -102,7 +102,7 @@ write_reference_evidence_csv <- function(rows, path, reference_label = "Code lis
 #' @param parent_label Label for the root or single-form parent breadcrumb.
 #' @param kind Either `code-list` or `registry`.
 #' @return Relative HTML path under `selected evidence`.
-#' @details Cases are separated by reference snapshot and value, with registry severity and reason where applicable. Summary CSV files supply both browser tables and downloads. Detailed evidence remains a CSV download; counts are rendered directly in HTML.
+#' @details Cases are separated by reference snapshot and value, with registry severity and reason where applicable. Source CSV files supply grouped browser tables and downloads with form names and cell locations. Detailed evidence remains a CSV download; counts are rendered directly in HTML.
 #' @keywords internal
 write_reference_evidence <- function(parts, directory, report_filename, context_columns,
                                      title, stylesheet, logo, kind = c("code-list", "registry"), evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
@@ -142,7 +142,8 @@ write_reference_evidence <- function(parts, directory, report_filename, context_
   case_columns <- c("reference", "model_version", context_columns, "value", extra_columns, "occurrences", "affected_files")
   evidence_columns <- c("input", "model_version", "reference", "value", extra_columns, "sheet", "field", "cells", "occurrences")
   summary_file <- paste0(labels$filename, ".csv")
-  write_reference_evidence_csv(cases[case_columns], file.path(folder, summary_file), labels$reference)
+  write_reference_evidence_csv(detail[unique(c("input", case_columns[!case_columns %in% "affected_files"], "sheet", "field", "cells"))],
+    file.path(folder, summary_file), labels$reference)
   write_reference_evidence_csv(detail[evidence_columns], file.path(folder, "evidence.csv"), labels$reference)
   summary <- list(
     tables = list(values = nrow(cases)),

@@ -46,6 +46,6 @@ Relative HTML path under \verb{selected evidence}.
 Write code-list or registry evidence
 }
 \details{
-Cases are separated by reference snapshot and value, with registry severity and reason where applicable. Summary CSV files supply both browser tables and downloads. Detailed evidence remains a CSV download; counts are rendered directly in HTML.
+Cases are separated by reference snapshot and value, with registry severity and reason where applicable. Source CSV files supply grouped browser tables and downloads with form names and cell locations. Detailed evidence remains a CSV download; counts are rendered directly in HTML.
 }
 \keyword{internal}

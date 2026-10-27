@@ -105,7 +105,7 @@ validation_plan <- function(model, rules = list()) {
       }
       unsupported <- setdiff(names(field),
                              c("id", "name", "sheet", "location", "row", "column", "type",
-                               "mandatory", "enum", "minimum", "maximum", "pattern", "unique",
+                               "mandatory", "enum", "minimum", "maximum", "maximum_field", "pattern", "unique",
                                "reference", "code_list", "registry", "required_field"))
       if (length(unsupported)) stop("Unsupported constraints: ", paste(unsupported, collapse = ", "), call. = FALSE)
       if (isTRUE(field$unique) && layout$kind != "table") {
@@ -113,7 +113,7 @@ validation_plan <- function(model, rules = list()) {
       }
       kinds <- c(if (field$mandatory) "mandatory",
                  if (!is.null(field$required_field)) "required_field", "type",
-                 intersect(c("reference", "code_list", "registry", "enum", "minimum", "maximum", "pattern", "unique"),
+                 intersect(c("reference", "code_list", "registry", "enum", "minimum", "maximum", "maximum_field", "pattern", "unique"),
                            names(field)))
       for (kind in kinds) {
         if (kind == "unique" && !isTRUE(field$unique)) next

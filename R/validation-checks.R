@@ -244,6 +244,12 @@ run_field <- function(rule, context) {
   } else if (kind == "maximum") {
     bad <- eligible[values > value]
     problem <- "Value is above maximum"; expected <- value
+  } else if (kind == "maximum_field") {
+    companion <- context$fields[[paste(field$sheet, value, sep = ".")]]
+    upper <- prepared_field(companion, context)
+    rows <- intersect(eligible, upper$eligible)
+    bad <- rows[values[match(rows, eligible)] > upper$values[match(rows, upper$eligible)]]
+    problem <- paste("Value exceeds", value); expected <- value
   } else if (kind == "pattern") {
     bad <- eligible[!grepl(value, values, perl = TRUE)]
     problem <- "Value does not match pattern"; expected <- value

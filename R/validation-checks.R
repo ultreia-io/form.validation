@@ -35,6 +35,7 @@ run_builtin <- function(rule, context) {
   if (rule$kind %in% c("primary_key_present", "primary_key_unique")) {
     return(run_primary_key(rule, context))
   }
+  if (rule$kind == "parent_key") return(run_parent_key(rule, context))
   layout <- sheet$layout
   if (rule$kind == "row_count") {
     count <- max(0L, nrow(grid) - layout$start_row + 1L)
@@ -87,29 +88,30 @@ run_builtin <- function(rule, context) {
 #' @param context Validation inputs and a cache cleared after preparation.
 #' @return One finding per affected physical row, or an empty finding table.
 #' @details Presence uses the configured missing-value policy. Uniqueness compares
-#'   complete, correctly typed keys using native data-frame duplicate detection,
-#'   without concatenating components. Every row of a duplicate group is reported.
+#'   complete, correctly typed keys using length-prefixed component encoding.
+#'   The cached lookup is shared with later parent-key checks. Every duplicate row is reported.
 #' @keywords internal
 run_primary_key <- function(rule, context) {
   cache_key <- paste0("primary_key/", rule$sheet)
   if (!exists(cache_key, context$cache, inherits = FALSE)) {
     cells <- lapply(rule$key_fields, prepared_field, context = context)
     names(cells) <- unlist(rule$value, use.names = FALSE)
+    complete <- Reduce(`&`, lapply(cells, `[[`, "filled"))
+    typed <- Reduce(`&`, lapply(cells, `[[`, "typed"))
+    eligible <- which(complete & typed)
+    encoded <- encode_key_rows(cells, eligible)
+    lookup <- new.env(hash = TRUE, parent = emptyenv())
+    if (length(encoded)) list2env(stats::setNames(rep(list(TRUE), length(unique(encoded))), unique(encoded)), lookup)
     context$cache[[cache_key]] <- list(cells = cells, rows = cells[[1L]]$rows,
-      complete = Reduce(`&`, lapply(cells, `[[`, "filled")),
-      typed = Reduce(`&`, lapply(cells, `[[`, "typed")))
+      complete = complete, typed = typed, eligible = eligible,
+      duplicates = eligible[duplicated(encoded) | duplicated(encoded, fromLast = TRUE)], lookup = lookup)
   }
   key <- context$cache[[cache_key]]
   if (rule$kind == "primary_key_present") {
     bad <- which(!key$complete)
     message <- "Primary key contains missing values."
   } else {
-    eligible <- which(key$complete & key$typed)
-    columns <- lapply(key$cells, function(cells) {
-      cells$values[match(eligible, cells$eligible)]
-    })
-    keys <- as.data.frame(columns, optional = TRUE, stringsAsFactors = FALSE)
-    bad <- eligible[duplicated(keys) | duplicated(keys, fromLast = TRUE)]
+    bad <- key$duplicates
     message <- "Primary key is not unique."
   }
   values <- lapply(bad, function(i) lapply(key$cells, function(cells) cells$original[[i]]))
@@ -375,4 +377,46 @@ prepared_field <- function(field, context) {
   cells$values <- unlist(lapply(cells$original[cells$eligible], comparison_value, type = field$type), use.names = FALSE)
   context$cache[[key]] <- cells
   cells
+}
+
+#' Encode complete key rows without separator collisions
+#' @param cells Ordered prepared field values, with compatible types on both sides.
+#' @param rows Local positions whose components are present and correctly typed.
+#' @return Character keys with byte-length-prefixed UTF-8 components. Numeric
+#'   values use 17 significant digits and normalize signed zero.
+#' @keywords internal
+encode_key_rows <- function(cells, rows) {
+  if (!length(rows)) return(character())
+  parts <- lapply(cells, function(cell) {
+    values <- cell$values[match(rows, cell$eligible)]
+    text <- if (is.numeric(values)) sprintf("%.17g", ifelse(values == 0, 0, values)) else as.character(values)
+    text <- enc2utf8(text)
+    paste0(nchar(text, type = "bytes"), ":", text)
+  })
+  do.call(paste0, parts)
+}
+
+#' Check child keys against an earlier sheet's cached primary key
+#' @param rule Generated parent-key descriptor with ordered child key fields.
+#' @param context Validation inputs and primary-key caches populated in sheet order.
+#' @return One finding per complete, correctly typed child key absent from the parent.
+#'   Missing or invalid components are left to existing presence and type checks.
+#'   Duplicate parent keys count as present and are reported by their uniqueness check.
+#' @keywords internal
+run_parent_key <- function(rule, context) {
+  cache_key <- paste0("primary_key/", rule$value$sheet)
+  if (!exists(cache_key, context$cache, inherits = FALSE))
+    stop("Parent primary-key cache is unavailable: ", rule$value$sheet, call. = FALSE)
+  parent <- context$cache[[cache_key]]
+  cells <- lapply(rule$key_fields, prepared_field, context = context)
+  names(cells) <- unlist(rule$value$fields, use.names = FALSE)
+  eligible <- which(Reduce(`&`, lapply(cells, `[[`, "typed")))
+  keys <- encode_key_rows(cells, eligible)
+  present <- vapply(keys, exists, logical(1), envir = parent$lookup, inherits = FALSE)
+  bad <- eligible[!present]
+  values <- lapply(bad, function(i) lapply(cells, function(cell) cell$original[[i]]))
+  validation_findings(paste("Parent key does not exist in", rule$value$sheet),
+    row = cells[[1L]]$rows[bad], sheet = rule$sheet, value = values,
+    expected = list(list(primary_key = unlist(rule$value$fields, use.names = FALSE),
+      parent_sheet = rule$value$sheet, parent_key = names(parent$cells))))
 }

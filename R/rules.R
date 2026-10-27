@@ -135,6 +135,14 @@ validation_plan <- function(model, rules = list()) {
         generated[[length(generated) + 1L]] <- rule
       }
     }
+    if (!is.null(sheet$parent_key)) {
+      rule <- rule_record(paste("sheet", sheet_name, "parent_key", sep = "/"), "parent_key",
+                          sheet = sheet_name, stage = "fields")
+      rule$value <- sheet$parent_key
+      key_ids <- paste(sheet_name, unlist(sheet$parent_key$fields, use.names = FALSE), sep = ".")
+      rule$key_fields <- fields[key_ids]
+      generated[[length(generated) + 1L]] <- rule
+    }
   }
   observations <- list()
   for (sheet_name in names(sheets)) {

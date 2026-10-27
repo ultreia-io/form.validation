@@ -19,7 +19,7 @@ Execute an explicit primary-key rule
 }
 \details{
 Presence uses the configured missing-value policy. Uniqueness compares
-complete, correctly typed keys using native data-frame duplicate detection,
-without concatenating components. Every row of a duplicate group is reported.
+complete, correctly typed keys using length-prefixed component encoding.
+The cached lookup is shared with later parent-key checks. Every duplicate row is reported.
 }
 \keyword{internal}

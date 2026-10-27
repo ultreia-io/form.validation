@@ -88,6 +88,21 @@ The engine caches key fields and compares tuples without joining values with sep
 
 Regenerate rules after changing a key. The loader rejects generated rules that no longer match the model.
 
+## Sequences
+
+A field's `sequence` declaration generates an explicit content rule:
+
+```yaml
+rules:
+  field/Observations.observation_id/sequence: {value: {start: 1, group_by: [station]}}
+```
+
+Numbering follows worksheet row order within each group, even when groups are interleaved.
+
+The first row expects 1, the second 2, and so on. String IDs may have leading zeroes.
+
+Each finding gives the expected number and cell location. Primary-key rules handle uniqueness separately.
+
 ## Interpret the result
 
 | Result             | Meaning                                  |

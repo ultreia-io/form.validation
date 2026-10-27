@@ -30,6 +30,7 @@ all nine field types, enums, bounds, patterns, uniqueness, code-list membership,
 registry matching,
 and same-sheet conditional requiredness. Generated content rules also include
 table row counts (info) and internal empty-row checks (warning).
+Sequence declarations generate consecutive numbering checks in worksheet order, within each group.
 Declared primary keys generate presence and composite uniqueness rules (error).
 
 Uniqueness applies only to table fields. Unsupported schema versions, types, layouts, or constraints

@@ -63,6 +63,7 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 #'   registry matching,
 #'   and same-sheet conditional requiredness. Generated content rules also include
 #'   table row counts (info) and internal empty-row checks (warning).
+#'   Sequence declarations generate consecutive numbering checks in worksheet order, within each group.
 #'   Declared primary keys generate presence and composite uniqueness rules (error).
 #'
 #' Uniqueness applies only to table fields. Unsupported schema versions, types, layouts, or constraints
@@ -105,7 +106,7 @@ validation_plan <- function(model, rules = list()) {
       }
       unsupported <- setdiff(names(field),
                              c("id", "name", "sheet", "location", "row", "column", "type",
-                               "mandatory", "enum", "minimum", "maximum", "maximum_field", "pattern", "unique",
+                               "mandatory", "enum", "minimum", "maximum", "maximum_field", "pattern", "sequence", "unique",
                                "reference", "code_list", "registry", "required_field"))
       if (length(unsupported)) stop("Unsupported constraints: ", paste(unsupported, collapse = ", "), call. = FALSE)
       if (isTRUE(field$unique) && layout$kind != "table") {
@@ -113,7 +114,7 @@ validation_plan <- function(model, rules = list()) {
       }
       kinds <- c(if (field$mandatory) "mandatory",
                  if (!is.null(field$required_field)) "required_field", "type",
-                 intersect(c("reference", "code_list", "registry", "enum", "minimum", "maximum", "maximum_field", "pattern", "unique"),
+                 intersect(c("reference", "code_list", "registry", "enum", "minimum", "maximum", "maximum_field", "pattern", "sequence", "unique"),
                            names(field)))
       for (kind in kinds) {
         if (kind == "unique" && !isTRUE(field$unique)) next

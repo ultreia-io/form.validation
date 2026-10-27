@@ -216,6 +216,7 @@ snapshot_keys <- function(id, snapshot) {
 #' @keywords internal
 run_field <- function(rule, context) {
   field <- context$fields[[rule$field]]
+  if (rule$kind == "sequence") return(run_sequence(rule, field, context))
   cells <- prepared_field(field, context)
   kind <- rule$kind
   value <- rule$value
@@ -419,4 +420,47 @@ run_parent_key <- function(rule, context) {
     row = cells[[1L]]$rows[bad], sheet = rule$sheet, value = values,
     expected = list(list(primary_key = unlist(rule$value$fields, use.names = FALSE),
       parent_sheet = rule$value$sheet, parent_key = names(parent$cells))))
+}
+
+#' Check consecutive numbering in worksheet order within each group
+#' @param rule Generated sequence descriptor with start and group_by properties.
+#' @param field Effective integer or string field definition.
+#' @param context Validation inputs and cached prepared field values.
+#' @return Findings at cells differing from their expected sequence position.
+#' @details Groups use complete, correctly typed component values and preserve
+#'   worksheet order, including interleaved groups. Every row in an identifiable
+#'   group occupies a sequence position. Missing, mistyped or pattern-invalid
+#'   sequence values remain the responsibility of their existing field checks.
+#'   Grouping and position assignment are linear in the number of rows.
+#' @keywords internal
+run_sequence <- function(rule, field, context) {
+  cells <- prepared_field(field, context)
+  group_ids <- paste(field$sheet, unlist(rule$value$group_by, use.names = FALSE), sep = ".")
+  groups <- lapply(context$fields[group_ids], prepared_field, context = context)
+  rows <- which(Reduce(`&`, lapply(groups, `[[`, "typed")))
+  if (!length(rows)) return(NULL)
+  keys <- encode_key_rows(groups, rows)
+  expected <- rep(NA_real_, length(cells$rows))
+  group_ids <- match(keys, unique(keys))
+  groups <- factor(group_ids, levels = seq_len(max(group_ids)))
+  for (positions in split(rows, groups))
+    expected[positions] <- rule$value$start + seq_along(positions) - 1
+  eligible <- intersect(rows, cells$eligible)
+  values <- cells$values[match(eligible, cells$eligible)]
+  if (!is.null(field$pattern)) {
+    valid <- grepl(field$pattern, values, perl = TRUE)
+    eligible <- eligible[valid]
+    values <- values[valid]
+  }
+  if (field$type == "string") {
+    # Decimal integer text only; leading zeroes do not change its sequence value.
+    valid <- grepl("^-?[0-9]+$", values)
+    numbers <- rep(NA_real_, length(values))
+    numbers[valid] <- suppressWarnings(as.numeric(values[valid]))
+  } else numbers <- values
+  bad <- eligible[!is.finite(numbers) | numbers != expected[eligible]]
+  validation_findings("Value is out of sequence within its group",
+    row = cells$rows[bad], sheet = field$sheet, field = field$id,
+    column = cells$column, value = cells$original[bad],
+    expected = as.list(expected[bad]))
 }

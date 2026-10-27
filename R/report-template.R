@@ -29,3 +29,18 @@ render_report_template <- function(name, values) {
     line
   }), use.names = FALSE)
 }
+
+#' Prepare counts for HTML cards
+#' @param counts Named list or one-row data frame of numeric counts.
+#' @return Scalar template values for formatted counts, raw values and empty states.
+#' @keywords internal
+report_count_values <- function(counts) {
+  values <- list()
+  for (key in names(counts)) {
+    count <- as.numeric(counts[[key]])
+    values[[paste0(key, "_count")]] <- format(count, big.mark = ",", scientific = FALSE, trim = TRUE)
+    values[[paste0(key, "_value")]] <- format(count, scientific = FALSE, trim = TRUE)
+    values[[paste0(key, "_empty")]] <- if (count == 0) "true" else "false"
+  }
+  values
+}

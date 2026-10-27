@@ -87,10 +87,10 @@ evidence_card_values <- function(parts, reference_report, registry_report, conve
 #' @param assets_directory Shared asset directory relative to `directory`.
 #' @param overwrite Whether existing evidence folders may be replaced.
 #' @return Template values from `evidence_card_values()` for the individual report.
-#' @details Writes HTML, reviewer CSV files and interactive case data only for
+#' @details Writes HTML, reviewer CSV files and summary counts only for
 #'   nonempty evidence kinds. On replacement, stale folders are removed even when
 #'   the new count is zero. Always saves `evidence.json` for later aggregation.
-#'   Source links point back to the form report; shared assets use content hashes.
+#'   Breadcrumbs point back to the form report; shared assets use content hashes.
 #' @keywords internal
 write_individual_evidence <- function(report, directory, report_filename, title,
                                       stylesheet, logo, assets_directory, overwrite) {

@@ -48,7 +48,7 @@ collect_primary_key_evidence <- function(detail, findings, report, context_colum
 #' @param scope Slash-separated aggregate path, or an empty string for the root.
 #' @param parent_label Label for the root or single-form parent breadcrumb.
 #' @return Relative HTML path under `primary-key-evidence`. Returns `NULL` without writing files when all parts are empty.
-#' @details Creates missing-component and duplicate-key tabs. Duplicate findings remain scoped to each source form; shared values across forms do not imply new duplicates. Writes case and evidence CSV files, metadata JSON, per-case JSON and HTML using shared assets.
+#' @details Missing-component and duplicate-key tabs read separate summary CSV files without a Problem column. Detailed evidence is a combined CSV download retaining that column. Duplicate findings remain scoped to each source form; shared values across forms do not imply new duplicates. Counts are rendered directly in HTML.
 #' @keywords internal
 write_primary_key_evidence <- function(parts, directory, report_filename, context_columns, title,
                                        stylesheet, logo, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
@@ -62,40 +62,32 @@ write_primary_key_evidence <- function(parts, directory, report_filename, contex
   if (!nrow(detail)) return(NULL)
   folder_name <- "primary-key-evidence"
   folder <- file.path(directory, folder_name)
-  dir.create(file.path(folder, "evidence"), recursive = TRUE, showWarnings = FALSE)
+  dir.create(folder, recursive = TRUE, showWarnings = FALSE)
   keys <- c("model_version", "rules_version", context_columns, "sheet", "key_fields", "problem", "value", "severity")
   groups <- reference_evidence_groups(detail, keys)
   cases <- do.call(rbind, lapply(seq_along(groups), function(i) {
     selected <- detail[groups[[i]], , drop = FALSE]
     row <- selected[1L, keys, drop = FALSE]
-    row$case_id <- sprintf("key-%04d", i)
     row$occurrences <- sum(as.numeric(selected$occurrences))
     row$affected_files <- length(unique(selected$input))
-    row$evidence_file <- paste0("evidence/", row$case_id, ".json")
     row
   }))
   case_columns <- c("sheet", "model_version", context_columns, "key_fields", "value", "severity", "occurrences", "affected_files")
   evidence_columns <- c("input", "model_version", "sheet", "key_fields", "problem", "value", "severity", "rows", "occurrences")
-  write_reference_evidence_csv(cases[c("problem", case_columns)], file.path(folder, "keys.csv"))
+  missing <- cases$problem == "Missing components"
+  write_reference_evidence_csv(cases[missing, case_columns], file.path(folder, "missing-components.csv"))
+  write_reference_evidence_csv(cases[!missing, case_columns], file.path(folder, "duplicate-keys.csv"))
   write_reference_evidence_csv(detail[evidence_columns], file.path(folder, "evidence.csv"))
-  for (i in seq_along(groups)) {
-    rows <- detail[groups[[i]], unique(c(evidence_columns, context_columns, "report")), drop = FALSE]
-    jsonlite::write_json(rows, file.path(folder, cases$evidence_file[i]), auto_unbox = TRUE)
-  }
-  jsonlite::write_json(list(
-    labels = list(cases = "Keys to review", filename = "keys", value = "Key values", rows = "Excel rows"),
-    case_tabs = list(list(id = "missing", label = "Missing components", key = "problem", value = "Missing components"),
-      list(id = "duplicates", label = "Duplicate keys", key = "problem", value = "Duplicate keys")),
-    case_heading_columns = as.list(c("sheet", "problem")),
-    context_columns = as.list(context_columns), case_columns = as.list(case_columns),
-    evidence_columns = as.list(evidence_columns), detail_columns = as.list(evidence_columns),
-    cases = cases[c("case_id", "problem", case_columns, "evidence_file")],
+  summary <- list(
+    tables = list(missing = sum(missing), duplicates = sum(!missing)),
     totals = list(cases = nrow(cases), sheets = length(unique(detail$sheet)),
       forms = length(unique(detail$input)), occurrences = sum(as.numeric(detail$occurrences)))
-  ), file.path(folder, "metadata.json"), auto_unbox = TRUE, pretty = TRUE)
+  )
   write_evidence_page(directory, folder_name, report_filename, title, stylesheet, logo, list(
-    evidence_label = "Primary-key evidence", cases_label = "Keys to review", category_total = "sheets",
-    references_label = "Affected sheets", summary_file = "keys.csv", summary_label = "Keys CSV",
-    summary_description = "Missing components and duplicate keys",
-    description = NULL, instructions = NULL), evidence_assets = evidence_assets, scope = scope, parent_label = parent_label)
+    report_kind = "primary-key", evidence_label = "Primary-key evidence", cases_label = "Keys to review", category_total = "sheets",
+    references_label = "Affected sheets", summary_file = "missing-components.csv", summary_label = "Missing components CSV",
+    summary_description = "Keys with missing components",
+    secondary_file = "duplicate-keys.csv", secondary_label = "Duplicate keys CSV",
+    secondary_description = "Repeated keys within a form",
+    description = NULL, instructions = NULL), summary = summary, evidence_assets = evidence_assets, scope = scope, parent_label = parent_label)
 }

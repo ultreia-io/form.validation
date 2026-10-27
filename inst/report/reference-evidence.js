@@ -1,114 +1,46 @@
-/* Review saved findings, then load only the selected case's source evidence. */
+/* Summary CSVs serve both interactive review and downloads; counts are rendered in HTML. */
 'use strict';
 (() => {
   const ui = window.ValidationReportUI, table = window.ValidationReportTable;
   const format = new Intl.NumberFormat('en');
   const progress = ui.feedback(document.getElementById('loading'));
-  const visibleValue = value => value === '' ? '(empty)'
-    : value.replace(/\r\n|\r|\n/g, '↵').replace(/\t/g, '⇥').replace(/ /g, '·');
+  const definitions = {
+    'code-list': [{id: 'values', label: 'Codes to review', file: 'codes.csv'}],
+    registry: [{id: 'values', label: 'Values to review', file: 'values.csv'}],
+    conversion: [{id: 'values', label: 'Values to review', file: 'values.csv'}],
+    'primary-key': [
+      {id: 'missing', label: 'Missing components', file: 'missing-components.csv'},
+      {id: 'duplicates', label: 'Duplicate keys', file: 'duplicate-keys.csv'}
+    ]
+  };
+  // Keep readable CSV headings in the UI while using the shared table's field keys.
+  const columnKey = heading => ({'Submitted value': 'value', 'Code list': 'reference',
+    Registry: 'reference', 'Affected forms': 'affected_files'}[heading]
+    || heading.toLowerCase().replaceAll(' ', '_'));
   async function main() {
-    const response = await fetch('metadata.json', {credentials: 'same-origin'});
-    if (!response.ok) throw new Error(`metadata.json: HTTP ${response.status}`);
-    const metadata = await response.json();
-    const cases = metadata.cases;
-    const caseHeading = item => (metadata.case_heading_columns || ['reference']).map(key => item[key]).join(' · ');
-    const labels = {value: 'Submitted value', ...metadata.labels};
-    const overview = document.getElementById('overview');
-    overview.querySelectorAll('[data-total]').forEach(node => {
-      const count = Number(metadata.totals[node.dataset.total]);
-      node.textContent = format.format(count);
-      node.closest('.overview-card').dataset.empty = String(count === 0);
-    });
+    const counts = document.querySelector('main').dataset;
     const root = document.getElementById('reference-review');
     root.replaceChildren();
-    let details;
-    function evidence(content, update) {
-      let ready = Promise.resolve(), requested, revision = 0;
-      const prompt = document.createElement('p');
-      prompt.textContent = `Select a case in ${metadata.labels.cases}.`;
-      content.append(prompt);
-      return {
-        get ready() { return ready; },
-        setFilters(filters) {
-          const item = cases.find(row => row.case_id === filters.case_id);
-          if (!item || item.case_id === requested) return;
-          requested = item.case_id;
-          const current = ++revision;
-          ready = (async () => {
-            update('Loading source evidence…');
-            const response = await fetch(item.evidence_file, {credentials: 'same-origin'});
-            if (!response.ok) throw new Error(`${item.evidence_file}: HTTP ${response.status}`);
-            const rows = await response.json();
-            if (current !== revision) return;
-            const section = document.getElementById('reference-case').content.firstElementChild.cloneNode(true);
-            section.querySelector('[data-case-reference]').textContent = caseHeading(item);
-            section.querySelector('[data-case-value]').textContent = visibleValue(item.value);
-            table(section.querySelector('[data-case-table]'), rows,
-              metadata.detail_columns,
-              {fileLinks: true, filename: 'evidence', pageSize: 20, labels,
-                exportColumns: metadata.evidence_columns,
-                renderCell(cell, key, row) {
-                  if (!['cells', 'rows'].includes(key) || row[key].length <= 80) return false;
-                  const disclosure = document.createElement('details'), caption = document.createElement('summary');
-                  caption.textContent = `${row[key].slice(0, 77)}…`;
-                  const locations = document.createElement('p'); locations.className = 'reference-cells';
-                  locations.textContent = row[key];
-                  disclosure.append(caption, locations); cell.append(disclosure);
-                  return true;
-                }});
-            content.replaceChildren(section);
-          })().catch(error => {
-            if (current === revision) requested = undefined;
-            throw error;
-          });
-        }
-      };
-    }
-    const caseTabs = metadata.case_tabs || [{id: 'values', label: metadata.labels.cases}];
-    const panels = caseTabs.map(tab => {
-      const selected = tab.key ? cases.filter(row => row[tab.key] === tab.value) : cases;
-      return {id: tab.id, largeTable: selected.length >= 10000, label: `${tab.label} (${format.format(selected.length)})`,
-        render(content) {
-          const valuesTable = table(content, selected,
-            metadata.case_columns,
-            {filename: metadata.labels.filename, pageSize: 20, labels,
-              renderCell(cell, key, row) {
-                if (key !== 'value') return false;
-                const button = document.createElement('button'); button.type = 'button';
-                button.className = 'reference-code-link report-value'; button.textContent = visibleValue(row.value);
-                button.title = `Inspect source evidence for ${caseHeading(row)}`;
-                button.onclick = () => {
-                  details.enable('evidence');
-                  details.open('evidence', {case_id: row.case_id}, true);
-                };
-                cell.append(button); return true;
-              }});
-          return valuesTable;
-        }};
-    });
-    details = ui.tabs(root, [...panels,
-      {id: 'evidence', label: 'Source evidence', disabled: true,
-        disabledHint: 'Select a case to view its source evidence.', render: evidence}
-    ], 'reference-details', 'Details', true);
-    if (metadata.filter_cards) {
-      const filters = document.getElementById('evidence-filters');
-      filters.hidden = false;
-      const names = {error: 'Errors', warning: 'Warnings', boolean: 'Boolean', integer: 'Integer',
-        number: 'Number', date: 'Date', datetime: 'Date and time', time: 'Time'};
-      for (const [key, cards] of Object.entries(metadata.filter_cards)) {
-        const group = filters.querySelector(`[data-filter-cards="${key}"]`);
-        for (const {value, count} of cards) {
-          const card = document.getElementById('evidence-filter-card').content.firstElementChild.cloneNode(true);
-          card.dataset.empty = String(count === 0);
-          if (key === 'severity') card.dataset.tone = value === 'error' ? 'error' : 'attention';
-          card.querySelector('strong').textContent = format.format(count);
-          card.querySelector('span').textContent = names[value] || value;
-          group.append(card);
-          ui.bindCard(card, count, () => details.open('values', {[key]: value}, true),
-            `Show ${names[value] || value} conversion findings`, 'View findings');
-        }
+    const panels = definitions[document.querySelector('main').dataset.reportKind].map(tab => ({
+      id: tab.id, largeTable: Number(counts[tab.id]) >= 10000,
+      label: `${tab.label} (${format.format(Number(counts[tab.id]))})`,
+      async render(content, update) {
+        const data = await ui.loadCSV(tab.file, update);
+        const columns = data.header.map(columnKey);
+        const labels = Object.fromEntries(data.header.map((heading, i) => [columns[i], heading]));
+        const rows = data.rows.map(row => Object.fromEntries(
+          data.header.map((heading, i) => [columns[i], row[heading]])));
+        return table(content, rows, columns,
+          {filename: tab.file.replace(/\.csv$/, ''), pageSize: 20, labels});
       }
-    }
+    }));
+    const details = ui.tabs(root, panels, 'reference-details', 'Details', true);
+    document.querySelectorAll('[data-filter]').forEach(card => {
+      const label = card.querySelector('span').textContent;
+      ui.bindCard(card, Number(card.dataset.value),
+        () => details.open('values', {[card.dataset.filter]: card.dataset.filterValue}, true),
+        `Show ${label} conversion findings`, 'View findings');
+    });
     await details.ready;
     progress.finish();
   }

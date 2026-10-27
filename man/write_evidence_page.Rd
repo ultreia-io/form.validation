@@ -12,6 +12,7 @@ write_evidence_page(
   stylesheet,
   logo,
   labels,
+  summary,
   evidence_assets = "../report-assets",
   scope = "",
   parent_label = "All reports"
@@ -20,7 +21,7 @@ write_evidence_page(
 \arguments{
 \item{directory}{Parent report directory receiving the evidence subdirectory.}
 
-\item{folder_name}{Evidence subdirectory already containing its CSV and JSON data.}
+\item{folder_name}{Evidence subdirectory already containing its CSV data.}
 
 \item{report_filename}{Filename for the generated HTML page and parent report links.}
 
@@ -29,6 +30,8 @@ write_evidence_page(
 \item{stylesheet, logo}{Optional branding file paths, or \code{NULL}.}
 
 \item{labels}{Template values for headings, counts, descriptions and CSV resource links.}
+
+\item{summary}{Table sizes, overview totals and optional conversion filter counts.}
 
 \item{evidence_assets}{Shared asset directory relative to the evidence subdirectory.}
 

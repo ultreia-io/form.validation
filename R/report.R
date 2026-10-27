@@ -168,7 +168,7 @@ write_report_csv <- function(data, path) {
 
 #' Write a CSV-backed HTML validation report
 #'
-#' Write a small HTML page that loads adjacent summary.csv and findings.csv.
+#' Write an HTML overview with counts and load adjacent findings.csv for tables.
 #' Serve the output over HTTP using Apache or a Shiny static resource directory.
 #' @param report Prepared data from [`validation_report_data()`][form.validation::validation_report_data].
 #' @param path Destination HTML filename.
@@ -235,13 +235,29 @@ write_validation_report <- function(report, path, title = "Validation report", a
   }, character(1)), names(sources))
   evidence <- write_individual_evidence(report, directory, basename(path), title,
     stylesheet, logo, assets_directory, overwrite)
-  html <- render_report_template("report.html", list(
+  summary <- report$summary
+  counts <- report_count_values(summary[c("errors", "warnings", "infos", "incomplete", "failed")])
+  explanation <- switch(summary$status,
+    valid = "This form passed validation.", invalid = "This form has not passed validation.",
+    incomplete = paste(format(summary$incomplete + summary$failed, big.mark = ",", trim = TRUE),
+      "checks could not finish. This form has not passed validation."),
+    failed = "Validation failed to complete. This form has not passed validation.")
+  if (!isTRUE(summary$structure_passed))
+    explanation <- "Structure validation did not pass. Field and business checks were not run."
+  html <- render_report_template("report.html", c(counts, list(
+    generated_at = sub("Z$", " UTC", sub("T", " ", summary$generated_at, fixed = TRUE)),
+    status = summary$status,
+    status_label = if (summary$status == "valid") "Validation passed" else paste("Validation", summary$status),
+    status_icon = c(valid = "\u2705", invalid = "\U0001f534", incomplete = "\u23f3", failed = "\u274c")[[summary$status]],
+    explanation = explanation, structure = if (isTRUE(summary$structure_passed)) "Passed" else "Not passed",
+    model_version = as.character(summary$model_version),
+    rules_version = if (is.na(summary$rules_version)) "" else as.character(summary$rules_version),
     title = title, style = urls[["style"]], script = urls[["script"]],
     overview_style = urls[["overview_style"]],
     loading_script = urls[["loading_script"]], csv_worker = urls[["csv_worker"]],
     stylesheet = if (!is.null(stylesheet)) urls[["stylesheet"]] else NULL,
     logo = if (!is.null(logo)) urls[["logo"]] else NULL, author = author, parent_report = parent_report,
-    report_notes = notes))
+    report_notes = notes)))
   html <- sub("<!-- evidence-cards -->", paste(render_report_template("evidence-cards.html", evidence), collapse = "\n"), html, fixed = TRUE)
   writeLines(html, path, useBytes = TRUE)
   invisible(normalizePath(path, mustWork = TRUE))

@@ -22,40 +22,37 @@
     <img class="report-logo" src="{{logo}}" alt="Report logo">
     <div class="report-navigation">
       <nav class="report-parent"><a href="{{parent_report}}">← Back to aggregate report</a></nav>
-      <span id="report-generated" class="report-generated"></span>
+      <span id="report-generated" class="report-generated">Generated {{generated_at}}</span>
     </div>
     <h1>{{title}}</h1>
     <p class="author">{{author}}</p>
     <div id="loading"></div>
-    <div id="report-overview"></div>
-    <noscript>JavaScript is required to display this report.</noscript>
-    <template id="findings-overview">
-      <section class="report-overview">
-        <div class="overview-outcome">
-          <strong class="overview-status" data-meta="status"></strong>
-          <p data-meta="explanation"></p>
+    <noscript>JavaScript is required for interactive tables. Download the CSV files to inspect the data.</noscript>
+      <section id="report-overview" class="report-overview">
+        <div class="overview-outcome" data-status="{{status}}">
+          <strong class="overview-status" data-meta="status"><span aria-hidden="true">{{status_icon}}</span> {{status_label}}</strong>
+          <p data-meta="explanation">{{explanation}}</p>
           <div class="overview-metadata">
-            <span>Structure: <strong data-meta="structure"></strong></span>
-            <span>Model version: <strong data-meta="model_version"></strong></span>
-            <span>Rules version: <strong data-meta="rules_version"></strong></span>
+            <span>Structure: <strong data-meta="structure">{{structure}}</strong></span>
+            <span>Model version: <strong data-meta="model_version">{{model_version}}</strong></span>
+            <span>Rules version: <strong data-meta="rules_version">{{rules_version}}</strong></span>
           </div>
         </div>
         <h3>Validation findings and unfinished checks</h3>
         <div class="overview-cards" aria-label="Findings and unfinished check counts">
-          <div class="overview-card" data-tone="error"><strong data-count="errors">—</strong><span><span class="severity-dot" data-severity="error" aria-hidden="true"></span>Error findings</span></div>
-          <div class="overview-card" data-tone="attention">
-            <strong data-count="warnings">—</strong>
+          <div class="overview-card" data-tone="error" data-empty="{{errors_empty}}"><strong data-count="errors" data-value="{{errors_value}}">{{errors_count}}</strong><span><span class="severity-dot" data-severity="error" aria-hidden="true"></span>Error findings</span></div>
+          <div class="overview-card" data-tone="attention" data-empty="{{warnings_empty}}">
+            <strong data-count="warnings" data-value="{{warnings_value}}">{{warnings_count}}</strong>
             <span><span class="severity-dot" data-severity="warning" aria-hidden="true"></span>Warning findings</span>
             <small id="warning-policy" class="overview-notes">{{report_notes}}</small>
           </div>
-          <div class="overview-card" data-tone="info"><strong data-count="infos">—</strong><span><span class="severity-dot" data-severity="info" aria-hidden="true"></span>Information findings</span></div>
-          <div class="overview-card" data-tone="attention"><strong data-count="incomplete">—</strong><span><span aria-hidden="true">⏳</span>Incomplete checks</span></div>
-          <div class="overview-card" data-tone="error"><strong data-count="failed">—</strong><span><span aria-hidden="true">❌</span>Failed checks</span></div>
+          <div class="overview-card" data-tone="info" data-empty="{{infos_empty}}"><strong data-count="infos" data-value="{{infos_value}}">{{infos_count}}</strong><span><span class="severity-dot" data-severity="info" aria-hidden="true"></span>Information findings</span></div>
+          <div class="overview-card" data-tone="attention" data-empty="{{incomplete_empty}}"><strong data-count="incomplete" data-value="{{incomplete_value}}">{{incomplete_count}}</strong><span><span aria-hidden="true">⏳</span>Incomplete checks</span></div>
+          <div class="overview-card" data-tone="error" data-empty="{{failed_empty}}"><strong data-count="failed" data-value="{{failed_value}}">{{failed_count}}</strong><span><span aria-hidden="true">❌</span>Failed checks</span></div>
         </div>
         <h3>Evidence reports</h3>
         <!-- evidence-cards -->
       </section>
-    </template>
     <section class="report-resources report-overview" aria-label="Resources">
       <h2>Resources</h2>
       <div class="resource-links">

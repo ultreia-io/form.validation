@@ -43,6 +43,6 @@ Relative HTML path under \code{conversion-evidence}.
 Write conversion evidence
 }
 \details{
-Cases retain model, field, expected type, value and severity. Values are not converted. Writes case and evidence CSV files, metadata JSON, per-case JSON and HTML using shared assets.
+Cases retain model, field, expected type, value and severity. Values are not converted. The browser groups source rows from values.csv; downloads retain form names and cell locations. Counts are rendered directly in HTML.
 }
 \keyword{internal}

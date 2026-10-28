@@ -37,9 +37,9 @@ Template values from \code{evidence_card_values()} for the individual report.
 Write individual evidence reports and their reusable data
 }
 \details{
-Writes HTML, reviewer CSV files and interactive case data only for
+Writes HTML, reviewer CSV files and summary counts only for
 nonempty evidence kinds. On replacement, stale folders are removed even when
 the new count is zero. Always saves \code{evidence.json} for later aggregation.
-Source links point back to the form report; shared assets use content hashes.
+Breadcrumbs point back to the form report; shared assets use content hashes.
 }
 \keyword{internal}

@@ -1,3 +1,11 @@
+# form.validation 0.5.0
+
+* Validate parent keys, grouped sequences, and field-to-field numeric maximums.
+* Publish JSON-free aggregate and evidence reports with source forms and locations.
+* Handle primary-key evidence from validation plans without a rules version.
+* Update form.model from 0.4.0 to 0.5.1 and form.references from 0.1.0 to 0.2.1.
+* Exercise the enriched survey and batch publication in the test suite.
+
 # form.validation 0.4.0
 
 * Validate table primary keys and report missing or duplicate keys as evidence.

@@ -92,9 +92,9 @@ test_that("individual and aggregate reports retain informational counts and card
   single <- write_validation_report(report, file.path(directory, "form", "index.html"))
   write_validation_aggregate(data.frame(directory = "form", report = "index.html"),
     directory, group_columns = character())
-  totals <- jsonlite::read_json(file.path(directory, "aggregate.json"), simplifyVector = TRUE)$totals
-  expect_identical(totals$infos, 1L)
-  expect_identical(totals$errors, 0L)
+  aggregate_html <- paste(readLines(file.path(directory, "index.html")), collapse = "\n")
+  expect_match(aggregate_html, 'data-total="infos" data-value="1">1</strong>', fixed = TRUE)
+  expect_match(aggregate_html, 'data-total="errors" data-value="0">0</strong>', fixed = TRUE)
   for (path in c(single, file.path(directory, "index.html"))) {
     html <- paste(readLines(path, warn = FALSE), collapse = "\n")
     expect_match(html, "Information findings", fixed = TRUE)

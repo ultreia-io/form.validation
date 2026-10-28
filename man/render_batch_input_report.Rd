@@ -13,7 +13,8 @@ render_batch_input_report(
   title,
   author,
   stylesheet,
-  logo
+  logo,
+  reference_context_columns
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ render_batch_input_report(
 \item{report_filename}{HTML basename.}
 
 \item{title, author, stylesheet, logo}{Report presentation options.}
+
+\item{reference_context_columns}{Public input columns shown in evidence tables.}
 }
 \value{
 Status and elapsed rendering time, or an error message.

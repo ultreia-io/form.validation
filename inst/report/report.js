@@ -143,44 +143,12 @@
     })), summary ? 'summary' : 'messages');
   }
   async function main() {
-    const summaries = await load('summary.csv', progress.update);
-    const columns = ['input', 'status', 'structure_passed', 'generated_at', 'model_version', 'rules_version', 'errors', 'warnings', 'incomplete', 'failed'];
-    columns.forEach(c => { if (!summaries.header.includes(c)) throw new Error(`Missing CSV column: ${c}`); });
-    if (summaries.rows.length !== 1) throw new Error('Expected one summary row');
-    const s = summaries.rows[0], root = document.getElementById('report');
-    const overview = document.getElementById('findings-overview').content.firstElementChild.cloneNode(true);
-    const number = new Intl.NumberFormat('en');
-    overview.querySelectorAll('[data-count]').forEach(node => {
-      const count = Number(s[node.dataset.count] || 0);
-      node.textContent = number.format(count);
-      node.closest('.overview-card').dataset.empty = String(count === 0);
-    });
-    const unfinishedCount = Number(s.incomplete) + Number(s.failed);
-    const descriptions = {
-      valid: 'This form passed validation.',
-      invalid: 'This form has not passed validation.',
-      incomplete: `${number.format(unfinishedCount)} checks could not finish. This form has not passed validation.`,
-      failed: 'Validation failed to complete. This form has not passed validation.'
-    };
-    const metadata = {
-      generated_at: `Generated ${s.generated_at.replace('T', ' ').replace('Z', ' UTC')}`,
-      status: s.status === 'valid' ? 'Validation passed' : `Validation ${s.status}`,
-      explanation: s.structure_passed !== 'TRUE'
-        ? 'Structure validation did not pass. Field and business checks were not run.'
-        : descriptions[s.status],
-      structure: s.structure_passed === 'TRUE' ? 'Passed' : 'Not passed',
-      model_version: s.model_version, rules_version: s.rules_version
-    };
-    document.getElementById('report-generated').textContent = metadata.generated_at;
-    overview.querySelectorAll('[data-meta]').forEach(node => { node.textContent = metadata[node.dataset.meta]; });
-    const statusIcon = {valid: '✅', invalid: '🔴', incomplete: '⏳', failed: '❌'}[s.status];
-    if (statusIcon) {
-      const icon = document.createElement('span'); icon.textContent = statusIcon;
-      icon.setAttribute('aria-hidden', 'true');
-      overview.querySelector('[data-meta="status"]').prepend(icon, document.createTextNode(' '));
-    }
-    overview.querySelector('.overview-outcome').dataset.status = s.status;
-    document.getElementById('report-overview').replaceChildren(overview);
+    const root = document.getElementById('report');
+    const overview = document.getElementById('report-overview');
+    const s = Object.fromEntries([...overview.querySelectorAll('[data-count]')]
+      .map(node => [node.dataset.count, Number(node.dataset.value)]));
+    const unfinishedCount = s.incomplete + s.failed;
+    root.replaceChildren();
     progress.finish();
     let prepared;
     async function getFindings(update) {
@@ -223,7 +191,7 @@
 
   const progress = ui.feedback(document.getElementById('loading'));
   async function run() {
-    progress.start('Loading summary…');
+    progress.start('Loading tables…');
     try { await main(); } catch (error) { progress.fail(error, run); }
   }
   run();

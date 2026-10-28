@@ -37,12 +37,12 @@ collect_conversion_evidence <- function(detail, report, context_columns) {
 #' @param scope Slash-separated aggregate path, or an empty string for the root.
 #' @param parent_label Label for the root or single-form parent breadcrumb.
 #' @return Relative HTML path under `conversion-evidence`.
-#' @details Cases retain model, field, expected type, value and severity. Values are not converted. Writes case and evidence CSV files, metadata JSON, per-case JSON and HTML using shared assets.
+#' @details Cases retain model, field, expected type, value and severity. Values are not converted. The browser groups source rows from values.csv; downloads retain form names and cell locations. Counts are rendered directly in HTML.
 #' @keywords internal
 write_conversion_evidence <- function(parts, directory, report_filename, context_columns, title, stylesheet, logo, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   folder_name <- "conversion-evidence"
   folder <- file.path(directory, folder_name)
-  dir.create(file.path(folder, "evidence"), recursive = TRUE, showWarnings = FALSE)
+  dir.create(folder, recursive = TRUE, showWarnings = FALSE)
   keys <- c("model_version", "rules_version", context_columns, "sheet", "field", "expected_type", "value", "severity")
   columns <- c("input", keys, "column", "cells", "occurrences", "report")
   parts <- Filter(Negate(is.null), parts)
@@ -50,17 +50,14 @@ write_conversion_evidence <- function(parts, directory, report_filename, context
     as.data.frame(stats::setNames(rep(list(character()), length(columns)), columns))
   # Preserve the full field identifier for grouping; shorten only its display label.
   groups <- reference_evidence_groups(detail, keys)
-  case_ids <- sprintf("conversion-%04d", seq_along(groups))
   case_columns <- c("field", "model_version", context_columns, "sheet", "expected_type", "value", "severity", "occurrences", "affected_files")
-  summary_columns <- c("case_id", keys, "occurrences", "affected_files", "evidence_file")
+  summary_columns <- c(keys, "occurrences", "affected_files")
   cases <- as.data.frame(stats::setNames(rep(list(character()), length(summary_columns)), summary_columns))
   if (length(groups)) cases <- do.call(rbind, lapply(seq_along(groups), function(i) {
     selected <- detail[groups[[i]], , drop = FALSE]
     row <- selected[1L, keys, drop = FALSE]
-    row$case_id <- case_ids[i]
     row$occurrences <- sum(as.numeric(selected$occurrences))
     row$affected_files <- length(unique(selected$input))
-    row$evidence_file <- paste0("evidence/", row$case_id, ".json")
     row[summary_columns]
   }))
   # Shorten displayed field identifiers
@@ -75,31 +72,22 @@ write_conversion_evidence <- function(parts, directory, report_filename, context
   cases <- shorten(cases)
   detail <- shorten(detail)
   evidence_columns <- c("input", "model_version", "sheet", "field", "expected_type", "value", "severity", "cells", "occurrences")
-  write_reference_evidence_csv(cases[case_columns], file.path(folder, "values.csv"))
+  write_reference_evidence_csv(detail[c("input", case_columns[!case_columns %in% "affected_files"], "cells")], file.path(folder, "values.csv"))
   write_reference_evidence_csv(detail[evidence_columns], file.path(folder, "evidence.csv"))
-  for (i in seq_along(groups)) {
-    rows <- detail[groups[[i]], unique(c(evidence_columns, context_columns, "report")), drop = FALSE]
-    jsonlite::write_json(rows, file.path(folder, cases$evidence_file[i]), auto_unbox = TRUE)
-  }
-  jsonlite::write_json(list(
-    labels = list(cases = "Values to review", filename = "values"),
+  summary <- list(
+    tables = list(values = nrow(cases)),
     filter_cards = list(
       severity = lapply(c("error", "warning"), function(value) list(value = value,
         count = sum(as.numeric(detail$occurrences[detail$severity == value])))),
       expected_type = lapply(unique(c("boolean", "integer", "number", "date", "datetime", detail$expected_type)),
         function(value) list(value = value,
           count = sum(as.numeric(detail$occurrences[detail$expected_type == value]))))),
-    case_heading_columns = as.list(c("sheet", "field", "expected_type")),
-    context_columns = as.list(context_columns), case_columns = as.list(case_columns),
-    evidence_columns = as.list(evidence_columns),
-    detail_columns = as.list(c("input", "model_version", context_columns, "sheet", "field", "severity", "cells", "occurrences")),
-    cases = cases[c("case_id", case_columns, "evidence_file")],
     totals = list(cases = nrow(cases), types = length(unique(detail$expected_type)),
       forms = length(unique(detail$input)), occurrences = sum(as.numeric(detail$occurrences)))
-  ), file.path(folder, "metadata.json"), auto_unbox = TRUE, pretty = TRUE)
+  )
   write_evidence_page(directory, folder_name, report_filename, title, stylesheet, logo, list(
-    evidence_label = "Conversion errors", cases_label = "Values to review", category_total = "types",
+    report_kind = "conversion", evidence_label = "Conversion errors", cases_label = "Values to review", category_total = "types",
     references_label = "Expected types", summary_file = "values.csv", summary_label = "Values CSV",
     summary_description = "Rejected values by model, sheet, field and expected type",
-    description = NULL, instructions = NULL), evidence_assets = evidence_assets, scope = scope, parent_label = parent_label)
+    description = NULL, instructions = NULL), summary = summary, evidence_assets = evidence_assets, scope = scope, parent_label = parent_label)
 }

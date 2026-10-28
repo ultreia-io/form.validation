@@ -40,7 +40,7 @@ Use a shared relative path for a collection of reports.}
 The normalized HTML path, invisibly.
 }
 \description{
-Write a small HTML page that loads adjacent summary.csv and findings.csv.
+Write an HTML overview with counts and load adjacent findings.csv for tables.
 Serve the output over HTTP using Apache or a Shiny static resource directory.
 }
 \details{

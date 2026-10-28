@@ -10,7 +10,7 @@ test_that("named generation preserves paths and reads the form family", {
   expect_identical(basename(paths), c("survey-structure-validation.yaml",
                                       "survey-generated-validation.yaml"))
   process <- list(schema_version = "1.0.0", rules_version = "1",
-                  model = list(id = "survey", version = "2026.1"),
+                  model = list(id = "survey", version = "2026.2"),
                   rulesets = list(structure = basename(paths[["structure"]]),
                                   content = list(basename(paths[["generated"]]))))
   process_path <- file.path(directory, "survey-validation.yaml")

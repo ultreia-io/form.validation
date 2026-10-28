@@ -23,7 +23,7 @@
 prepare_report_evidence <- function(tables, provenance, context, findings) {
   if (!is.list(context) || (length(context) && (is.null(names(context)) ||
       any(!nzchar(names(context))) || anyDuplicated(names(context))))) stop("context must be a named list")
-  reserved <- c(names(tables$details), names(tables$summary), "report", "cells", "occurrences", "snapshot_sha256", "rows", "key_fields", "problem")
+  reserved <- c(names(tables$details), names(tables$summary), "report", "cells", "occurrences", "snapshot_sha256", "rows", "key_fields", "parent_sheet", "problem")
   if (length(intersect(names(context), reserved))) stop("Context names conflict with report columns")
   if (any(!vapply(context, function(x) is.character(x) && length(x) == 1L && !is.na(x), logical(1))))
     stop("Context values must be scalar text")
@@ -87,10 +87,10 @@ evidence_card_values <- function(parts, reference_report, registry_report, conve
 #' @param assets_directory Shared asset directory relative to `directory`.
 #' @param overwrite Whether existing evidence folders may be replaced.
 #' @return Template values from `evidence_card_values()` for the individual report.
-#' @details Writes HTML, reviewer CSV files and interactive case data only for
+#' @details Writes HTML, reviewer CSV files and summary counts only for
 #'   nonempty evidence kinds. On replacement, stale folders are removed even when
 #'   the new count is zero. Always saves `evidence.json` for later aggregation.
-#'   Source links point back to the form report; shared assets use content hashes.
+#'   Breadcrumbs point back to the form report; shared assets use content hashes.
 #' @keywords internal
 write_individual_evidence <- function(report, directory, report_filename, title,
                                       stylesheet, logo, assets_directory, overwrite) {

@@ -186,6 +186,8 @@ validate_batch_inputs <- function(selected, bundle, plan, state, state_path, log
 #' @inheritParams write_validation_report
 #' @param overwrite Rebuild the complete reports directory from saved results.
 #' @param workers Number of forms to render concurrently. The default is one.
+#' @param reference_context_columns Public input columns shown in evidence tables.
+#'   Defaults to the batch grouping and identity columns.
 #' @return The reports directory, invisibly.
 #' @details Requires every planned input to have a saved result. Reads no input
 #'   workbook or reference CSV. Uses the form saved with each result, so rendering
@@ -195,7 +197,8 @@ validate_batch_inputs <- function(selected, bundle, plan, state, state_path, log
 #' @export
 write_validation_batch_reports <- function(plan, report_filename = "index.html", overwrite = FALSE,
                                             title = "Validation report", author = NULL,
-                                            stylesheet = NULL, logo = NULL, workers = 1L) {
+                                            stylesheet = NULL, logo = NULL, workers = 1L,
+                                            reference_context_columns = NULL) {
   if (length(workers) != 1L || !is.numeric(workers) || is.na(workers) ||
       !is.finite(workers) || workers < 1 || workers > .Machine$integer.max ||
       workers != as.integer(workers))
@@ -203,6 +206,12 @@ write_validation_batch_reports <- function(plan, report_filename = "index.html",
   workers <- as.integer(workers)
   plan <- read_validation_batch_plan(plan)
   check_batch_report_filename(report_filename)
+  if (is.null(reference_context_columns))
+    reference_context_columns <- unique(c(plan$group_columns, plan$identity_columns))
+  if (!is.character(reference_context_columns) || anyNA(reference_context_columns) ||
+      anyDuplicated(reference_context_columns) ||
+      !all(reference_context_columns %in% names(plan$files)))
+    stop("reference_context_columns must name public input columns", call. = FALSE)
   lock <- lock_validation_batch(plan)
   on.exit(unlink(lock, recursive = TRUE), add = TRUE)
   validation <- read_batch_state(plan, "validation")
@@ -216,7 +225,7 @@ write_validation_batch_reports <- function(plan, report_filename = "index.html",
   outcomes <- list()
   files <- lapply(seq_len(nrow(plan$files)), function(i) plan$files[i, ])
   render <- function(file) render_batch_input_report(file, plan, validation, stage,
-    report_filename, title, author, stylesheet, logo)
+    report_filename, title, author, stylesheet, logo, reference_context_columns)
   if (workers == 1L) {
     rendered <- lapply(files, render)
   } else if (.Platform$OS.type == "windows") {
@@ -260,10 +269,11 @@ write_validation_batch_reports <- function(plan, report_filename = "index.html",
 #' @param stage Staging directory for all individual reports.
 #' @param report_filename HTML basename.
 #' @param title,author,stylesheet,logo Report presentation options.
+#' @param reference_context_columns Public input columns shown in evidence tables.
 #' @return Status and elapsed rendering time, or an error message.
 #' @keywords internal
 render_batch_input_report <- function(file, plan, validation, stage, report_filename,
-                                      title, author, stylesheet, logo) {
+                                      title, author, stylesheet, logo, reference_context_columns) {
   started <- proc.time()[["elapsed"]]
   tryCatch({
     outcome <- validation$outcomes[[file$relative]]
@@ -275,7 +285,7 @@ render_batch_input_report <- function(file, plan, validation, stage, report_file
         !identical(saved$input_sha256, file$sha256))
       stop("Saved result differs from the plan")
     job <- plan$jobs[match(file$job, plan$jobs$id), ]
-    context <- as.list(file[unique(c(plan$group_columns, plan$identity_columns))])
+    context <- as.list(file[reference_context_columns])
     report <- validation_report_data(saved$result, saved$model,
       reference_provenance = plan$resources[[job$resource]]$references, context = context)
     depth <- length(strsplit(file$relative, "/", fixed = TRUE)[[1L]])

@@ -52,41 +52,15 @@
   }
   async function main() {
     const root = document.getElementById('aggregate');
-    const response = await fetch('aggregate.json', {credentials: 'same-origin', cache: 'no-store'});
-    if (!response.ok) throw Error(`aggregate.json: HTTP ${response.status}`);
-    const meta = await response.json();
-    const nav = document.getElementById('breadcrumbs');
-    meta.breadcrumbs.forEach((item, i) => {
-      if (i) nav.append(document.createTextNode(' / '));
-      if (i === meta.breadcrumbs.length - 1) {
-        el('span', item.label, nav).setAttribute('aria-current', 'page');
-      } else el('a', item.label, nav).href = item.href;
-    });
     const overview = document.getElementById('overview');
-    const totals = meta.totals[0];
-    const statuses = Object.fromEntries(meta.statuses.map(row => [row.Status, row.Files]));
-    const format = new Intl.NumberFormat('en');
-    function setCount(node, count) {
-      node.textContent = format.format(count);
-      node.closest('.overview-card').dataset.empty = String(count === 0);
-    }
-    overview.querySelectorAll('[data-total]').forEach(node => setCount(node, Number(totals[node.dataset.total] || 0)));
-    overview.querySelectorAll('[data-status]').forEach(node => setCount(node, Number(statuses[node.dataset.status] || 0)));
+    const totals = Object.fromEntries([...overview.querySelectorAll('[data-total]')]
+      .map(node => [node.dataset.total, Number(node.dataset.value)]));
+    totals.files = Number(document.querySelector('main').dataset.files);
+    const statuses = Object.fromEntries([...overview.querySelectorAll('[data-status]')]
+      .map(node => [node.dataset.status, Number(node.dataset.value)]));
     const versions = document.getElementById('overview-versions');
-    const template = document.getElementById('overview-version-card');
-    meta.versions.forEach(version => {
-      const card = template.content.firstElementChild.cloneNode(true);
-      setCount(card.querySelector('strong'), Number(version.files));
-      card.querySelector('span').textContent = `V${version.version}`;
-      versions.append(card);
-    });
-    meta.notes.forEach(note => el('p', note, document.getElementById('overview-notes')));
-    if (meta.children.length) {
-      const navigation = document.getElementById('aggregate-children');
-      el('h2', 'Browse reports', navigation);
-      const list = el('ul', undefined, navigation);
-      meta.children.forEach(item => { el('a', item.label, el('li', undefined, list)).href = item.href; });
-    }
+    const sheetOrder = [...document.getElementById('aggregate-sheets').content.querySelectorAll('[data-sheet]')]
+      .map(node => node.dataset.sheet);
 
     progress.finish();
     const definitions = [
@@ -100,7 +74,7 @@
         ['input', 'model_version', 'status', 'errors', 'warnings'], true, 10)},
       {id: 'findings', label: 'Validation findings',
         decorate: button => severityTab(button, 'Validation findings', [{severity: 'error', count: Number(totals.errors)}, {severity: 'warning', count: Number(totals.warnings)}, {severity: 'info', count: Number(totals.infos || 0)}]),
-        render: async (content, update) => findings(content, await load('issues.csv', update), 'findings', meta.sheet_order)}
+        render: async (content, update) => findings(content, await load('issues.csv', update), 'findings', sheetOrder)}
     ];
     if (Number(totals.incomplete_checks) + Number(totals.failed_checks)) definitions.push(
       {id: 'execution', label: 'Unfinished checks',
@@ -121,19 +95,15 @@
         () => details.open(target, {[key]: value}, true), `Show ${value} ${key === 'severity' ? 'findings' : 'checks'}`,
         key === 'severity' ? 'View findings' : 'View checks');
     }
-    [...versions.children].forEach((card, index) => {
-      const version = meta.versions[index];
+    [...versions.children].forEach(card => {
+      const version = {version: card.dataset.version, files: Number(card.querySelector('strong').dataset.value)};
       ui.bindCard(card, Number(version.files), () => details.open('files', {model_version: version.version}, true), `Show forms for model ${version.version}`, 'View forms');
     });
   }
 
   const progress = ui.feedback(document.getElementById('loading'));
   async function run() {
-    progress.start('Loading summary…');
-    document.getElementById('breadcrumbs').replaceChildren();
-    document.getElementById('overview-versions').replaceChildren();
-    document.getElementById('overview-notes').replaceChildren();
-    document.getElementById('aggregate-children').replaceChildren();
+    progress.start('Loading tables…');
     document.getElementById('aggregate').replaceChildren();
     try { await main(); } catch (error) { progress.fail(error, run); }
   }

@@ -2,7 +2,7 @@ schema_version: 1.0.0
 rules_version: '1'
 model:
   id: survey
-  version: '2026.1'
+  version: '2026.2'
 stage: structure
 sheets:
   Metadata:
@@ -10,3 +10,9 @@ sheets:
     columns: 3
   Observations:
     columns: 11
+  Samples:
+    columns: 6
+  Measurements:
+    columns: 5
+  Equipment:
+    columns: 3

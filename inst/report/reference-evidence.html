@@ -19,17 +19,7 @@
       <button type="button" hidden>Retry</button>
     </div>
   </template>
-  <template id="evidence-filter-card">
-    <div class="overview-card"><strong></strong><span></span><small>Occurrences</small></div>
-  </template>
-  <template id="reference-case">
-    <section>
-      <h3 data-case-reference></h3>
-      <p>Selected value: <code class="report-value" data-case-value></code></p>
-      <div data-case-table></div>
-    </section>
-  </template>
-  <main data-evidence-label="{{evidence_label}}">
+  <main data-evidence-label="{{evidence_label}}" data-report-kind="{{report_kind}}" data-values="{{values_value}}" data-missing="{{missing_value}}" data-duplicates="{{duplicates_value}}" data-parents="{{parents_value}}">
     <img class="report-logo" src="{{logo}}" alt="Report logo">
     <div class="report-navigation">
       <nav aria-label="Breadcrumb"><!-- evidence-breadcrumbs --> <span aria-current="page">{{evidence_label}}</span></nav>
@@ -41,22 +31,24 @@
     <div id="loading"></div>
     <section id="overview" class="report-overview">
       <div class="overview-cards" aria-label="{{evidence_label}} counts">
-        <div class="overview-card" data-tone="attention"><strong data-total="cases">—</strong><span>{{cases_label}}</span></div>
-        <div class="overview-card"><strong data-total="{{category_total}}">—</strong><span>{{references_label}}</span></div>
-        <div class="overview-card"><strong data-total="forms">—</strong><span>Affected forms</span></div>
-        <div class="overview-card" data-tone="error"><strong data-total="occurrences">—</strong><span>Occurrences</span></div>
+        <div class="overview-card" data-tone="attention" data-empty="{{cases_empty}}"><strong data-total="cases">{{cases_count}}</strong><span>{{cases_label}}</span></div>
+        <div class="overview-card" data-empty="{{categories_empty}}"><strong data-total="{{category_total}}">{{categories_count}}</strong><span>{{references_label}}</span></div>
+        <div class="overview-card" data-empty="{{forms_empty}}"><strong data-total="forms">{{forms_count}}</strong><span>Affected forms</span></div>
+        <div class="overview-card" data-tone="error" data-empty="{{occurrences_empty}}"><strong data-total="occurrences">{{occurrences_count}}</strong><span>Occurrences</span></div>
       </div>
-      <div id="evidence-filters" hidden>
+      <div id="evidence-filters" {{filters_hidden}}>
         <h3>Findings by severity</h3>
-        <div class="overview-cards" data-filter-cards="severity"></div>
+        <div class="overview-cards" data-filter-cards="severity"><!-- severity-cards --></div>
         <h3>Findings by expected type</h3>
-        <div class="overview-cards" data-filter-cards="expected_type"></div>
+        <div class="overview-cards" data-filter-cards="expected_type"><!-- expected_type-cards --></div>
       </div>
     </section>
     <section class="report-resources" aria-label="Resources">
       <h2>Resources</h2>
       <div class="resource-links">
         <div><a href="{{summary_file}}" download>↓ {{summary_label}}</a><p>{{summary_description}}</p></div>
+        <div><a href="{{secondary_file}}" download>↓ {{secondary_label}}</a><p>{{secondary_description}}</p></div>
+        <div><a href="{{tertiary_file}}" download>↓ {{tertiary_label}}</a><p>{{tertiary_description}}</p></div>
         <div><a href="evidence.csv" download>↓ Evidence CSV</a><p>All affected forms and source locations</p></div>
       </div>
     </section>

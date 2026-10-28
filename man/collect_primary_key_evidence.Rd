@@ -22,6 +22,6 @@ A compact evidence data frame, or \code{NULL} when no key findings exist.
 Collect recorded primary-key failures
 }
 \details{
-Separates missing components and duplicate keys. Preserves declared component order and physical row ranges; every involved duplicate row contributes an occurrence. No key check is rerun.
+Separates missing components, duplicate keys and missing parent keys. Preserves declared component order and physical row ranges; every involved duplicate row contributes an occurrence. No key check is rerun.
 }
 \keyword{internal}

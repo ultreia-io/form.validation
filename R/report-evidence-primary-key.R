@@ -54,6 +54,10 @@ write_primary_key_evidence <- function(parts, directory, report_filename, contex
                                        stylesheet, logo, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
   parts <- Filter(Negate(is.null), parts)
   if (!length(parts)) return(NULL)
+  parts <- lapply(parts, function(part) {
+    if (!"rules_version" %in% names(part)) part$rules_version <- NA_character_
+    part
+  })
   detail <- do.call(rbind, parts)
   if (!nrow(detail)) return(NULL)
   folder_name <- "primary-key-evidence"

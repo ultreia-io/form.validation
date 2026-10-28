@@ -19,7 +19,7 @@ Depends: R (>= 4.1.0)
 Imports: cellranger, digest, jsonlite, form.model (>= 0.5.1), parallel, readxl,
     tools, yaml (>= 2.3.10)
 Suggests: form.references (>= 0.2.1), knitr, openxlsx,
-    rmarkdown, testthat (>= 3.0.0), xml2
+    rmarkdown, testthat (>= 3.0.0), withr, xml2
 Remotes: ultreia-io/form.model@v0.5.1,
     ultreia-io/form.references@v0.2.1
 VignetteBuilder: knitr

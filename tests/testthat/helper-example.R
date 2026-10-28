@@ -38,7 +38,10 @@ upstream_references <- function() list(
 )
 upstream_data <- function() {
   data <- list(Metadata = matrix(vector("list", 15), 5, 3),
-               Observations = matrix(vector("list", 77), 7, 11))
+               Observations = matrix(vector("list", 77), 7, 11),
+               Samples = matrix(vector("list", 30), 5, 6),
+               Measurements = matrix(vector("list", 25), 5, 5),
+               Equipment = matrix(vector("list", 15), 5, 3))
   data$Metadata[[2, 3]] <- "001"
   data$Metadata[[3, 3]] <- "2026-10-03"
   data$Observations[5, ] <- as.list(c("STATION", "COUNT", "LENGTH", "UNIT", "ACTIVE", "OBSERVED_AT", "LATITUDE", "LONGITUDE", "OBSERVATION_ID", "QUALITY", "OBSERVER"))

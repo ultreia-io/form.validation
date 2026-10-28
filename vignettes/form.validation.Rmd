@@ -97,7 +97,13 @@ observations[7, ] <- list(
   "002", 3, NA_real_, NA_character_, FALSE, "2026-10-03T13:00:00Z",
   -21, 56, "OBS-002", 2L, "ALICE"
 )
-data <- list(Metadata = metadata, Observations = observations)
+data <- list(
+  Metadata = metadata,
+  Observations = observations,
+  Samples = matrix(list(NULL), nrow = 5, ncol = 6),
+  Measurements = matrix(list(NULL), nrow = 5, ncol = 5),
+  Equipment = matrix(list(NULL), nrow = 5, ncol = 3)
+)
 ```
 
 The loader downloads and verifies references. The validation engine receives their values explicitly.

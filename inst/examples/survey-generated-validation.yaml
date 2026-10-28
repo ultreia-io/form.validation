@@ -2,11 +2,17 @@ schema_version: 1.0.0
 rules_version: '1'
 model:
   id: survey
-  version: '2026.1'
+  version: '2026.2'
 stage: fields
 rules:
   sheet/Observations/row_count: {value: true, severity: info}
   sheet/Observations/empty_rows: {value: true, severity: warning}
+  sheet/Samples/row_count: {value: true, severity: info}
+  sheet/Samples/empty_rows: {value: true, severity: warning}
+  sheet/Measurements/row_count: {value: true, severity: info}
+  sheet/Measurements/empty_rows: {value: true, severity: warning}
+  sheet/Equipment/row_count: {value: true, severity: info}
+  sheet/Equipment/empty_rows: {value: true, severity: warning}
   field/Metadata.submission/mandatory: true
   field/Metadata.submission/type: "string"
   field/Metadata.submission/pattern: "^[0-9]{3}$"
@@ -40,3 +46,45 @@ rules:
   field/Observations.observer/code_list: {value: "observers", severity: warning}
   sheet/Observations/primary_key_present: ["station", "observation_id"]
   sheet/Observations/primary_key_unique: ["station", "observation_id"]
+  field/Samples.station/mandatory: true
+  field/Samples.station/type: "string"
+  field/Samples.observation_id/mandatory: true
+  field/Samples.observation_id/type: "string"
+  field/Samples.sample_no/mandatory: true
+  field/Samples.sample_no/type: "integer"
+  field/Samples.sample_no/sequence: {value: {"start": 1, "group_by": ["station", "observation_id"]}}
+  field/Samples.minimum_length/type: "number"
+  field/Samples.minimum_length/minimum: 0
+  field/Samples.minimum_length/maximum_field: "maximum_length"
+  field/Samples.maximum_length/type: "number"
+  field/Samples.maximum_length/minimum: 0
+  field/Samples.unit/required_field: "minimum_length"
+  field/Samples.unit/type: "string"
+  field/Samples.unit/enum: ["cm", "m"]
+  sheet/Samples/primary_key_present: ["station", "observation_id", "sample_no"]
+  sheet/Samples/primary_key_unique: ["station", "observation_id", "sample_no"]
+  sheet/Samples/parent_key: {value: {"sheet": "Observations", "fields": ["station", "observation_id"]}}
+  field/Measurements.station/mandatory: true
+  field/Measurements.station/type: "string"
+  field/Measurements.observation_id/mandatory: true
+  field/Measurements.observation_id/type: "string"
+  field/Measurements.sample_no/mandatory: true
+  field/Measurements.sample_no/type: "integer"
+  field/Measurements.reading_no/mandatory: true
+  field/Measurements.reading_no/type: "integer"
+  field/Measurements.reading_no/sequence: {value: {"start": 1, "group_by": ["station", "observation_id", "sample_no"]}}
+  field/Measurements.value/mandatory: true
+  field/Measurements.value/type: "number"
+  field/Measurements.value/minimum: 0
+  sheet/Measurements/primary_key_present: ["station", "observation_id", "sample_no", "reading_no"]
+  sheet/Measurements/primary_key_unique: ["station", "observation_id", "sample_no", "reading_no"]
+  sheet/Measurements/parent_key: {value: {"sheet": "Samples", "fields": ["station", "observation_id", "sample_no"]}}
+  field/Equipment.equipment_id/mandatory: true
+  field/Equipment.equipment_id/type: "string"
+  field/Equipment.serial/mandatory: true
+  field/Equipment.serial/type: "string"
+  field/Equipment.serial/unique: true
+  field/Equipment.label/mandatory: true
+  field/Equipment.label/type: "string"
+  sheet/Equipment/primary_key_present: ["equipment_id"]
+  sheet/Equipment/primary_key_unique: ["equipment_id"]

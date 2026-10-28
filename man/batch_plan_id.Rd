@@ -16,6 +16,6 @@ A SHA-256 string for the plan contents.
 Compute the identity of a frozen batch plan
 }
 \details{
-Excludes the stored ID and local directory. Callback bodies are normalized to source form so runtime byte compilation does not change the identity.
+Excludes the stored ID and local directory. Callback definitions, including argument defaults, are normalized without bytecode or source references so runtime compilation and source metadata do not change the identity.
 }
 \keyword{internal}

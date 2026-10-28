@@ -123,7 +123,8 @@ read_validation_batch_plan <- function(plan) {
     plan$directory <- dirname(path)
   }
   if (!inherits(plan, "validation_batch_plan") || !identical(plan$schema_version, 1L) ||
-      !identical(plan$id, batch_plan_id(plan))) stop("Invalid or modified batch plan", call. = FALSE)
+      !identical(plan$id, batch_plan_id(plan)))
+    stop("Invalid or modified batch plan", call. = FALSE)
   if (!dir.exists(plan$directory)) stop("Batch directory is missing", call. = FALSE)
   plan
 }
@@ -140,13 +141,20 @@ batch_time <- function() format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 #' Compute the identity of a frozen batch plan
 #' @param plan Verified local `validation_batch_plan`.
 #' @return A SHA-256 string for the plan contents.
-#' @details Excludes the stored ID and local directory. Callback bodies are normalized to source form so runtime byte compilation does not change the identity.
+#' @details Excludes the stored ID and local directory. Callback definitions, including argument defaults, are normalized without bytecode or source references so runtime compilation and source metadata do not change the identity.
 #' @keywords internal
 batch_plan_id <- function(plan) {
-  # R may compile callbacks after execution; bytecode is not a change of policy.
-  # Hash their source bodies so an unchanged plan survives reuse in one session.
+  # Strip bytecode and mutable source references from callback definitions.
   for (name in c("reader", "prepare_data")) {
-    if (is.function(plan[[name]])) body(plan[[name]]) <- body(plan[[name]])
+    callback <- plan[[name]]
+    if (is.function(callback)) {
+      attributes <- attributes(callback)
+      attributes$srcref <- NULL
+      callback <- eval(parse(text = deparse(callback, control = "all"), keep.source = FALSE)[[1L]],
+        envir = environment(callback))
+      attributes(callback) <- attributes
+      plan[[name]] <- callback
+    }
   }
   digest::digest(unclass(plan)[setdiff(names(plan), c("id", "directory"))], algo = "sha256")
 }

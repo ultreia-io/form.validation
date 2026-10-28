@@ -16,11 +16,11 @@ URL: https://ultreia-io.github.io/form.validation/,
 BugReports: https://github.com/ultreia-io/form.validation/issues
 Encoding: UTF-8
 Depends: R (>= 4.1.0)
-Imports: cellranger, digest, jsonlite, form.model (== 0.4.0), parallel, readxl,
+Imports: cellranger, digest, jsonlite, form.model (>= 0.5.1), parallel, readxl,
     tools, yaml (>= 2.3.10)
 Suggests: form.references (== 0.1.0), knitr, openxlsx,
     rmarkdown, testthat (>= 3.0.0), xml2
-Remotes: ultreia-io/form.model@v0.4.0,
+Remotes: ultreia-io/form.model@v0.5.1,
     ultreia-io/form.references@v0.1.0
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)

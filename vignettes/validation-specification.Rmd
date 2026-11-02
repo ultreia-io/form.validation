@@ -57,6 +57,15 @@ rules:
 
 Change generated rules by editing the form model and regenerating them.
 
+Enum case matching is configured directly on the validation rule; regeneration preserves this option.
+
+```yaml
+rules:
+  field/Observations.unit/enum: {value: [cm, m], ignore_case: false}
+```
+
+Omitting `ignore_case` defaults to `true`. This changes comparison only; submitted and declared values stay unchanged.
+
 A field's `registry` declaration generates a registry check. Its value records
 the table ID, column and matching mode; the supplied column snapshot
 must contain exactly one match for each submitted value.

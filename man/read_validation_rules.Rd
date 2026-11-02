@@ -22,6 +22,8 @@ Load validation rules
 \details{
 Requires one structure and one field file, matching the model and rule version.
 Generated rule order, values and severity must match; stale files need regeneration.
+Enum rules may set \code{ignore_case: false} for strict matching. Omitted or true
+ignores case for character values, without rewriting submitted values.
 Structural and business files may declare callbacks as \verb{namespace/[field/]callback}.
 Parameters reach callbacks through \code{config$rule}, including the optional field ID.
 Severity defaults to \code{error}, and description to the rule ID.

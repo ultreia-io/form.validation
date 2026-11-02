@@ -81,6 +81,8 @@ read_validation_process <- function(path, model, checks = list(), business = cha
 #' @return A `validation_plan` for [`validate_data()`][form.validation::validate_data].
 #' @details Requires one structure and one field file, matching the model and rule version.
 #'   Generated rule order, values and severity must match; stale files need regeneration.
+#'   Enum rules may set `ignore_case: false` for strict matching. Omitted or true
+#'   ignores case for character values, without rewriting submitted values.
 #'   Structural and business files may declare callbacks as `namespace/[field/]callback`.
 #'   Parameters reach callbacks through `config$rule`, including the optional field ID.
 #'   Severity defaults to `error`, and description to the rule ID.
@@ -175,12 +177,19 @@ bind_generated_rules <- function(plan, documents) {
     rule
   })
   expected <- generated_rule_entries(plan)
-  if (!identical(names(fields$rules), names(expected)) || !rules_equal(fields$rules, expected)) {
+  comparable <- lapply(fields$rules, function(rule) {
+    rule$ignore_case <- NULL
+    rule
+  })
+  if (!identical(names(comparable), names(expected)) || !rules_equal(comparable, expected)) {
     stop("Generated field validation differs from model; regenerate it", call. = FALSE)
   }
   for (i in seq_along(plan$rules)) {
     rule <- plan$rules[[i]]
-    if (rule$stage == "fields") plan$rules[[i]]$value <- fields$rules[[rule$id]]$value
+    if (rule$stage == "fields") {
+      plan$rules[[i]]$value <- fields$rules[[rule$id]]$value
+      if (rule$kind == "enum") plan$rules[[i]]$ignore_case <- fields$rules[[rule$id]]$ignore_case
+    }
   }
   plan
 }
@@ -243,8 +252,13 @@ check_generated_rules <- function(rules, path) {
   for (id in names(rules)) {
     rule <- rules[[id]]
     named_list(rule, paste(path, id))
-    if (!"value" %in% names(rule) || length(setdiff(names(rule), c("value", "severity")))) {
+    allowed <- c("value", "severity", if (endsWith(id, "/enum")) "ignore_case")
+    if (!"value" %in% names(rule) || length(setdiff(names(rule), allowed))) {
       stop(path, ": generated rule requires value and optional severity: ", id, call. = FALSE)
+    }
+    if ("ignore_case" %in% names(rule) &&
+        (!is.logical(rule$ignore_case) || length(rule$ignore_case) != 1L || is.na(rule$ignore_case))) {
+      stop(path, ": enum ignore_case must be true or false: ", id, call. = FALSE)
     }
     if (!is.null(rule$severity) && !rule$severity %in% c("error", "warning", "info")) {
       stop(path, ": generated severity must be error, warning, info or omitted: ", id, call. = FALSE)

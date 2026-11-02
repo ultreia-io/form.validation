@@ -27,6 +27,8 @@ stages:
     rule_id: [field/<sheet>.<field>/<check>, sheet/<sheet>/<check>]
     required_rule_values: [value]
     optional_rule_values: [severity]
+    enum_optional_rule_values: [ignore_case]
+    enum_ignore_case_type: boolean
     checks: [row_count, empty_rows, primary_key_present, primary_key_unique, mandatory, required_field, type, code_list, registry, enum, minimum, maximum, pattern, unique]
   business:
     keys: [schema_version, rules_version, model, stage, rules]
@@ -37,3 +39,4 @@ stages:
 defaults:
   severity: error
   description: rule_id
+  enum_ignore_case: true

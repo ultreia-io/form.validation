@@ -239,7 +239,9 @@ run_field <- function(rule, context) {
     problem <- "Value is required by a filled companion field"; expected <- value
   } else if (kind == "enum") {
     allowed <- unlist(lapply(value, comparison_value, type = field$type), use.names = FALSE)
-    bad <- eligible[!values %in% allowed]
+    matches <- if (!identical(rule$ignore_case, FALSE) && field$type %in% c("string", "email"))
+      tolower(values) %in% tolower(allowed) else values %in% allowed
+    bad <- eligible[!matches]
     problem <- paste("Value is not in enum; allowed values:", paste(unlist(value), collapse = ", ")); expected <- value
   } else if (kind == "minimum") {
     bad <- eligible[values < value]

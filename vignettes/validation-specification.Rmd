@@ -131,7 +131,14 @@ Supply aliases when more than one spelling is explicitly accepted for a code:
 references <- list(units = list(values = c("cm", "kg"), aliases = c(CM = "cm")))
 ```
 
-This accepts `cm`, `kg` and `CM` without changing submitted values. Other spellings remain invalid.
+Code-list rules ignore case by default, including aliases. Submitted and reference values remain unchanged.
+
+```yaml
+rules:
+  field/Observations.unit/code_list: {value: units, ignore_case: false}
+```
+
+Use strict matching if case variants identify different canonical codes. Regeneration preserves this option.
 
 Each alias must point to an existing reference value. A missing reference list leaves the check unfinished.
 

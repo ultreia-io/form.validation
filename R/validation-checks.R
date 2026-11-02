@@ -157,10 +157,11 @@ prepare_validation_references <- function(references, ids = names(references)) {
 #' Get cached reference keys
 #' @param id Reference identifier.
 #' @param context Execution inputs and run-local cache.
+#' @param ignore_case Compare character codes and aliases without case distinctions.
 #' @return Character keys, or an incomplete/failed execution condition.
 #' @keywords internal
-reference_keys <- function(id, context) {
-  key <- paste0("reference/", id)
+reference_keys <- function(id, context, ignore_case = TRUE) {
+  key <- paste0("reference/", id, if (ignore_case) "/ignore-case" else "/exact")
   if (exists(key, context$cache, inherits = FALSE)) return(context$cache[[key]])
   snapshot <- context$references[[id]]
   prepared <- attr(context$references, "validation_keys", exact = TRUE)[[id]]
@@ -168,6 +169,7 @@ reference_keys <- function(id, context) {
     if (!is.null(prepared$error)) stop(prepared$error)
     keys <- prepared$keys
   } else keys <- snapshot_keys(id, snapshot)
+  if (ignore_case) keys <- unique(tolower(keys))
   context$cache[[key]] <- keys
   keys
 }
@@ -259,8 +261,10 @@ run_field <- function(rule, context) {
     bad <- eligible[!grepl(value, values, perl = TRUE)]
     problem <- "Value does not match pattern"; expected <- value
   } else if (kind == "code_list") {
-    keys <- if (length(eligible)) reference_keys(value, context) else character()
-    bad <- eligible[!values %in% keys]
+    ignore_case <- !identical(rule$ignore_case, FALSE)
+    keys <- if (length(eligible)) reference_keys(value, context, ignore_case) else character()
+    compared <- if (ignore_case && is.character(values)) tolower(values) else values
+    bad <- eligible[!compared %in% keys]
     problem <- paste("Value not found in code list", value); expected <- value
   } else if (kind == "registry") {
     if (!length(eligible)) return(empty_findings())

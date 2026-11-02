@@ -29,6 +29,8 @@ stages:
     optional_rule_values: [severity]
     enum_optional_rule_values: [ignore_case]
     enum_ignore_case_type: boolean
+    code_list_optional_rule_values: [ignore_case]
+    code_list_ignore_case_type: boolean
     checks: [row_count, empty_rows, primary_key_present, primary_key_unique, mandatory, required_field, type, code_list, registry, enum, minimum, maximum, pattern, unique]
   business:
     keys: [schema_version, rules_version, model, stage, rules]
@@ -40,3 +42,4 @@ defaults:
   severity: error
   description: rule_id
   enum_ignore_case: true
+  code_list_ignore_case: true

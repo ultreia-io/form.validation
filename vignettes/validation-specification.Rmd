@@ -57,6 +57,15 @@ rules:
 
 Change generated rules by editing the form model and regenerating them.
 
+Enum case matching is configured directly on the validation rule; regeneration preserves this option.
+
+```yaml
+rules:
+  field/Observations.unit/enum: {value: [cm, m], ignore_case: false}
+```
+
+Omitting `ignore_case` defaults to `true`. This changes comparison only; submitted and declared values stay unchanged.
+
 A field's `registry` declaration generates a registry check. Its value records
 the table ID, column and matching mode; the supplied column snapshot
 must contain exactly one match for each submitted value.
@@ -122,13 +131,31 @@ Supply aliases when more than one spelling is explicitly accepted for a code:
 references <- list(units = list(values = c("cm", "kg"), aliases = c(CM = "cm")))
 ```
 
-This accepts `cm`, `kg` and `CM` without changing submitted values. Other spellings remain invalid.
+Code-list rules ignore case by default, including aliases. Submitted and reference values remain unchanged.
+
+```yaml
+rules:
+  field/Observations.unit/code_list: {value: units, ignore_case: false}
+```
+
+Use strict matching if case variants identify different canonical codes. Regeneration preserves this option.
 
 Each alias must point to an existing reference value. A missing reference list leaves the check unfinished.
 
 ## Match registry names
 
-Registry matching is exact by default. Enable name matching when case, accents or word order may differ:
+Registry rules ignore case by default. Use `ignore_case: false` for case-sensitive comparison:
+
+```yaml
+rules:
+  field/Observations.observer/registry:
+    value: {id: observers, column: name, matching: exact}
+    ignore_case: false
+```
+
+The option also controls case in aliases and name fallback. Multiple matching registry rows remain ambiguous.
+
+Enable name matching when accents or word order may differ:
 
 ```r
 index <- registry_index(c("MARTIN Emile", "Jane Smith"), matching = "name",

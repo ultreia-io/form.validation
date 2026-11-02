@@ -8,7 +8,8 @@ registry_index(
   values,
   type = "string",
   matching = "exact",
-  aliases = character()
+  aliases = character(),
+  ignore_case = TRUE
 )
 }
 \arguments{
@@ -20,6 +21,9 @@ registry_index(
 
 \item{aliases}{Named character vector or named list mapping aliases to names.
 Aliases require string fields. Chains are allowed; cycles are errors.}
+
+\item{ignore_case}{Ignore case in character values, aliases and name fallback?
+Defaults to TRUE. Validation YAML supplies this option per registry rule.}
 }
 \value{
 A \code{validation_registry} list, reusable across fields and submissions.
@@ -28,8 +32,9 @@ A \code{validation_registry} list, reusable across fields and submissions.
 Prepare a reusable registry lookup from supplied values
 }
 \details{
-Lookup tries exact values, then explicit aliases, then normalized
-names. Any exact match takes precedence, including ambiguous matches.
+Lookup tries full values, then explicit aliases, then normalized
+names, using the selected case policy throughout. Full-value matches take
+precedence, including ambiguous matches caused by case variants.
 Zero matches means unknown; more than one means ambiguous. Neither is valid.
 Alias targets absent from the supplied registry remain unmatched.
 No data is loaded, changed, or deduplicated. Prepare once per snapshot.

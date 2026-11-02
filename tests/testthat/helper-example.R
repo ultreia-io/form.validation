@@ -9,7 +9,7 @@ fixture_model <- function() {
           id = list(mandatory = TRUE, type = "string", pattern = "^S[0-9]{2}$", unique = TRUE),
           amount = list(type = "number", minimum = 0, maximum = 100),
           unit = list(type = "string", required_field = "amount", enum = list("cm", "m")),
-          site = list(mandatory = TRUE, type = "string", reference = list(id = "sites", severity = "warning")))))))
+          site = list(mandatory = TRUE, type = "string", code_list = list(id = "sites", severity = "warning")))))))
 }
 fixture_data <- function() {
   list(Cover = matrix("Example", 1, 1),

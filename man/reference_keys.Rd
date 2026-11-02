@@ -4,12 +4,14 @@
 \alias{reference_keys}
 \title{Get cached reference keys}
 \usage{
-reference_keys(id, context)
+reference_keys(id, context, ignore_case = TRUE)
 }
 \arguments{
 \item{id}{Reference identifier.}
 
 \item{context}{Execution inputs and run-local cache.}
+
+\item{ignore_case}{Compare character codes and aliases without case distinctions.}
 }
 \value{
 Character keys, or an incomplete/failed execution condition.

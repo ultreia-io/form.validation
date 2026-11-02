@@ -21,6 +21,7 @@ generate_validation_rules <- function(name, directory, version = "1.0.0", overwr
 #' @return Both paths, invisibly.
 #' @details Preserves custom structural rules. Field rules use compact YAML;
 #'   edit the form and regenerate when its definition changes.
+#'   Explicit enum, code-list and registry `ignore_case` options are preserved when regenerating field rules.
 #' @seealso [`generate_validation_rules()`][form.validation::generate_validation_rules], [`read_validation_rules()`][form.validation::read_validation_rules]
 #' @export
 write_validation_rules <- function(model, structure_path, generated_path,
@@ -36,6 +37,7 @@ write_validation_rules <- function(model, structure_path, generated_path,
   paths <- c(structure = structure_path, generated = generated_path)
   stages <- c(structure = "structure", generated = "fields")
   structure_rules <- NULL
+  case_options <- list()
   for (name in names(paths)) {
     path <- paths[[name]]
     if (!dir.exists(dirname(path))) stop("Missing output directory: ", dirname(path), call. = FALSE)
@@ -43,6 +45,13 @@ write_validation_rules <- function(model, structure_path, generated_path,
       if (!overwrite) stop("File exists: ", path, call. = FALSE)
       previous <- read_rules_yaml(path)
       if (name == "structure") structure_rules <- previous[["rules"]]
+      if (name == "generated") {
+        entries <- lapply(previous[["rules"]], function(rule) {
+          if (is.null(names(rule))) list(value = rule) else rule
+        })
+        check_generated_rules(entries, path)
+        case_options <- lapply(entries, function(rule) rule$ignore_case)
+      }
       if (!identical(previous$stage, stages[[name]])) {
         stop("Only the matching generated validation file can be replaced: ", path, call. = FALSE)
       }
@@ -57,9 +66,11 @@ write_validation_rules <- function(model, structure_path, generated_path,
   lines <- vapply(names(rules), function(id) {
     rule <- rules[[id]]
     value <- flow_rule_value(rule$value)
-    if (!is.null(rule$severity) || !is.null(names(rule$value))) {
+    ignore_case <- if (grepl("/(enum|code_list|registry)$", id)) case_options[[id]] else NULL
+    if (!is.null(rule$severity) || !is.null(names(rule$value)) || !is.null(ignore_case)) {
       value <- paste0("{value: ", value,
-        if (!is.null(rule$severity)) paste0(", severity: ", rule$severity), "}")
+        if (!is.null(rule$severity)) paste0(", severity: ", rule$severity),
+        if (!is.null(ignore_case)) paste0(", ignore_case: ", flow_rule_value(ignore_case)), "}")
     }
     paste0("  ", id, ": ", value)
   }, character(1))

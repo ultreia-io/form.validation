@@ -4,10 +4,12 @@
 \alias{normalized_name_key}
 \title{Build order-independent comparison keys for personal or vessel names}
 \usage{
-normalized_name_key(x)
+normalized_name_key(x, ignore_case = TRUE)
 }
 \arguments{
 \item{x}{Character vector of names.}
+
+\item{ignore_case}{Ignore letter case? Defaults to TRUE.}
 }
 \value{
 Character keys; missing or empty normalized names return \code{NA}.
@@ -16,7 +18,7 @@ Character keys; missing or empty normalized names return \code{NA}.
 Build order-independent comparison keys for personal or vessel names
 }
 \details{
-Removes commas, squishes whitespace, uppercases and transliterates
+Removes commas, squishes whitespace, optionally uppercases and transliterates
 accents to ASCII, replaces apostrophes, hyphens, dots and parentheses with
 spaces, then sorts and concatenates words. This is not fuzzy matching or a
 cryptographic hash. Different names can share a key; retain duplicate rows.

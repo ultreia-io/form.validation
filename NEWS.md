@@ -1,3 +1,10 @@
+# form.validation 0.6.0
+
+* Remove legacy `reference` rules; use `code_list` instead.
+* Match enums case-insensitively by default; use YAML `ignore_case: false` for strict matching.
+* Match code lists case-insensitively by default; use YAML `ignore_case: false` for strict matching.
+* Match registries case-insensitively by default; use YAML `ignore_case: false` for strict matching.
+
 # form.validation 0.5.0
 
 * Validate parent keys, grouped sequences, and field-to-field numeric maximums.

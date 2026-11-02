@@ -268,6 +268,7 @@ run_field <- function(rule, context) {
     problem <- paste("Value not found in code list", value); expected <- value
   } else if (kind == "registry") {
     if (!length(eligible)) return(empty_findings())
+    ignore_case <- !identical(rule$ignore_case, FALSE)
     id <- if (is.null(value$column)) value$id else paste(value$id, value$column, sep = ".")
     snapshot <- context$references[[id]]
     if (is.null(snapshot)) validation_incomplete(paste("Missing registry snapshot:", id))
@@ -279,6 +280,7 @@ run_field <- function(rule, context) {
     for (candidate in snapshot$indexes) {
       if (identical(candidate$type, field$type) &&
           identical(candidate$matching, value$matching) &&
+          identical(candidate$ignore_case, ignore_case) &&
           identical(candidate$aliases, aliases)) {
         index <- candidate
         break
@@ -288,7 +290,7 @@ run_field <- function(rule, context) {
       cache_key <- paste0("registry/", rule$id)
       if (exists(cache_key, context$cache, inherits = FALSE)) index <- context$cache[[cache_key]]
       else {
-        index <- registry_index(snapshot$values, field$type, value$matching, aliases)
+        index <- registry_index(snapshot$values, field$type, value$matching, aliases, ignore_case)
         context$cache[[cache_key]] <- index
       }
     }

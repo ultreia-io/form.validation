@@ -1,15 +1,19 @@
 #' Build order-independent comparison keys for personal or vessel names
 #' @param x Character vector of names.
+#' @param ignore_case Ignore letter case? Defaults to TRUE.
 #' @return Character keys; missing or empty normalized names return `NA`.
-#' @details Removes commas, squishes whitespace, uppercases and transliterates
+#' @details Removes commas, squishes whitespace, optionally uppercases and transliterates
 #'   accents to ASCII, replaces apostrophes, hyphens, dots and parentheses with
 #'   spaces, then sorts and concatenates words. This is not fuzzy matching or a
 #'   cryptographic hash. Different names can share a key; retain duplicate rows.
 #' @export
-normalized_name_key <- function(x) {
+normalized_name_key <- function(x, ignore_case = TRUE) {
   if (!is.character(x)) stop("Names must be character", call. = FALSE)
+  if (!is.logical(ignore_case) || length(ignore_case) != 1L || is.na(ignore_case))
+    stop("ignore_case must be TRUE or FALSE", call. = FALSE)
   x <- trimws(gsub("[[:space:]]+", " ", gsub(",", "", x, fixed = TRUE)))
-  x <- toupper(iconv(x, to = "ASCII//TRANSLIT"))
+  x <- iconv(x, to = "ASCII//TRANSLIT")
+  if (ignore_case) x <- toupper(x)
   x <- gsub("[.'()\\-]", " ", x, perl = TRUE)
   vapply(strsplit(x, "[[:space:]]+"), function(words) {
     if (anyNA(words)) return(NA_character_)
@@ -20,10 +24,12 @@ normalized_name_key <- function(x) {
 
 #' Encode a validated scalar registry key
 #' @param x One nonmissing scalar accepted by [`value_type()`][form.validation::value_type].
+#' @param ignore_case Ignore case in character keys? Defaults to FALSE.
 #' @return A character key with a numeric, Boolean, or string prefix. Dates and
 #'   timestamps use their canonical text representation; numeric zero is unsigned.
 #' @keywords internal
-registry_key <- function(x) {
+registry_key <- function(x, ignore_case = FALSE) {
+  if (ignore_case && is.character(x)) x <- tolower(x)
   if (inherits(x, "Date")) x <- format(x, "%Y-%m-%d")
   if (inherits(x, "POSIXct")) x <- format(x, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
   type <- if (is.numeric(x)) "n" else if (is.logical(x)) "b" else "s"
@@ -48,9 +54,12 @@ registry_count <- function(counts, keys) {
 #' @param matching `"exact"` or `"name"` for normalized name fallback.
 #' @param aliases Named character vector or named list mapping aliases to names.
 #'   Aliases require string fields. Chains are allowed; cycles are errors.
+#' @param ignore_case Ignore case in character values, aliases and name fallback?
+#'   Defaults to TRUE. Validation YAML supplies this option per registry rule.
 #' @return A `validation_registry` list, reusable across fields and submissions.
-#' @details Lookup tries exact values, then explicit aliases, then normalized
-#'   names. Any exact match takes precedence, including ambiguous matches.
+#' @details Lookup tries full values, then explicit aliases, then normalized
+#'   names, using the selected case policy throughout. Full-value matches take
+#'   precedence, including ambiguous matches caused by case variants.
 #'   Zero matches means unknown; more than one means ambiguous. Neither is valid.
 #'   Alias targets absent from the supplied registry remain unmatched.
 #'   No data is loaded, changed, or deduplicated. Prepare once per snapshot.
@@ -58,7 +67,9 @@ registry_count <- function(counts, keys) {
 #' index <- registry_index(c("MARTIN Emile", "Jane Smith"), matching = "name")
 #' registry_match_counts(index, c("Emile Martin", "Unknown"))
 #' @export
-registry_index <- function(values, type = "string", matching = "exact", aliases = character()) {
+registry_index <- function(values, type = "string", matching = "exact", aliases = character(), ignore_case = TRUE) {
+  if (!is.logical(ignore_case) || length(ignore_case) != 1L || is.na(ignore_case))
+    stop("ignore_case must be TRUE or FALSE", call. = FALSE)
   type <- match.arg(type, c("string", "email", "boolean", "integer", "number", "latitude", "longitude", "date", "datetime"))
   matching <- match.arg(matching, c("exact", "name"))
   if (!(is.atomic(values) || is.list(values)) || is.data.frame(values) || !is.null(dim(values))) {
@@ -76,21 +87,28 @@ registry_index <- function(values, type = "string", matching = "exact", aliases 
   if (type != "string" && (matching == "name" || length(aliases))) {
     stop("Name matching and aliases require string fields", call. = FALSE)
   }
-  exact <- table(vapply(values, registry_key, character(1)))
-  normalized <- if (matching == "name") table(normalized_name_key(vapply(values, identity, character(1)))) else integer()
+  exact <- table(vapply(values, registry_key, character(1), ignore_case = ignore_case))
+  normalized <- if (matching == "name") table(normalized_name_key(
+    vapply(values, identity, character(1)), ignore_case)) else integer()
+  lookup_aliases <- aliases
+  if (ignore_case && length(aliases)) {
+    pairs <- unique(data.frame(alias = tolower(names(aliases)), target = tolower(unname(aliases))))
+    if (anyDuplicated(pairs$alias)) stop("Ambiguous case-insensitive registry aliases", call. = FALSE)
+    lookup_aliases <- stats::setNames(pairs$target, pairs$alias)
+  }
   # Resolve one registry value through aliases
   # @param value Text value to look up.
   # @param seen Alias values already visited while resolving this chain.
   # @return Matching registry row count; cyclic aliases raise an error.
   resolve <- function(value, seen = character()) {
-    count <- registry_count(exact, registry_key(value))
+    count <- registry_count(exact, registry_key(value, ignore_case))
     if (count > 0L) return(count)
     if (value %in% seen) stop("Cyclic registry alias: ", value, call. = FALSE)
-    if (value %in% names(aliases)) return(resolve(aliases[[value]], c(seen, value)))
-    if (matching == "name") registry_count(normalized, normalized_name_key(value)) else 0L
+    if (value %in% names(lookup_aliases)) return(resolve(lookup_aliases[[value]], c(seen, value)))
+    if (matching == "name") registry_count(normalized, normalized_name_key(value, ignore_case)) else 0L
   }
-  alias_counts <- vapply(names(aliases), resolve, integer(1))
-  structure(list(type = type, matching = matching, aliases = aliases, exact = exact,
+  alias_counts <- vapply(names(lookup_aliases), resolve, integer(1))
+  structure(list(type = type, matching = matching, ignore_case = ignore_case, aliases = aliases, exact = exact,
     normalized = normalized, alias_counts = alias_counts), class = "validation_registry")
 }
 
@@ -111,16 +129,18 @@ registry_match_counts <- function(index, values) {
   }
   result <- integer(length(values))
   values <- values[present]
-  keys <- vapply(values, registry_key, character(1))
+  ignore_case <- isTRUE(index$ignore_case)
+  keys <- vapply(values, registry_key, character(1), ignore_case = ignore_case)
   first <- !duplicated(keys)
   distinct <- keys[first]
   counts <- registry_count(index$exact, distinct)
   if (index$type == "string") {
     submitted <- vapply(values[first], identity, character(1))
-    aliased <- counts == 0L & submitted %in% names(index$aliases)
+    if (ignore_case) submitted <- tolower(submitted)
+    aliased <- counts == 0L & submitted %in% names(index$alias_counts)
     counts[aliased] <- registry_count(index$alias_counts, submitted[aliased])
     fallback <- counts == 0L & !aliased & index$matching == "name"
-    counts[fallback] <- registry_count(index$normalized, normalized_name_key(submitted[fallback]))
+    counts[fallback] <- registry_count(index$normalized, normalized_name_key(submitted[fallback], ignore_case))
   }
   result[present] <- counts[match(keys, distinct)]
   result

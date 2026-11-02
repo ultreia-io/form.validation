@@ -81,7 +81,7 @@ read_validation_process <- function(path, model, checks = list(), business = cha
 #' @return A `validation_plan` for [`validate_data()`][form.validation::validate_data].
 #' @details Requires one structure and one field file, matching the model and rule version.
 #'   Generated rule order, values and severity must match; stale files need regeneration.
-#'   Enum and code-list rules may set `ignore_case: false` for strict matching. Omitted or true
+#'   Enum, code-list and registry rules may set `ignore_case: false` for strict matching. Omitted or true
 #'   ignores case for character values, without rewriting submitted values.
 #'   Structural and business files may declare callbacks as `namespace/[field/]callback`.
 #'   Parameters reach callbacks through `config$rule`, including the optional field ID.
@@ -188,7 +188,7 @@ bind_generated_rules <- function(plan, documents) {
     rule <- plan$rules[[i]]
     if (rule$stage == "fields") {
       plan$rules[[i]]$value <- fields$rules[[rule$id]]$value
-      if (rule$kind %in% c("enum", "code_list")) plan$rules[[i]]$ignore_case <- fields$rules[[rule$id]]$ignore_case
+      if (rule$kind %in% c("enum", "code_list", "registry")) plan$rules[[i]]$ignore_case <- fields$rules[[rule$id]]$ignore_case
     }
   }
   plan
@@ -252,7 +252,7 @@ check_generated_rules <- function(rules, path) {
   for (id in names(rules)) {
     rule <- rules[[id]]
     named_list(rule, paste(path, id))
-    allowed <- c("value", "severity", if (grepl("/(enum|code_list)$", id)) "ignore_case")
+    allowed <- c("value", "severity", if (grepl("/(enum|code_list|registry)$", id)) "ignore_case")
     if (!"value" %in% names(rule) || length(setdiff(names(rule), allowed))) {
       stop(path, ": generated rule requires value and optional severity: ", id, call. = FALSE)
     }

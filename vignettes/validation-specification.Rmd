@@ -144,7 +144,18 @@ Each alias must point to an existing reference value. A missing reference list l
 
 ## Match registry names
 
-Registry matching is exact by default. Enable name matching when case, accents or word order may differ:
+Registry rules ignore case by default. Use `ignore_case: false` for case-sensitive comparison:
+
+```yaml
+rules:
+  field/Observations.observer/registry:
+    value: {id: observers, column: name, matching: exact}
+    ignore_case: false
+```
+
+The option also controls case in aliases and name fallback. Multiple matching registry rows remain ambiguous.
+
+Enable name matching when accents or word order may differ:
 
 ```r
 index <- registry_index(c("MARTIN Emile", "Jane Smith"), matching = "name",

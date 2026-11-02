@@ -21,7 +21,7 @@ generate_validation_rules <- function(name, directory, version = "1.0.0", overwr
 #' @return Both paths, invisibly.
 #' @details Preserves custom structural rules. Field rules use compact YAML;
 #'   edit the form and regenerate when its definition changes.
-#'   Explicit enum and code-list `ignore_case` options are preserved when regenerating field rules.
+#'   Explicit enum, code-list and registry `ignore_case` options are preserved when regenerating field rules.
 #' @seealso [`generate_validation_rules()`][form.validation::generate_validation_rules], [`read_validation_rules()`][form.validation::read_validation_rules]
 #' @export
 write_validation_rules <- function(model, structure_path, generated_path,
@@ -66,7 +66,7 @@ write_validation_rules <- function(model, structure_path, generated_path,
   lines <- vapply(names(rules), function(id) {
     rule <- rules[[id]]
     value <- flow_rule_value(rule$value)
-    ignore_case <- if (grepl("/(enum|code_list)$", id)) case_options[[id]] else NULL
+    ignore_case <- if (grepl("/(enum|code_list|registry)$", id)) case_options[[id]] else NULL
     if (!is.null(rule$severity) || !is.null(names(rule$value)) || !is.null(ignore_case)) {
       value <- paste0("{value: ", value,
         if (!is.null(rule$severity)) paste0(", severity: ", rule$severity),

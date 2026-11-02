@@ -4,10 +4,12 @@
 \alias{registry_key}
 \title{Encode a validated scalar registry key}
 \usage{
-registry_key(x)
+registry_key(x, ignore_case = FALSE)
 }
 \arguments{
 \item{x}{One nonmissing scalar accepted by \code{\link[=value_type]{value_type()}}.}
+
+\item{ignore_case}{Ignore case in character keys? Defaults to FALSE.}
 }
 \value{
 A character key with a numeric, Boolean, or string prefix. Dates and

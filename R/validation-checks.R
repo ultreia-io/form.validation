@@ -256,7 +256,7 @@ run_field <- function(rule, context) {
   } else if (kind == "pattern") {
     bad <- eligible[!grepl(value, values, perl = TRUE)]
     problem <- "Value does not match pattern"; expected <- value
-  } else if (kind %in% c("reference", "code_list")) {
+  } else if (kind == "code_list") {
     keys <- if (length(eligible)) reference_keys(value, context) else character()
     bad <- eligible[!values %in% keys]
     problem <- paste("Value not found in code list", value); expected <- value

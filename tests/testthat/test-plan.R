@@ -5,9 +5,9 @@ test_that("plans expose stable rule identities and preserve declared severity", 
   ids <- vapply(plan$rules, function(rule) rule$id, character(1))
   expect_true(all(c("workbook/sheets", "field/Observations.unit/enum",
                     "field/Observations.unit/required_field",
-                    "field/Observations.id/unique", "field/Observations.site/reference") %in% ids))
+                    "field/Observations.id/unique", "field/Observations.site/code_list") %in% ids))
   expect_false(anyDuplicated(ids) > 0L)
-  expect_identical(plan$rules[[match("field/Observations.site/reference", ids)]]$severity, "warning")
+  expect_identical(plan$rules[[match("field/Observations.site/code_list", ids)]]$severity, "warning")
   expect_identical(form.model::form_definition(model), before)
   expect_identical(ids, vapply(validation_plan(model)$rules, function(rule) rule$id, character(1)))
 })

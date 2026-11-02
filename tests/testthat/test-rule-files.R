@@ -7,7 +7,7 @@ test_that("generated validation files are compact and round-trip the plan", {
   expect_identical(names(structure$sheets), c("Cover", "Observations"))
   expect_identical(fields$stage, "fields")
   expect_identical(fields$rules[["field/Observations.amount/minimum"]], 0)
-  expect_identical(fields$rules[["field/Observations.site/reference"]], list(value = "sites", severity = "warning"))
+  expect_identical(fields$rules[["field/Observations.site/code_list"]], list(value = "sites", severity = "warning"))
   expect_identical(fields$rules[["field/Observations.unit/enum"]], list("cm", "m"))
   plan <- read_validation_rules(stats::setNames(paths, c("structure", "generated")), fixture_model())
   actual <- validate_data(plan, fixture_data(), fixture_references())
@@ -138,7 +138,7 @@ test_that("generated rule order, parameters and severities cannot silently drift
     function(d) { d$rules <- d$rules[-1L]; d },
     function(d) { d$rules <- rev(d$rules); d },
     function(d) { d$rules[["field/Observations.amount/minimum"]] <- -1; d },
-    function(d) { d$rules[["field/Observations.site/reference"]]$severity <- NULL; d }
+    function(d) { d$rules[["field/Observations.site/code_list"]]$severity <- NULL; d }
   )) {
     yaml::write_yaml(change(original), paths[[2L]])
     expect_error(read_validation_rules(paths, fixture_model()), "differs from model")

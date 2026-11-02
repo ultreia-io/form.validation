@@ -107,21 +107,21 @@ validation_plan <- function(model, rules = list()) {
       unsupported <- setdiff(names(field),
                              c("id", "name", "sheet", "location", "row", "column", "type",
                                "mandatory", "enum", "minimum", "maximum", "maximum_field", "pattern", "sequence", "unique",
-                               "reference", "code_list", "registry", "required_field"))
+                               "code_list", "registry", "required_field"))
       if (length(unsupported)) stop("Unsupported constraints: ", paste(unsupported, collapse = ", "), call. = FALSE)
       if (isTRUE(field$unique) && layout$kind != "table") {
         stop("unique is only supported for table fields: ", field$id, call. = FALSE)
       }
       kinds <- c(if (field$mandatory) "mandatory",
                  if (!is.null(field$required_field)) "required_field", "type",
-                 intersect(c("reference", "code_list", "registry", "enum", "minimum", "maximum", "maximum_field", "pattern", "sequence", "unique"),
+                 intersect(c("code_list", "registry", "enum", "minimum", "maximum", "maximum_field", "pattern", "sequence", "unique"),
                            names(field)))
       for (kind in kinds) {
         if (kind == "unique" && !isTRUE(field$unique)) next
-        severity <- if (kind %in% c("reference", "code_list", "registry")) field[[kind]]$severity else "error"
+        severity <- if (kind %in% c("code_list", "registry")) field[[kind]]$severity else "error"
         rule <- rule_record(paste("field", field$id, kind, sep = "/"), kind,
                             severity, sheet_name, field$id, stage = "fields")
-        rule$value <- if (kind %in% c("reference", "code_list")) field[[kind]]$id else
+        rule$value <- if (kind == "code_list") field[[kind]]$id else
           if (kind == "registry") Filter(Negate(is.null), field$registry[c("id", "column", "matching")]) else field[[kind]]
         generated[[length(generated) + 1L]] <- rule
       }

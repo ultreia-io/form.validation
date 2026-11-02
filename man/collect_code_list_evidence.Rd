@@ -22,6 +22,6 @@ A compact evidence data frame, or \code{NULL} when no code-list findings exist.
 Collect completed code-list findings
 }
 \details{
-Selects built-in reference checks; incomplete execution records do not contribute cases.
+Selects built-in code-list checks; incomplete execution records do not contribute cases.
 }
 \keyword{internal}

@@ -68,7 +68,7 @@ test_that("vector uniqueness preserves mixed temporal representations and origin
   expect_identical(duplicate$value[[1]], as.Date("2026-10-02"))
 })
 
-test_that("mandatory, type and reference precede remaining constraints regardless of mapping order", {
+test_that("mandatory, type and code list precede remaining constraints regardless of mapping order", {
   d <- fixture_definition()
   site <- d$sheets$Observations$fields$site
   site$mandatory <- TRUE
@@ -77,7 +77,7 @@ test_that("mandatory, type and reference precede remaining constraints regardles
   plan <- validation_plan(form.model::as_form_model(d))
   rules <- Filter(function(rule) identical(rule$field, "Observations.site"), plan$rules)
   expect_identical(vapply(rules, `[[`, character(1), "kind"),
-                   c("mandatory", "type", "reference", "pattern"))
+                   c("mandatory", "type", "code_list", "pattern"))
   data <- fixture_data()
   data$Observations$site <- list(NA_character_, 42)
   result <- validate_data(plan, data)
@@ -95,16 +95,16 @@ test_that("numeric uniqueness uses value equality without coercing invalid or nu
   expect_identical(result$findings$row[result$findings$rule_id == "field/Values.value/unique"], c(2L, 4L))
 })
 
-test_that("compact references default to errors and preserve explicit warnings", {
+test_that("compact code lists default to errors and preserve explicit warnings", {
   d <- fixture_definition()
-  d$sheets$Observations$fields$site <- list(mandatory = TRUE, type = "string", reference = "sites")
+  d$sheets$Observations$fields$site <- list(mandatory = TRUE, type = "string", code_list = "sites")
   data <- fixture_data()
   data$Observations$site <- c(NA_character_, "unknown")
   result <- validate_fixture(data, model = form.model::as_form_model(d))
   expect_identical(declared_findings(result)$rule_id,
-                   c("field/Observations.site/mandatory", "field/Observations.site/reference"))
+                   c("field/Observations.site/mandatory", "field/Observations.site/code_list"))
   expect_identical(declared_findings(result)$severity, c("error", "error"))
-  d$sheets$Observations$fields$site$reference <- list(id = "sites", severity = "warning")
+  d$sheets$Observations$fields$site$code_list <- list(id = "sites", severity = "warning")
   result <- validate_fixture(data, model = form.model::as_form_model(d))
   expect_identical(declared_findings(result)$severity, c("error", "warning"))
 })

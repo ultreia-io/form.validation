@@ -46,32 +46,18 @@ jobs:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      # Keep downloaded APT packages: Docker images normally delete them after installation.
-      - name: Prepare Linux package cache
-        if: runner.os == 'Linux'
-        id: apt-cache
-        run: |
-          rm -f /etc/apt/apt.conf.d/docker-clean
-          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
-          # Identify the actual image so latest never reuses another R or OS version's cache.
-          echo "r-version=$(Rscript -e 'cat(as.character(getRversion()))')" >> "$GITHUB_OUTPUT"
-          . /etc/os-release
-          echo "os-version=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
-
-      # Keep website dependencies in their own cache; refresh it weekly.
-      # Fall back to shared downloads when no website cache exists yet.
-      # APT still refreshes its indexes and installs packages normally.
-      - name: Cache Linux packages
-        if: runner.os == 'Linux'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      # Document the supplied release commit, or the branch selected for a manual run.
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
         with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
-          key: apt-website-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
-          restore-keys: |
-            apt-website-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-
-            apt-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Cache Linux packages
+        id: apt-cache
+        uses: ./.github/actions/cache-apt
+        with:
+          scope: apt-website-rocker
+          fallback-scope: apt-rocker
 
       # Add Git, R check tools and lsb_release, which setup-r uses to identify Ubuntu.
       - name: Install Linux check tools
@@ -79,12 +65,6 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release
-
-      # Document the supplied release commit, or the branch selected for a manual run.
-      - name: Check out repository
-        uses: actions/checkout@v7.0.1
-        with:
-          ref: ${{ inputs.ref || github.ref }}
 
       # Configure the image's R installation and prefer package binaries where supported.
       - name: Set up R
@@ -108,12 +88,9 @@ jobs:
       # Restore the last metadata snapshot before dependency resolution on every platform.
       # A new key saves any refreshed metadata; pak still decides when it needs an update.
       - name: Cache R dependency metadata
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: ./.github/actions/cache-r-metadata
         with:
-          path: ${{ env.PKG_METADATA_CACHE_DIR }}
-          key: pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
-          restore-keys: |
-            pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-
+          r-version: ${{ steps.setup-r.outputs.installed-r-version }}
 
       # Install pkgdown, roxygen and the dependencies declared for website generation.
       - name: Install site dependencies
@@ -129,12 +106,13 @@ jobs:
         shell: Rscript {0}
         run: roxygen2::roxygenise()
 
-      # Build the site and its coverage reports under docs/.
+      # Build the documentation site under docs/.
       # .nojekyll tells Pages to serve the generated files without Jekyll processing.
       - name: Build pkgdown site
         shell: Rscript {0}
         run: |
-          source("tools/build-site.R")
+          source("tools/prepare-site-assets.R")
+          pkgdown::build_site()
           file.create("docs/.nojekyll")
 
       # Load the repository's Pages configuration for deployment.

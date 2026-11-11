@@ -1,0 +1,15 @@
+name: Cache R dependency metadata
+description: Restore the previous pak metadata snapshot without changing pak refresh rules
+inputs:
+  r-version:
+    description: Installed R version
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      with:
+        path: ${{ env.PKG_METADATA_CACHE_DIR }}
+        key: pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ inputs.r-version }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+        restore-keys: |
+          pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ inputs.r-version }}-

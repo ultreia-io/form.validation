@@ -1,0 +1,5 @@
+menu_name	URL	default	source	win.binary	mac.binary
+CRAN	CRAN	https://cloud.r-project.org	TRUE	TRUE	TRUE	TRUE
+BioCsoft	"BioC software"	%bm/packages/%v/bioc	FALSE	TRUE	TRUE	TRUE
+BioCann	"BioC annotation"	%bm/packages/%v/data/annotation	FALSE	TRUE	TRUE	TRUE
+BioCexp	"BioC experiment"	%bm/packages/%v/data/experiment	FALSE	TRUE	TRUE	TRUE

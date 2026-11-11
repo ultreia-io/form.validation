@@ -4,6 +4,7 @@
 ^LICENSE$
 ^_pkgdown\.yml$
 ^docs$
+^pkgdown$
 ^tools$
 ^coverage.*$
 ^.*\.tar\.gz.*$
@@ -17,3 +18,4 @@
 ^CODE_OF_CONDUCT\.md$
 ^DEVELOPMENT\.md$
 ^SECURITY\.md$
+^cran-comments\.md$

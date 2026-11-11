@@ -28,7 +28,7 @@ jobs:
   check:
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
     runs-on: ${{ matrix.config.os }}
-    # Linux: R is preinstalled in the Rocker container.
+    # Linux release: R is preinstalled in Rocker; setup-r installs R-devel on the Ubuntu runner.
     # Windows: R is preinstalled in the GitHub runner image.
     # macOS: setup-r installs R in the GitHub runner.
     container: ${{ matrix.config.container }}
@@ -50,6 +50,9 @@ jobs:
           - os: windows-latest
             r: release
             container: ""
+          - os: ubuntu-latest
+            r: devel
+            container: ""
 
     env:
       # Use the runner's Homebrew metadata without updating or cleaning unrelated tools.
@@ -60,53 +63,49 @@ jobs:
       PKG_METADATA_CACHE_DIR: ${{ github.workspace }}/.github/pak-metadata
       # Authenticate GitHub dependency downloads using the workflow token.
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-      # Keep source references for diagnostics. Skip CRAN submission and runner clock checks in CI.
+      # Keep source references and enable CRAN incoming checks, including remote checks.
       R_KEEP_PKG_SOURCE: yes
       _R_CHECK_SYSTEM_CLOCK_: 'false'
-      _R_CHECK_CRAN_INCOMING_: 'false'
-      _R_CHECK_CRAN_INCOMING_REMOTE_: 'false'
+      _R_CHECK_CRAN_INCOMING_: 'true'
+      _R_CHECK_CRAN_INCOMING_REMOTE_: 'true'
+      # Share CRAN mirror settings with local checks.
+      R_CHECK_ENVIRON: ${{ github.workspace }}/tools/check.Renviron
 
     steps:
-      # Keep downloaded APT packages: Docker images normally delete them after installation.
-      - name: Prepare Linux package cache
-        if: runner.os == 'Linux'
-        id: apt-cache
-        run: |
-          rm -f /etc/apt/apt.conf.d/docker-clean
-          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
-          # Identify the actual image so latest never reuses another R or OS version's cache.
-          echo "r-version=$(Rscript -e 'cat(as.character(getRversion()))')" >> "$GITHUB_OUTPUT"
-          . /etc/os-release
-          echo "os-version=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
-
-      # Share downloads across Linux jobs; refresh the cache weekly.
-      # APT still refreshes its indexes and installs packages normally.
-      - name: Cache Linux packages
-        if: runner.os == 'Linux'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
-        with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
-          key: apt-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
-          restore-keys: |
-            apt-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-
-
-      # Add Git, R check tools and lsb_release, which setup-r uses to identify Ubuntu.
-      - name: Install Linux check tools
-        if: runner.os == 'Linux'
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release
-
       # An explicit ref selects a release commit; otherwise use the event commit (the proposed merge for PRs).
       - name: Check out repository
+        id: checkout
         uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.ref || github.sha }}
 
-      # Reuse R supplied by Linux and Windows images; install R only on macOS.
+      - name: Cache Linux packages
+        if: matrix.config.container != ''
+        id: apt-cache
+        uses: ./.github/actions/cache-apt
+
+      # Add R check tools, Ubuntu identification and curl/gpg for the Codecov uploader.
+      - name: Install Linux check tools
+        if: matrix.config.container != ''
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release sudo texinfo xz-utils curl gpg tidy
+
+      # Prefer modern HTML Tidy over the older version supplied by macOS.
+      - name: Install HTML Tidy on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install tidy-html5
+          echo "$(brew --prefix tidy-html5)/bin" >> "$GITHUB_PATH"
+
+      - name: Set up cached Linux R-devel
+        if: matrix.config.r == 'devel'
+        id: setup-r-devel
+        uses: ./.github/actions/setup-r-devel
+
+      # Reuse the supplied stable R; install R on macOS.
       - name: Set up R
+        if: matrix.config.r != 'devel'
         id: setup-r
         uses: r-lib/actions/setup-r@v2.12.1
         with:
@@ -116,31 +115,35 @@ jobs:
 
       # Rocker installs into its site library; tell setup-r-dependencies to cache that actual location.
       - name: Select R package cache directory on Linux
-        if: runner.os == 'Linux'
+        if: matrix.config.container != ''
         shell: Rscript {0}
         run: cat(paste0("R_LIBS_USER=", .libPaths()[1], "\n"), file = Sys.getenv("GITHUB_ENV"), append = TRUE)
 
       # Pandoc is needed to render the package vignettes.
       - name: Set up Pandoc
         uses: r-lib/actions/setup-pandoc@v2.12.1
+      # Reuse the complete manual toolchain across checks and publication.
+      - name: Set up cached TinyTeX
+        uses: ./.github/actions/setup-tinytex
 
       # Restore the last metadata snapshot before dependency resolution on every platform.
       # A new key saves any refreshed metadata; pak still decides when it needs an update.
       - name: Cache R dependency metadata
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: ./.github/actions/cache-r-metadata
         with:
-          path: ${{ env.PKG_METADATA_CACHE_DIR }}
-          key: pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
-          restore-keys: |
-            pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-
+          r-version: ${{ (steps.setup-r.outputs.installed-r-version || steps.setup-r-devel.outputs.installed-r-version) }}
 
       # Install package dependencies plus the tools used to generate documentation and run R CMD check.
       - name: Install R dependencies
         uses: r-lib/actions/setup-r-dependencies@v2.12.1
         with:
+          # Preserve installed packages even if a later check fails.
+          cache: always
           extra-packages: |
             any::rcmdcheck
             any::roxygen2
+            ${{ runner.os == 'Linux' && matrix.config.r == 'release' && 'any::covr' || '' }}
+            ${{ runner.os == 'Linux' && matrix.config.r == 'release' && 'any::xml2' || '' }}
           needs: check
 
       # Rd documentation is generated from roxygen comments before building the source package.
@@ -148,11 +151,50 @@ jobs:
         shell: Rscript {0}
         run: roxygen2::roxygenise()
 
-      # Build and check installation, tests, examples and vignettes. Skip only the PDF manual.
-      # Notes and warnings fail this check, just like errors; results are kept under build/.
+      # Build and check installation, tests, examples, vignettes and the PDF manual.
+      # Temporarily allow warnings while form.references awaits CRAN availability; errors still fail.
       - name: Check package
         uses: r-lib/actions/check-r-package@v2.12.1
         with:
-          args: 'c("--no-manual", "--as-cran")'
+          args: '"--as-cran"'
+          build_args: 'character()'
           check-dir: '"build"'
-          error-on: '"note"'
+          error-on: '"error"'
+
+      # Reject interrupted checks even if the check action reports success.
+      - name: Verify check completion
+        if: always()
+        shell: Rscript {0}
+        run: source("tools/check-ci-results.R")
+
+      # Measure coverage once, after successful checks on Linux with the release version of R.
+      - name: Test coverage
+        if: success() && runner.os == 'Linux' && matrix.config.r == 'release'
+        shell: Rscript {0}
+        run: |
+          # Disable IDE source markers during instrumentation.
+          options(covr.rstudio_source_markers = FALSE)
+          # Run the package tests with coverage instrumentation.
+          coverage_result <- covr::package_coverage(
+            quiet = FALSE,
+            clean = FALSE,
+            install_path = file.path(normalizePath(Sys.getenv("RUNNER_TEMP"), winslash = "/"), "coverage-package")
+          )
+          # Show the coverage summary in the job log.
+          print(coverage_result)
+          # Export the measured coverage for Codecov.
+          covr::to_cobertura(coverage_result, filename = "coverage.xml")
+
+      - name: Upload coverage to Codecov
+        if: success() && runner.os == 'Linux' && matrix.config.r == 'release'
+        uses: codecov/codecov-action@v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ultreia-io/form.validation
+          # Attribute release checks to the merged main commit, rather than the release PR head.
+          override_commit: ${{ steps.checkout.outputs.commit }}
+          override_branch: ${{ github.event.pull_request.merged == true && github.event.pull_request.base.ref || '' }}
+          files: coverage.xml
+          plugins: noop
+          disable_search: true
+          fail_ci_if_error: ${{ github.event_name != 'pull_request' || secrets.CODECOV_TOKEN != '' }}

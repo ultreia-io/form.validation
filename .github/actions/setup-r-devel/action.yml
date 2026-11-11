@@ -1,0 +1,58 @@
+name: Cached Linux R-devel
+description: Install a daily R-devel snapshot and reuse its system downloads
+outputs:
+  installed-r-version:
+    value: ${{ steps.setup-r.outputs.installed-r-version }}
+runs:
+  using: composite
+  steps:
+    - id: identity
+      shell: bash
+      run: |
+        . /etc/os-release
+        echo "platform=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+        echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+        echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+        sudo rm -f /etc/apt/apt.conf.d/docker-clean
+        sudo mkdir -p /opt/R
+        sudo chown "$(id -u):$(id -g)" /opt/R
+        sudo chown "$(id -u):$(id -g)" /var/cache/apt/archives
+    - name: Cache system downloads
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      with:
+        path: /var/cache/apt/archives/*.deb
+        key: apt-r-devel-${{ steps.identity.outputs.platform }}-${{ runner.arch }}-v1-${{ steps.identity.outputs.week }}
+        restore-keys: apt-r-devel-${{ steps.identity.outputs.platform }}-${{ runner.arch }}-v1-
+    - name: Restore daily R-devel
+      id: r-cache
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      with:
+        path: |
+          /opt/R/devel
+          .github/r-devel-cache
+        key: r-devel-${{ steps.identity.outputs.platform }}-${{ runner.arch }}-v1-${{ steps.identity.outputs.day }}
+    - name: Install system requirements
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends qpdf ghostscript texinfo xz-utils curl tidy
+        if [[ -f .github/r-devel-cache/dependencies ]]; then
+          sudo apt-get satisfy -y "$(cat .github/r-devel-cache/dependencies)"
+          sudo ln -sf /opt/R/devel/bin/R /usr/local/bin/R
+          sudo ln -sf /opt/R/devel/bin/Rscript /usr/local/bin/Rscript
+        fi
+    - name: Configure R-devel
+      id: setup-r
+      uses: r-lib/actions/setup-r@v2.12.1
+      with:
+        r-version: devel
+        install-r: ${{ steps.r-cache.outputs.cache-hit != 'true' }}
+        use-public-rspm: true
+    - name: Record runtime dependencies for fresh runners
+      if: steps.r-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p .github/r-devel-cache
+        r_package=$(dpkg-query -S /opt/R/devel/bin/R | head -1 | cut -d: -f1)
+        dpkg-query -W -f='${Depends}' "$r_package" > .github/r-devel-cache/dependencies
+        test -s .github/r-devel-cache/dependencies

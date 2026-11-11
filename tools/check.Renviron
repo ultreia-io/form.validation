@@ -1,0 +1,5 @@
+# Use the same CRAN mirror for source metadata and web checks.
+R_CRAN_SRC=https://cloud.r-project.org
+R_CRAN_WEB=https://cloud.r-project.org
+# Resolve the repository configuration from the project root in CI or a local shell.
+R_REPOSITORIES="${GITHUB_WORKSPACE-${PWD}}/tools/cran-repositories"

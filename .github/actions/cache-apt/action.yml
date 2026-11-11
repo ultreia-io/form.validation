@@ -1,0 +1,32 @@
+name: Cache Rocker APT downloads
+description: Preserve weekly package downloads and indexes for the current Rocker image
+inputs:
+  scope:
+    description: Cache namespace for this job
+    default: apt-rocker
+  fallback-scope:
+    description: Optional shared download namespace
+    default: ''
+outputs:
+  r-version:
+    value: ${{ steps.identity.outputs.r-version }}
+runs:
+  using: composite
+  steps:
+    - id: identity
+      shell: bash
+      run: |
+        rm -f /etc/apt/apt.conf.d/docker-clean
+        echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+        echo "r-version=$(Rscript -e 'cat(as.character(getRversion()))')" >> "$GITHUB_OUTPUT"
+        . /etc/os-release
+        echo "os-version=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      with:
+        path: |
+          /var/cache/apt/archives
+          /var/lib/apt/lists
+        key: ${{ inputs.scope }}-${{ steps.identity.outputs.r-version }}-${{ steps.identity.outputs.os-version }}-${{ runner.arch }}-v1-${{ steps.identity.outputs.week }}
+        restore-keys: |
+          ${{ inputs.scope }}-${{ steps.identity.outputs.r-version }}-${{ steps.identity.outputs.os-version }}-${{ runner.arch }}-v1-
+          ${{ inputs.fallback-scope != '' && format('{0}-{1}-{2}-{3}-v1-', inputs.fallback-scope, steps.identity.outputs.r-version, steps.identity.outputs.os-version, runner.arch) || '' }}

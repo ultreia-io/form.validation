@@ -23,7 +23,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
-       startsWith(github.head_ref, 'release/v'))
+       startsWith(github.head_ref, 'release/'))
     runs-on: ubuntu-latest
     # R is preinstalled in this Ubuntu image; no R download or installation is needed.
     container: rocker/r-ver:latest
@@ -39,30 +39,15 @@ jobs:
       RELEASE_BRANCH: ${{ github.head_ref }}
       SOURCE_REF: ${{ github.ref }}
     steps:
-      # Keep downloaded APT packages: Docker images normally delete them after installation.
-      - name: Prepare Linux package cache
-        if: runner.os == 'Linux'
-        id: apt-cache
-        run: |
-          rm -f /etc/apt/apt.conf.d/docker-clean
-          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
-          # Identify the actual image so latest never reuses another R or OS version's cache.
-          echo "r-version=$(Rscript -e 'cat(as.character(getRversion()))')" >> "$GITHUB_OUTPUT"
-          . /etc/os-release
-          echo "os-version=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+      # Read the selected develop commit, or GitHub's proposed merge on a PR event.
+      - name: Check out release sources
+        uses: actions/checkout@v7.0.1
 
-      # Share downloads across Linux jobs; refresh the cache weekly.
-      # APT still refreshes its indexes and installs packages normally.
       - name: Cache Linux packages
-        if: runner.os == 'Linux'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        id: apt-cache
+        uses: ./.github/actions/cache-apt
         with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
-          key: apt-metadata-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
-          restore-keys: |
-            apt-metadata-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-
+          scope: apt-metadata-rocker
 
       # setup-r uses lsb_release to identify the preinstalled R environment.
       - name: Install Linux identification tool
@@ -70,9 +55,6 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends lsb-release
 
-      # Read the selected develop commit, or GitHub's proposed merge on a PR event.
-      - name: Check out release sources
-        uses: actions/checkout@v7.0.1
       # Only R is needed here to read DESCRIPTION; package checks run in Build.yaml.
       - name: Set up R for metadata validation
         uses: r-lib/actions/setup-r@v2.12.1
@@ -95,7 +77,7 @@ jobs:
               stop("Start Release must run from develop; selected ref: ", Sys.getenv("SOURCE_REF"), call. = FALSE)
             }
           } else {
-            expected <- sub("^release/v", "", Sys.getenv("RELEASE_BRANCH"))
+            expected <- sub("^release/", "", Sys.getenv("RELEASE_BRANCH"))
             if (!identical(version, expected)) {
               stop("Release branch version ", expected, " does not match DESCRIPTION version ", version, ".", call. = FALSE)
             }
@@ -106,7 +88,7 @@ jobs:
           }
           cat(paste0("version=", version, "\n"), file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
 
-      # Freeze develop in release/vX.Y.Z and open a PR into main for manual review and merge.
+      # Freeze develop in release/X.Y.Z and open a PR into main for manual review and merge.
       # Use this action only for PR creation; PublishRelease.yaml handles the merged commit.
       - name: Open Gitflow release pull request
         if: github.event_name == 'workflow_dispatch'
@@ -114,7 +96,7 @@ jobs:
         with:
           develop_branch: develop
           main_branch: main
-          version: v${{ steps.release.outputs.version }}
+          version: ${{ steps.release.outputs.version }}
         env:
           # A custom token starts PR checks automatically; GITHUB_TOKEN may require approval.
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}

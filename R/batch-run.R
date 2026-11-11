@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Validate every input in a saved batch plan
 #' @inheritParams read_validation_batch_plan
 #' @param resume Reuse completed, checksum-verified results after an interruption.
@@ -73,6 +75,91 @@ validate_batch <- function(plan, resume = TRUE, workers = 1L) {
 }
 
 # Each worker writes only its own result. The parent alone updates validation.rds.
+
+#' Generate individual reports from completed validation results
+#' @inheritParams read_validation_batch_plan
+#' @param report_filename HTML basename, ending in `.html`.
+#' @inheritParams write_validation_report
+#' @param overwrite Rebuild the complete reports directory from saved results.
+#' @param workers Number of forms to render concurrently. The default is one.
+#' @param reference_context_columns Public input columns shown in evidence tables.
+#'   Defaults to the batch grouping and identity columns.
+#' @return The reports directory, invisibly.
+#' @details Requires every planned input to have a saved result. Reads no input
+#'   workbook or reference CSV. Uses the form saved with each result, so rendering
+#'   does not depend on changes to installed form definitions.
+#'   Reports are staged together and replace the previous report tree only after
+#'   every form has rendered successfully. The batch plan and results stay intact.
+#' @export
+write_validation_batch_reports <- function(plan, report_filename = "index.html", overwrite = FALSE,
+                                            title = "Validation report", author = NULL,
+                                            stylesheet = NULL, logo = NULL, workers = 1L,
+                                            reference_context_columns = NULL) {
+  if (length(workers) != 1L || !is.numeric(workers) || is.na(workers) ||
+      !is.finite(workers) || workers < 1 || workers > .Machine$integer.max ||
+      workers != as.integer(workers))
+    stop("workers must be a positive whole number", call. = FALSE)
+  workers <- as.integer(workers)
+  plan <- read_validation_batch_plan(plan)
+  check_batch_report_filename(report_filename)
+  if (is.null(reference_context_columns))
+    reference_context_columns <- unique(c(plan$group_columns, plan$identity_columns))
+  if (!is.character(reference_context_columns) || anyNA(reference_context_columns) ||
+      anyDuplicated(reference_context_columns) ||
+      !all(reference_context_columns %in% names(plan$files)))
+    stop("reference_context_columns must name public input columns", call. = FALSE)
+  lock <- lock_validation_batch(plan)
+  on.exit(unlink(lock, recursive = TRUE), add = TRUE)
+  validation <- read_batch_state(plan, "validation")
+  output <- file.path(plan$directory, "reports")
+  if (file.exists(output) && !isTRUE(overwrite)) stop("Reports already exist; use overwrite = TRUE", call. = FALSE)
+  stage <- tempfile(".reports-", tmpdir = plan$directory)
+  dir.create(stage)
+  on.exit(unlink(stage, recursive = TRUE), add = TRUE)
+  log <- batch_log(plan$directory, "report.log")
+  started <- proc.time()[["elapsed"]]
+  outcomes <- list()
+  files <- lapply(seq_len(nrow(plan$files)), function(i) plan$files[i, ])
+  render <- function(file) render_batch_input_report(file, plan, validation, stage,
+    report_filename, title, author, stylesheet, logo, reference_context_columns)
+  if (workers == 1L) {
+    rendered <- lapply(files, render)
+  } else if (.Platform$OS.type == "windows") {
+    cluster <- parallel::makePSOCKcluster(workers)
+    on.exit(parallel::stopCluster(cluster), add = TRUE)
+    rendered <- parallel::parLapplyLB(cluster, files, render)
+  } else {
+    rendered <- parallel::mclapply(files, render, mc.cores = workers, mc.preschedule = FALSE)
+  }
+  for (i in seq_along(files)) {
+    file <- files[[i]]
+    result <- rendered[[i]]
+    if (inherits(result, "try-error") || !is.null(result$error))
+      stop("Cannot render report for ", file$relative, ": ",
+        if (inherits(result, "try-error")) as.character(result) else result$error, call. = FALSE)
+    outcomes[[file$relative]] <- result
+    log(sprintf("REPORTED %s elapsed=%.3fs", file$relative, result$elapsed))
+  }
+  paths <- sort(list.files(stage, recursive = TRUE, all.files = TRUE, no.. = TRUE))
+  artifacts <- stats::setNames(vapply(file.path(stage, paths), batch_file_hash, character(1)), paths)
+  state <- list(schema_version = 1L, plan_id = plan$id, complete = TRUE,
+    validation_sha256 = batch_file_hash(file.path(plan$directory, "validation.rds")),
+    report_filename = report_filename, finished_at = batch_time(),
+    elapsed = proc.time()[["elapsed"]] - started, outcomes = outcomes, artifacts = artifacts)
+  backup <- tempfile(".reports-previous-", tmpdir = plan$directory)
+  if (dir.exists(output) && !file.rename(output, backup)) stop("Cannot replace reports directory", call. = FALSE)
+  if (!file.rename(stage, output)) {
+    if (dir.exists(backup)) file.rename(backup, output)
+    stop("Cannot finalize reports", call. = FALSE)
+  }
+  write_batch_state(state, file.path(plan$directory, "reports.rds"))
+  unlink(backup, recursive = TRUE)
+  log(sprintf("FINISHED reports; %d forms; elapsed=%.3fs", nrow(plan$files), state$elapsed))
+  invisible(output)
+}
+
+# Internal helpers ----------------------------------------------------------
+
 #' Validate and save one planned input
 #' @param file One row from the batch plan's input table.
 #' @param bundle Frozen rules and references for the input's job.
@@ -178,88 +265,6 @@ validate_batch_inputs <- function(selected, bundle, plan, state, state_path, log
     }
   }
   state
-}
-
-#' Generate individual reports from completed validation results
-#' @inheritParams read_validation_batch_plan
-#' @param report_filename HTML basename, ending in `.html`.
-#' @inheritParams write_validation_report
-#' @param overwrite Rebuild the complete reports directory from saved results.
-#' @param workers Number of forms to render concurrently. The default is one.
-#' @param reference_context_columns Public input columns shown in evidence tables.
-#'   Defaults to the batch grouping and identity columns.
-#' @return The reports directory, invisibly.
-#' @details Requires every planned input to have a saved result. Reads no input
-#'   workbook or reference CSV. Uses the form saved with each result, so rendering
-#'   does not depend on changes to installed form definitions.
-#'   Reports are staged together and replace the previous report tree only after
-#'   every form has rendered successfully. The batch plan and results stay intact.
-#' @export
-write_validation_batch_reports <- function(plan, report_filename = "index.html", overwrite = FALSE,
-                                            title = "Validation report", author = NULL,
-                                            stylesheet = NULL, logo = NULL, workers = 1L,
-                                            reference_context_columns = NULL) {
-  if (length(workers) != 1L || !is.numeric(workers) || is.na(workers) ||
-      !is.finite(workers) || workers < 1 || workers > .Machine$integer.max ||
-      workers != as.integer(workers))
-    stop("workers must be a positive whole number", call. = FALSE)
-  workers <- as.integer(workers)
-  plan <- read_validation_batch_plan(plan)
-  check_batch_report_filename(report_filename)
-  if (is.null(reference_context_columns))
-    reference_context_columns <- unique(c(plan$group_columns, plan$identity_columns))
-  if (!is.character(reference_context_columns) || anyNA(reference_context_columns) ||
-      anyDuplicated(reference_context_columns) ||
-      !all(reference_context_columns %in% names(plan$files)))
-    stop("reference_context_columns must name public input columns", call. = FALSE)
-  lock <- lock_validation_batch(plan)
-  on.exit(unlink(lock, recursive = TRUE), add = TRUE)
-  validation <- read_batch_state(plan, "validation")
-  output <- file.path(plan$directory, "reports")
-  if (file.exists(output) && !isTRUE(overwrite)) stop("Reports already exist; use overwrite = TRUE", call. = FALSE)
-  stage <- tempfile(".reports-", tmpdir = plan$directory)
-  dir.create(stage)
-  on.exit(unlink(stage, recursive = TRUE), add = TRUE)
-  log <- batch_log(plan$directory, "report.log")
-  started <- proc.time()[["elapsed"]]
-  outcomes <- list()
-  files <- lapply(seq_len(nrow(plan$files)), function(i) plan$files[i, ])
-  render <- function(file) render_batch_input_report(file, plan, validation, stage,
-    report_filename, title, author, stylesheet, logo, reference_context_columns)
-  if (workers == 1L) {
-    rendered <- lapply(files, render)
-  } else if (.Platform$OS.type == "windows") {
-    cluster <- parallel::makePSOCKcluster(workers)
-    on.exit(parallel::stopCluster(cluster), add = TRUE)
-    rendered <- parallel::parLapplyLB(cluster, files, render)
-  } else {
-    rendered <- parallel::mclapply(files, render, mc.cores = workers, mc.preschedule = FALSE)
-  }
-  for (i in seq_along(files)) {
-    file <- files[[i]]
-    result <- rendered[[i]]
-    if (inherits(result, "try-error") || !is.null(result$error))
-      stop("Cannot render report for ", file$relative, ": ",
-        if (inherits(result, "try-error")) as.character(result) else result$error, call. = FALSE)
-    outcomes[[file$relative]] <- result
-    log(sprintf("REPORTED %s elapsed=%.3fs", file$relative, result$elapsed))
-  }
-  paths <- sort(list.files(stage, recursive = TRUE, all.files = TRUE, no.. = TRUE))
-  artifacts <- stats::setNames(vapply(file.path(stage, paths), batch_file_hash, character(1)), paths)
-  state <- list(schema_version = 1L, plan_id = plan$id, complete = TRUE,
-    validation_sha256 = batch_file_hash(file.path(plan$directory, "validation.rds")),
-    report_filename = report_filename, finished_at = batch_time(),
-    elapsed = proc.time()[["elapsed"]] - started, outcomes = outcomes, artifacts = artifacts)
-  backup <- tempfile(".reports-previous-", tmpdir = plan$directory)
-  if (dir.exists(output) && !file.rename(output, backup)) stop("Cannot replace reports directory", call. = FALSE)
-  if (!file.rename(stage, output)) {
-    if (dir.exists(backup)) file.rename(backup, output)
-    stop("Cannot finalize reports", call. = FALSE)
-  }
-  write_batch_state(state, file.path(plan$directory, "reports.rds"))
-  unlink(backup, recursive = TRUE)
-  log(sprintf("FINISHED reports; %d forms; elapsed=%.3fs", nrow(plan$files), state$elapsed))
-  invisible(output)
 }
 
 #' Render one saved result into the batch's staging directory

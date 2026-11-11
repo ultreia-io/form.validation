@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Freeze an explicit inventory for staged batch validation
 #'
 #' A batch plan describes work to execute. A [`validation_plan()`][form.validation::validation_plan] describes the
@@ -52,7 +54,8 @@ validation_batch_plan <- function(inputs, jobs, resources, directory,
     if (length(parts) != length(group_columns) + 1L ||
         !identical(unname(utils::head(parts, -1L)), unname(as.character(groups))))
       stop("Input path differs from grouping metadata: ", inputs$relative[i], call. = FALSE)
-    if (parts[1L] %in% c("report-assets", "reference-evidence", "code-list-evidence", "registry-evidence", "conversion-evidence", "logs"))
+    if (parts[1L] %in% c("report-assets", "conversion-evidence", "primary-key-evidence", "logs") ||
+        grepl("^reference-[0-9a-f]+-evidence$", parts[1L]))
       stop("Input path uses a reserved publication directory", call. = FALSE)
   }
   named_list(resources, "resources")
@@ -129,15 +132,19 @@ read_validation_batch_plan <- function(plan) {
   plan
 }
 
+# Internal helpers ----------------------------------------------------------
+
 #' Hash a batch artifact
 #' @param path Path to an existing file.
 #' @return A SHA-256 hexadecimal string computed from file bytes.
 #' @keywords internal
 batch_file_hash <- function(path) digest::digest(file = path, algo = "sha256")
+
 #' Format the current batch timestamp
 #' @return Current UTC time as `YYYY-MM-DDTHH:MM:SSZ`.
 #' @keywords internal
 batch_time <- function() format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+
 #' Compute the identity of a frozen batch plan
 #' @param plan Verified local `validation_batch_plan`.
 #' @return A SHA-256 string for the plan contents.
@@ -173,6 +180,7 @@ check_batch_paths <- function(paths) {
 }
 
 # State updates replace a complete file; interrupted writes leave the prior state readable.
+
 #' Replace a batch state file atomically
 #' @param value R object to serialize.
 #' @param path Destination RDS path. Parent directories are created.
@@ -241,6 +249,7 @@ batch_url <- function(path) {
 }
 
 # Public navigation data contains only the explicit public columns.
+
 #' Export public batch navigation metadata
 #' @param plan Verified local `validation_batch_plan`.
 #' @param path Destination JSON file.
@@ -263,6 +272,7 @@ write_batch_plan_json <- function(plan, path, reports = NULL) {
 }
 
 # A dead local process may leave a lock after a session crash.
+
 #' Acquire an exclusive local batch lock
 #' @param plan Verified local `validation_batch_plan`.
 #' @return The lock directory path; the caller must remove it on exit.

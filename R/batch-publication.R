@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Build a publication tree from a completed validation batch
 #' @inheritParams read_validation_batch_plan
 #' @param output New directory, defaulting to `publication` inside the batch.
@@ -59,11 +61,12 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   if (!all(columns %in% names(files))) stop("Missing publication metadata columns", call. = FALSE)
   descriptors <- data.frame(directory = files$relative, report = rep(reports$report_filename, nrow(files)))
   descriptors[columns] <- files[columns]
-  provenance <- list()
   for (i in seq_len(nrow(files))) {
     file <- files[i, ]
     add_batch_breadcrumbs(file.path(stage, file$relative, reports$report_filename), file$relative, report_filename)
-    evidence_labels <- c(`code-list-evidence` = "Code-list evidence", `registry-evidence` = "Registry evidence",
+    prepared <- read_report_evidence(file.path(stage, file$relative, "evidence.json"))
+    evidence_labels <- c(stats::setNames(vapply(prepared$catalogues, function(x) paste(x$label, "evidence"), character(1)),
+      vapply(prepared$catalogues, `[[`, character(1), "folder")),
       `conversion-evidence` = "Conversion errors", `primary-key-evidence` = "Primary-key evidence")
     for (kind in names(evidence_labels)) {
       relative <- file.path(file$relative, kind)
@@ -71,9 +74,6 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
       if (file.exists(path)) add_batch_breadcrumbs(path, relative, report_filename,
         current_label = evidence_labels[[kind]], parent_filename = reports$report_filename)
     }
-    job <- plan$jobs[match(file$job, plan$jobs$id), ]
-    refs <- plan$resources[[job$resource]]$references
-    provenance[[file$relative]] <- Filter(function(reference) identical(reference$status, "available"), refs)
   }
   for (name in c("validation.log", "report.log")) copy(file.path(plan$directory, name), file.path("logs", name))
   message(sprintf("Publication copy and navigation: %.1fs", proc.time()[["elapsed"]] - phase_started))
@@ -81,18 +81,23 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   pages <- write_validation_aggregate(descriptors, stage,
     group_columns = plan$group_columns, identity_columns = plan$identity_columns,
     report_filename = report_filename, title = title, author = author, stylesheet = stylesheet, logo = logo,
-    model_versions = plan$model_versions, reference_provenance = if (length(Filter(length, provenance))) provenance else NULL,
+    model_versions = plan$model_versions,
     reference_context_columns = reference_context_columns, report_notes = report_notes,
     workers = as.integer(workers))
   message(sprintf("Aggregate reports: %.1fs", proc.time()[["elapsed"]] - phase_started))
   phase_started <- proc.time()[["elapsed"]]
   individual_evidence <- basename(dirname(report_files[basename(report_files) == reports$report_filename]))
-  reference_reports <- sum(individual_evidence == "code-list-evidence") + length(attr(pages, "reference_report"))
-  registry_reports <- sum(individual_evidence == "registry-evidence") + length(attr(pages, "registry_report"))
+  catalogues <- attr(pages, "catalogues")
+  catalogue_reports <- lapply(catalogues, function(spec) {
+    spec$reports <- sum(individual_evidence == spec$folder) +
+      sum(basename(dirname(attr(pages, "reference_report"))) == spec$folder)
+    spec
+  })
+  reference_reports <- sum(vapply(catalogue_reports, `[[`, numeric(1), "reports"))
   conversion_reports <- sum(individual_evidence == "conversion-evidence") + length(attr(pages, "conversion_report"))
   primary_key_reports <- sum(individual_evidence == "primary-key-evidence") + length(attr(pages, "primary_key_report"))
   html <- list.files(stage, pattern = "\\.html$", recursive = TRUE, full.names = TRUE)
-  if (length(html) != nrow(descriptors) + length(pages) + reference_reports + registry_reports + conversion_reports + primary_key_reports) stop("Unexpected HTML report count")
+  if (length(html) != nrow(descriptors) + length(pages) + reference_reports + conversion_reports + primary_key_reports) stop("Unexpected HTML report count")
   stage_prefix <- paste0(normalizePath(stage, winslash = "/", mustWork = TRUE), "/")
   for (path in html) {
     text <- paste(readLines(path, warn = FALSE), collapse = "\n")
@@ -119,7 +124,7 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   files <- sort(list.files(stage, recursive = TRUE, full.names = FALSE, all.files = TRUE, no.. = TRUE))
   manifest <- list(batch = basename(plan$directory), report_filename = report_filename,
     individual_reports = nrow(descriptors), aggregate_reports = length(pages), aggregate_pages = as.list(pages),
-    reference_reports = reference_reports, registry_reports = registry_reports, conversion_reports = conversion_reports, primary_key_reports = primary_key_reports, no_inputs = as.list(setdiff(plan$model_versions, plan$files$model_version)),
+    reference_reports = reference_reports, catalogue_reports = catalogue_reports, conversion_reports = conversion_reports, primary_key_reports = primary_key_reports, no_inputs = as.list(setdiff(plan$model_versions, plan$files$model_version)),
     files = lapply(files, function(path) list(path = path, sha256 = digest::digest(file = file.path(stage, path), algo = "sha256"))))
   if (!is.null(comment) && nzchar(comment)) manifest$comment <- comment
   message(sprintf("Publication checks and inventory: %.1fs", proc.time()[["elapsed"]] - phase_started))
@@ -130,6 +135,9 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
 }
 
 # Add ancestor navigation only to the staged publication copy.
+
+# Internal helpers ----------------------------------------------------------
+
 #' Add ancestor navigation to a publication copy
 #' @param path HTML file to update in place.
 #' @param relative Report directory relative to the publication root.

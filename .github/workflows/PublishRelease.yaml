@@ -21,7 +21,7 @@ jobs:
     if: >-
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.event.pull_request.head.ref, 'release/v')
+      startsWith(github.event.pull_request.head.ref, 'release/')
     uses: ./.github/workflows/Build.yaml
     with:
       ref: ${{ github.event.pull_request.merge_commit_sha }}
@@ -40,52 +40,35 @@ jobs:
       contents: write
     outputs:
       commit: ${{ github.event.pull_request.merge_commit_sha }}
+      tag: ${{ steps.version.outputs.tag }}
     env:
       # Reuse dependency metadata while retaining pak's default daily refresh.
       PKG_METADATA_CACHE_DIR: ${{ github.workspace }}/.github/pak-metadata
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
-      _R_CHECK_CRAN_INCOMING_: 'false'
-      _R_CHECK_CRAN_INCOMING_REMOTE_: 'false'
+      _R_CHECK_CRAN_INCOMING_: 'true'
+      _R_CHECK_CRAN_INCOMING_REMOTE_: 'true'
+      # Share CRAN mirror settings with local checks.
+      R_CHECK_ENVIRON: ${{ github.workspace }}/tools/check.Renviron
       _R_CHECK_SYSTEM_CLOCK_: 'false'
     steps:
-      # Keep downloaded APT packages: Docker images normally delete them after installation.
-      - name: Prepare Linux package cache
-        if: runner.os == 'Linux'
-        id: apt-cache
-        run: |
-          rm -f /etc/apt/apt.conf.d/docker-clean
-          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
-          # Identify the actual image so latest never reuses another R or OS version's cache.
-          echo "r-version=$(Rscript -e 'cat(as.character(getRversion()))')" >> "$GITHUB_OUTPUT"
-          . /etc/os-release
-          echo "os-version=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
-
-      # Share downloads across Linux jobs; refresh the cache weekly.
-      # APT still refreshes its indexes and installs packages normally.
-      - name: Cache Linux packages
-        if: runner.os == 'Linux'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      # Use the commit approved by the manual merge throughout publication.
+      - name: Check out merged release
+        uses: actions/checkout@v7.0.1
         with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
-          key: apt-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-${{ steps.apt-cache.outputs.week }}
-          restore-keys: |
-            apt-rocker-${{ steps.apt-cache.outputs.r-version }}-${{ steps.apt-cache.outputs.os-version }}-${{ runner.arch }}-v1-
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Cache Linux packages
+        id: apt-cache
+        uses: ./.github/actions/cache-apt
 
       # Add Git, R check tools and lsb_release, which setup-r uses to identify Ubuntu.
       - name: Install Linux check tools
         if: runner.os == 'Linux'
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release
+          apt-get install -y --no-install-recommends git qpdf ghostscript lsb-release sudo texinfo xz-utils curl tidy
 
-      # Use the commit approved by the manual merge throughout publication.
-      - name: Check out merged release
-        uses: actions/checkout@v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
       # Configure the image's R installation and use package binaries where supported.
       - name: Set up R
         id: setup-r
@@ -110,7 +93,7 @@ jobs:
           if (!grepl("^[0-9]+[.][0-9]+[.][0-9]+$", version)) {
             stop("DESCRIPTION version must use X.Y.Z format; found: ", version, call. = FALSE)
           }
-          expected_branch <- paste0("release/v", version)
+          expected_branch <- paste0("release/", version)
           if (!identical(Sys.getenv("RELEASE_BRANCH"), expected_branch)) {
             stop("Release branch ", Sys.getenv("RELEASE_BRANCH"), " does not match DESCRIPTION version ",
                  version, "; expected branch: ", expected_branch, call. = FALSE)
@@ -119,19 +102,19 @@ jobs:
           if (!heading %in% readLines("NEWS.md")) {
             stop("NEWS.md is missing the heading: ", heading, call. = FALSE)
           }
-          cat(paste0("tag=v", version, "\n"), file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+          cat(paste0("tag=", version, "\n"), file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
       # Pandoc renders package vignettes during the build.
       - name: Set up Pandoc
         uses: r-lib/actions/setup-pandoc@v2.12.1
+      # Reuse the complete manual toolchain used by Build.
+      - name: Set up cached TinyTeX
+        uses: ./.github/actions/setup-tinytex
       # Restore the last metadata snapshot before dependency resolution on every platform.
       # A new key saves any refreshed metadata; pak still decides when it needs an update.
       - name: Cache R dependency metadata
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: ./.github/actions/cache-r-metadata
         with:
-          path: ${{ env.PKG_METADATA_CACHE_DIR }}
-          key: pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
-          restore-keys: |
-            pak-metadata-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-r.outputs.installed-r-version }}-
+          r-version: ${{ steps.setup-r.outputs.installed-r-version }}
 
       # This job installs its own dependencies and the documentation/check tools.
       - name: Install package and check dependencies
@@ -146,13 +129,18 @@ jobs:
         shell: Rscript {0}
         run: roxygen2::roxygenise()
       # This job has its own workspace: build and check the archive that will be uploaded.
-      # Treat warnings and notes as failures as well as errors.
+      # Fail on warnings and errors; retain CRAN notes for review.
       - name: Build and check publication archive
         uses: r-lib/actions/check-r-package@v2.12.1
         with:
-          args: 'c("--no-manual", "--as-cran")'
+          args: '"--as-cran"'
+          build_args: 'character()'
           check-dir: '"build"'
-          error-on: '"note"'
+          error-on: '"warning"'
+      # Require a completed check before publishing the archive.
+      - name: Verify check completion
+        shell: Rscript {0}
+        run: source("tools/check-ci-results.R")
       # Supply a checksum alongside the archive so downloads can be verified.
       - name: Create archive checksum
         working-directory: build
@@ -169,6 +157,83 @@ jobs:
           fail_on_unmatched_files: true
           overwrite_files: false
           generate_release_notes: true
+
+  # Submit the exact published archive; website deployment remains independent.
+  cran:
+    name: Submit to CRAN
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.publish.outputs.tag }}
+      RELEASE_ARCHIVE: form.validation_${{ needs.publish.outputs.tag }}.tar.gz
+    steps:
+      # Release assets survive reruns; an unfinished attempt must be reviewed before retrying.
+      - name: Check previous CRAN submission
+        id: submission
+        shell: bash
+        run: |
+          release_assets=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
+          if grep -qx 'CRAN-SUBMITTED.txt' <<< "$release_assets"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Already submitted to CRAN; no upload repeated." >> "$GITHUB_STEP_SUMMARY"
+          elif grep -qx 'CRAN-SUBMISSION-STARTED.txt' <<< "$release_assets"; then
+            echo "::error::Previous CRAN attempt has no receipt. Check its run and CRAN email before retrying."
+            exit 1
+          fi
+      - name: Check out released sources
+        if: steps.submission.outputs.skip != 'true'
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ needs.publish.outputs.commit }}
+      - name: Set up R
+        if: steps.submission.outputs.skip != 'true'
+        uses: r-lib/actions/setup-r@v2.12.1
+        with:
+          use-public-rspm: true
+      - name: Install submission tools
+        if: steps.submission.outputs.skip != 'true'
+        uses: r-lib/actions/setup-r-dependencies@v2.12.1
+        with:
+          packages: |
+            any::xfun
+            any::curl
+      - name: Download and verify the release archive
+        if: steps.submission.outputs.skip != 'true'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/cran-release"
+          gh release download "$RELEASE_TAG" --pattern "$RELEASE_ARCHIVE" --pattern SHA256SUMS \
+            --dir "$RUNNER_TEMP/cran-release"
+          cd "$RUNNER_TEMP/cran-release"
+          sha256sum --check SHA256SUMS
+          if [[ -f "$GITHUB_WORKSPACE/cran-comments.md" ]]; then
+            cp "$GITHUB_WORKSPACE/cran-comments.md" .
+          fi
+      # Reserve the attempt before uploading; never overwrite this duplicate guard.
+      - name: Record CRAN submission attempt
+        if: steps.submission.outputs.skip != 'true'
+        working-directory: ${{ runner.temp }}/cran-release
+        shell: bash
+        run: |
+          cp SHA256SUMS CRAN-SUBMISSION-STARTED.txt
+          printf '\nWorkflow: https://github.com/%s/actions/runs/%s\n' "$GH_REPO" "$GITHUB_RUN_ID" \
+            >> CRAN-SUBMISSION-STARTED.txt
+          gh release upload "$RELEASE_TAG" CRAN-SUBMISSION-STARTED.txt
+      - name: Submit the existing archive with xfun
+        if: steps.submission.outputs.skip != 'true'
+        working-directory: ${{ runner.temp }}/cran-release
+        shell: bash
+        run: |
+          Rscript -e 'xfun::submit_cran(file = Sys.getenv("RELEASE_ARCHIVE"), sync = FALSE)' 2>&1 | tee submission.log
+          # xfun can report an unsuccessful submission without raising an R error.
+          grep -Fq 'The package has been submitted.' submission.log
+          cp CRAN-SUBMISSION-STARTED.txt CRAN-SUBMITTED.txt
+          gh release upload "$RELEASE_TAG" CRAN-SUBMITTED.txt
+          echo "Submitted to CRAN. Confirm the email sent to the package maintainer." >> "$GITHUB_STEP_SUMMARY"
 
   # Deploy documentation from the same commit once the GitHub release is available.
   website:

@@ -1,3 +1,15 @@
+# form.validation 0.7.0
+
+* [feature] Rename public functions to clarify their actions; remove the former API names.
+* [feature] Generate reference rules from catalogue lookups, preserving explicit case-matching overrides.
+* [feature] Share text matching with form.references and report reference evidence by catalogue.
+* [feature] Validate row-level information requirements with at-least-one rules.
+* [docs] Clarify terminology and guides with runnable survey examples.
+* [dependencies] Require form.model >= 0.6.2 and form.references >= 0.3.0.
+* [build] Add full CRAN checks, shared caches and Codecov coverage.
+* [build] Submit GitHub release archives to CRAN with duplicate protection.
+* [build] Use standard pkgdown builds with prepared download assets.
+
 # form.validation 0.6.0
 
 * Remove legacy `reference` rules; use `code_list` instead.

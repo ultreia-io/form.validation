@@ -22,11 +22,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Tony Chemit \email{dev@tchemit.fr}
+\strong{Maintainer}: Tony Chemit \email{dev@tchemit.fr} (\href{https://orcid.org/0009-0007-1802-5256}{ORCID}) (URL: https://ultreia.io) [copyright holder]
 
 Authors:
 \itemize{
-  \item Tony Chemit \email{dev@tchemit.fr}
+  \item Tony Chemit \email{dev@tchemit.fr} (\href{https://orcid.org/0009-0007-1802-5256}{ORCID}) (URL: https://ultreia.io) [copyright holder]
 }
 
 }

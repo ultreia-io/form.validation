@@ -1,4 +1,5 @@
-# Share content-addressed assets across individual and aggregate reports.
+# Internal helpers ----------------------------------------------------------
+
 #' Copy content-addressed report assets
 #' @param sources Named vector of existing source file paths.
 #' @param directory Destination asset directory, created if needed.

@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Aggregate completed validation reports without running validation
 #'
 #' @param descriptors Data frame with `directory` (existing report directory),
@@ -12,12 +14,10 @@
 #' @param report_notes Public validation-policy notes shown in the Warning
 #'   findings card on every aggregate page. Text is HTML-escaped.
 #' @param model_versions Optional model versions to show, including versions with no files.
-#' @param reference_provenance Retained for compatibility. Snapshot identity is
-#'   already stored in each individual report's prepared evidence.
 #' @param reference_context_columns Descriptor columns to show in code summaries and source tables.
 #' @param workers Number of top-level aggregate directories to render concurrently.
 #' @return Relative aggregate HTML paths, invisibly, with a `reference_report`
-#'   attribute for code-list evidence, `registry_report` for registry evidence,
+#'   attribute for catalogue evidence, `catalogues` for frozen catalogue metadata,
 #'   and `conversion_report` for number, integer, boolean and temporal type failures.
 #'   Attributes contain all contextual evidence report paths. Each aggregate's
 #'   evidence includes only its forms, with counts and links scoped accordingly.
@@ -36,7 +36,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
                                        identity_columns = group_columns,
                                        report_filename = "index.html", title = "Validation reports", notes = character(),
                                        author = NULL, stylesheet = NULL, logo = NULL, model_versions = NULL,
-                                       reference_provenance = NULL, reference_context_columns = character(),
+                                       reference_context_columns = character(),
                                        report_notes = character(), workers = 1L) {
   if (!is.character(report_notes) || anyNA(report_notes))
     stop("report_notes must be character text without missing values", call. = FALSE)
@@ -92,7 +92,7 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
     result$affected_files <- tabulate(pairs$group, nbins = length(order))
     result
   }
-  files <- list(); issues <- list(); execution <- list(); reference_evidence <- list(); registry_evidence <- list(); conversion_evidence <- list(); primary_key_evidence <- list()
+  files <- list(); issues <- list(); execution <- list(); reference_evidence <- list(); catalogues <- list(); form_catalogues <- list(); conversion_evidence <- list(); primary_key_evidence <- list()
   for (i in seq_len(nrow(descriptors))) {
     d <- descriptors[i, , drop = FALSE]
     if (grepl("(^/|(^|/)\\.\\.(/|$))", d$directory)) stop("Unsafe descriptor path")
@@ -122,7 +122,12 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       rows
     }
     reference_evidence[i] <- list(part("reference"))
-    registry_evidence[i] <- list(part("registry"))
+    form_catalogues[i] <- list(names(prepared$catalogues))
+    for (id in names(prepared$catalogues)) {
+      spec <- prepared$catalogues[[id]]
+      if (!is.null(catalogues[[id]]) && !identical(catalogues[[id]], spec)) stop("Conflicting catalogue metadata: ", id)
+      catalogues[[id]] <- spec
+    }
     conversion_evidence[i] <- list(part("conversion"))
     primary_key_evidence[i] <- list(part("primary_key"))
     # Collapse each form before retaining it; the full corpus never occupies memory.
@@ -173,20 +178,20 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       part
     })
     reference_parts <- scoped_evidence(reference_evidence)
-    registry_parts <- scoped_evidence(registry_evidence)
     conversion_parts <- scoped_evidence(conversion_evidence)
     primary_key_parts <- scoped_evidence(primary_key_evidence)
-    reference_count <- evidence_count(reference_parts)
-    registry_count <- evidence_count(registry_parts)
     conversion_count <- evidence_count(conversion_parts)
     primary_key_count <- evidence_count(primary_key_parts)
     evidence_assets <- paste0(prefix, "../report-assets")
-    reference_report <- if (reference_count == "0") NULL else write_reference_evidence(
-      reference_parts, folder, report_filename, reference_context_columns, page_title, stylesheet, logo,
-      evidence_assets = evidence_assets, scope = group)
-    registry_report <- if (registry_count == "0") NULL else write_reference_evidence(
-      registry_parts, folder, report_filename, reference_context_columns, page_title, stylesheet, logo,
-      "registry", evidence_assets = evidence_assets, scope = group)
+    scoped_catalogues <- catalogues[unique(unlist(form_catalogues[which(selected)], use.names = FALSE))]
+    reference_reports <- list()
+    for (id in names(scoped_catalogues)) {
+      selected_parts <- catalogue_evidence_parts(reference_parts, id)
+      if (evidence_count(selected_parts) == "0") next
+      reference_reports[[id]] <- write_reference_evidence(selected_parts, folder, report_filename,
+        reference_context_columns, page_title, stylesheet, logo, catalogue = catalogues[[id]],
+        evidence_assets = evidence_assets, scope = group)
+    }
     conversion_report <- if (conversion_count == "0") NULL else write_conversion_evidence(conversion_parts, folder, report_filename,
       reference_context_columns, page_title, stylesheet, logo, evidence_assets = evidence_assets, scope = group)
     primary_key_report <- if (primary_key_count == "0") NULL else write_primary_key_evidence(primary_key_parts, folder, report_filename,
@@ -230,13 +235,6 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       loading_script = paste0(prefix, "report-assets/", asset_names[["loading_script"]]),
       csv_worker = paste0(prefix, "report-assets/", asset_names[["csv_worker"]]),
       table_script = paste0(prefix, "report-assets/", asset_names[["table_script"]]),
-      reference_report = if (reference_count != "0") reference_report else NULL,
-      registry_report = if (registry_count != "0") registry_report else NULL,
-      conversion_report = if (conversion_count != "0") conversion_report else NULL,
-      reference_empty = if (reference_count == "0") "0" else NULL,
-      registry_empty = if (registry_count == "0") "0" else NULL,
-      conversion_empty = if (conversion_count == "0") "0" else NULL,
-      reference_count = reference_count, registry_count = registry_count, conversion_count = conversion_count,
       overview_style = paste0(prefix, "report-assets/", asset_names[["overview_style"]]),
       stylesheet = if (!is.null(stylesheet)) paste0(prefix, "report-assets/", asset_names[["stylesheet"]]) else NULL,
       logo = if (!is.null(logo)) paste0(prefix, "report-assets/", asset_names[["logo"]]) else NULL,
@@ -257,12 +255,13 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
       "overview-version-card.html", c(list(version = version_counts$version[i]),
         report_count_values(list(files = version_counts$files[i])))), collapse = "\n"), character(1))
     html <- sub("<!-- version-cards -->", paste(versions_html, collapse = "\n"), html, fixed = TRUE)
-    cards <- evidence_card_values(list(reference = reference_parts, registry = registry_parts,
-      conversion = conversion_parts, primary_key = primary_key_parts), reference_report, registry_report, conversion_report, primary_key_report)
-    html <- sub("<!-- evidence-cards -->", paste(render_report_template("evidence-cards.html", cards), collapse = "\n"), html, fixed = TRUE)
+    cards <- evidence_card_values(list(reference = reference_parts,
+      conversion = conversion_parts, primary_key = primary_key_parts), reference_reports,
+      conversion_report, primary_key_report, scoped_catalogues)
+    html <- sub("<!-- evidence-cards -->", paste(render_evidence_cards(cards), collapse = "\n"), html, fixed = TRUE)
     writeLines(html, outputs[1], useBytes = TRUE)
     list(page = if (nzchar(group)) file.path(group, report_filename) else report_filename,
-      reference_report = relative_report(reference_report), registry_report = relative_report(registry_report),
+      reference_report = lapply(reference_reports, relative_report),
       conversion_report = relative_report(conversion_report), primary_key_report = relative_report(primary_key_report))
   }
   if (workers == 1L || length(groups) == 1L) {
@@ -288,6 +287,6 @@ write_validation_aggregate <- function(descriptors, directory, group_columns,
   pages <- vapply(rendered, `[[`, character(1), "page")
   paths <- function(key) as.character(unlist(lapply(rendered, `[[`, key), use.names = FALSE))
   invisible(structure(unname(pages),
-    reference_report = paths("reference_report"), registry_report = paths("registry_report"),
+    reference_report = paths("reference_report"), catalogues = catalogues,
     conversion_report = paths("conversion_report"), primary_key_report = paths("primary_key_report")))
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/report-evidence-shared.R
 \name{write_reference_evidence}
 \alias{write_reference_evidence}
-\title{Write code-list or registry evidence}
+\title{Write one catalogue's reference evidence}
 \usage{
 write_reference_evidence(
   parts,
@@ -12,7 +12,7 @@ write_reference_evidence(
   title,
   stylesheet,
   logo,
-  kind = c("code-list", "registry"),
+  catalogue,
   evidence_assets = "../report-assets",
   scope = "",
   parent_label = "All reports"
@@ -31,7 +31,7 @@ write_reference_evidence(
 
 \item{stylesheet, logo}{Optional branding file paths, or \code{NULL}.}
 
-\item{kind}{Either \code{code-list} or \code{registry}.}
+\item{catalogue}{Frozen catalogue identifier, label and safe folder name.}
 
 \item{evidence_assets}{Shared asset directory relative to the evidence subdirectory.}
 
@@ -43,9 +43,9 @@ write_reference_evidence(
 Relative HTML path under \verb{selected evidence}.
 }
 \description{
-Write code-list or registry evidence
+Write one catalogue's reference evidence
 }
 \details{
-Cases are separated by reference snapshot and value, with registry severity and reason where applicable. Source CSV files supply grouped browser tables and downloads with form names and cell locations. Detailed evidence remains a CSV download; counts are rendered directly in HTML.
+Cases are separated by reference snapshot and value, including severity and reason. Source CSV files supply grouped browser tables and downloads with form names and cell locations. Detailed evidence remains a CSV download; counts are rendered directly in HTML.
 }
 \keyword{internal}

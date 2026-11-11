@@ -1,5 +1,5 @@
-# Render installed HTML templates with escaped scalar placeholders.
-# NULL omits a complete template line; substitution never reprocesses inserted values.
+# Internal helpers ----------------------------------------------------------
+
 #' Render an installed HTML template
 #' @param name Filename under the installed `report` directory.
 #' @param values Named list of scalar character values or `NULL`.

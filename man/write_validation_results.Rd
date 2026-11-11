@@ -48,10 +48,23 @@ Both existing paths are checked before writing either file. Filesystem write
 errors are raised; the two-file write is not transactional.
 }
 \examples{
-model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-result <- validate_data(validation_plan(model), list(), source = "submission.xlsx")
-directory <- tempfile()
-write_validation_results(result, directory)
-read.csv(file.path(directory, "summary.csv"))
-unlink(directory, recursive = TRUE)
+# Load the requested form model.
+form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+# Read the named reference lookup settings.
+reference_configuration <- form.references::read_reference_configuration(
+  system.file("examples", "survey", "references.yaml", package = "form.references"))
+# Resolve reference lookups without changing the original form model.
+reference_resolved_form_model <- form.references::resolve_reference_lookups(
+  form_model_definition, reference_configuration)
+# Prepare the validation rules and their execution order.
+validation_result <- validate_data(
+  validation_plan(reference_resolved_form_model), list(), source = "submission.xlsx")
+# Choose a temporary location for this example.
+validation_directory <- tempfile()
+# Write the prepared results to the output directory.
+write_validation_results(validation_result, validation_directory)
+# Display the returned values.
+read.csv(file.path(validation_directory, "summary.csv"))
+# Remove the temporary files created by this example.
+unlink(validation_directory, recursive = TRUE)
 }

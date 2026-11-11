@@ -5,8 +5,7 @@
   const format = new Intl.NumberFormat('en');
   const progress = ui.feedback(document.getElementById('loading'));
   const definitions = {
-    'code-list': [{id: 'values', label: 'Codes to review', file: 'codes.csv'}],
-    registry: [{id: 'values', label: 'Values to review', file: 'values.csv'}],
+    reference: [{id: 'values', label: 'Values to review', file: 'values.csv'}],
     conversion: [{id: 'values', label: 'Values to review', file: 'values.csv'}],
     'primary-key': [
       {id: 'missing', label: 'Missing components', file: 'missing-components.csv'},
@@ -15,8 +14,7 @@
     ]
   };
   // Keep readable CSV headings in the UI while using the shared table's field keys.
-  const columnKey = heading => ({'Submitted value': 'value', 'Code list': 'reference',
-    Registry: 'reference', 'Affected forms': 'affected_files'}[heading]
+  const columnKey = heading => ({'Submitted value': 'value', Reference: 'reference', 'Affected forms': 'affected_files'}[heading]
     || heading.toLowerCase().replaceAll(' ', '_'));
   async function main() {
     const counts = document.querySelector('main').dataset;
@@ -33,10 +31,10 @@
           data.header.map((heading, i) => [exportColumns[i], row[heading]])));
         const kind = document.querySelector('main').dataset.reportKind;
         const sourceOnly = ['reporting_form', 'cells', 'rows'];
-        if (kind === 'code-list' || kind === 'registry') sourceOnly.push('sheet', 'field');
+        if (kind === 'reference') sourceOnly.push('sheet', 'field');
         const columns = exportColumns.filter(key => !sourceOnly.includes(key));
-        const groupKeys = columns.filter(key => kind === 'code-list' || kind === 'registry'
-          ? ['reference', 'value', 'severity', 'reason'].includes(key)
+        const groupKeys = columns.filter(key => kind === 'reference'
+          ? ['reference', 'value', 'severity', 'reason', 'snapshot_sha256'].includes(key)
           : key !== 'occurrences');
         const groups = new Map();
         for (const source of sourceRows) {

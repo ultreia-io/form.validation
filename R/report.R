@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Prepare one input's validation report
 #'
 #' Prepare plain tables once for HTML output or a future interactive consumer.
@@ -21,10 +23,21 @@
 #'   Optional `metadata$report_notes` is a character vector displayed as escaped
 #'   text in the Warning findings card. Other metadata is retained without interpretation.
 #' @examples
-#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-#' result <- validate_data(validation_plan(model), list(), source = "submission.xlsx")
-#' report <- validation_report_data(result, model)
-#' report$summary
+#' # Load the requested form model.
+#' form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+#' # Read the named reference lookup settings.
+#' reference_configuration <- form.references::read_reference_configuration(
+#'   system.file("examples", "survey", "references.yaml", package = "form.references"))
+#' # Resolve reference lookups without changing the original form model.
+#' reference_resolved_form_model <- form.references::resolve_reference_lookups(
+#'   form_model_definition, reference_configuration)
+#' # Prepare the validation rules and their execution order.
+#' validation_result <- validate_data(
+#'   validation_plan(reference_resolved_form_model), list(), source = "submission.xlsx")
+#' # Prepare report.
+#' validation_report <- validation_report_data(validation_result, reference_resolved_form_model)
+#' # Display the returned values.
+#' validation_report$summary
 #' @export
 validation_report_data <- function(result, model, reference_provenance = result$reference_provenance,
                                    context = list()) {
@@ -86,7 +99,8 @@ validation_report_data <- function(result, model, reference_provenance = result$
   execution <- result$execution[result$execution$status %in% c("failed", "incomplete"),
     c("severity", "stage", "sheet", "field", "rule_id", "status", "message"), drop = FALSE]
   execution$stage <- report_stage_labels(execution$stage)
-  evidence <- prepare_report_evidence(tables, reference_provenance, context, result$findings)
+  evidence <- prepare_report_evidence(tables, reference_provenance, context, result$findings,
+    if (is.null(result$reference_lookups)) reference_evidence_definitions(model) else result$reference_lookups)
   structure(list(tables = tables, evidence = evidence, summary = tables$summary, structure_passed = result$structure_passed,
                  sheets = Filter(Negate(is.null), sections), execution = execution,
                  generated_at = tables$summary$generated_at, metadata = result$metadata),
@@ -127,12 +141,25 @@ validation_report_data <- function(result, model, reference_provenance = result$
 #' Both existing paths are checked before writing either file. Filesystem write
 #'   errors are raised; the two-file write is not transactional.
 #' @examples
-#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-#' result <- validate_data(validation_plan(model), list(), source = "submission.xlsx")
-#' directory <- tempfile()
-#' write_validation_results(result, directory)
-#' read.csv(file.path(directory, "summary.csv"))
-#' unlink(directory, recursive = TRUE)
+#' # Load the requested form model.
+#' form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+#' # Read the named reference lookup settings.
+#' reference_configuration <- form.references::read_reference_configuration(
+#'   system.file("examples", "survey", "references.yaml", package = "form.references"))
+#' # Resolve reference lookups without changing the original form model.
+#' reference_resolved_form_model <- form.references::resolve_reference_lookups(
+#'   form_model_definition, reference_configuration)
+#' # Prepare the validation rules and their execution order.
+#' validation_result <- validate_data(
+#'   validation_plan(reference_resolved_form_model), list(), source = "submission.xlsx")
+#' # Choose a temporary location for this example.
+#' validation_directory <- tempfile()
+#' # Write the prepared results to the output directory.
+#' write_validation_results(validation_result, validation_directory)
+#' # Display the returned values.
+#' read.csv(file.path(validation_directory, "summary.csv"))
+#' # Remove the temporary files created by this example.
+#' unlink(validation_directory, recursive = TRUE)
 #' @export
 write_validation_results <- function(result, directory, overwrite = FALSE) {
   if (!inherits(result, "validation_result") && !inherits(result, "validation_report")) {
@@ -152,18 +179,6 @@ write_validation_results <- function(result, directory, overwrite = FALSE) {
   write_report_csv(tables$summary, paths[["summary"]])
   write_report_csv(tables$details, paths[["findings"]])
   invisible(paths)
-}
-
-#' Write a report table as UTF-8 CSV with a BOM
-#' @param data Report table.
-#' @param path Destination CSV file.
-#' @return No return value, called for file output.
-#' @keywords internal
-write_report_csv <- function(data, path) {
-  connection <- file(path, open = "wt", encoding = "UTF-8")
-  on.exit(close(connection))
-  cat("\ufeff", file = connection)
-  utils::write.csv(data, connection, row.names = FALSE, na = "")
 }
 
 #' Write a CSV-backed HTML validation report
@@ -258,9 +273,23 @@ write_validation_report <- function(report, path, title = "Validation report", a
     stylesheet = if (!is.null(stylesheet)) urls[["stylesheet"]] else NULL,
     logo = if (!is.null(logo)) urls[["logo"]] else NULL, author = author, parent_report = parent_report,
     report_notes = notes)))
-  html <- sub("<!-- evidence-cards -->", paste(render_report_template("evidence-cards.html", evidence), collapse = "\n"), html, fixed = TRUE)
+  html <- sub("<!-- evidence-cards -->", paste(render_evidence_cards(evidence), collapse = "\n"), html, fixed = TRUE)
   writeLines(html, path, useBytes = TRUE)
   invisible(normalizePath(path, mustWork = TRUE))
+}
+
+# Internal helpers ----------------------------------------------------------
+
+#' Write a report table as UTF-8 CSV with a BOM
+#' @param data Report table.
+#' @param path Destination CSV file.
+#' @return No return value, called for file output.
+#' @keywords internal
+write_report_csv <- function(data, path) {
+  connection <- file(path, open = "wt", encoding = "UTF-8")
+  on.exit(close(connection))
+  cat("\ufeff", file = connection)
+  utils::write.csv(data, connection, row.names = FALSE, na = "")
 }
 
 #' Prepare shared CSV and report tables

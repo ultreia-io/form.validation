@@ -1,5 +1,5 @@
-# Collect recorded type failures only; never parse, trim or coerce submitted values.
-# Coordinate types combine numeric and range validation and are deliberately excluded.
+# Internal helpers ----------------------------------------------------------
+
 #' Collect recorded type-conversion failures
 #' @param detail Formatted finding rows with kind, rule, value, expectation, location and public metadata columns.
 #' @param report Parent form report path relative to the current report context.
@@ -26,6 +26,7 @@ collect_conversion_evidence <- function(detail, report, context_columns) {
 }
 
 # Group conversion cases by model, field and unchanged submitted value.
+
 #' Write conversion evidence
 #' @param parts List of per-form prepared evidence data frames; empty entries may be `NULL`.
 #' @param directory Parent report directory receiving the evidence subdirectory.

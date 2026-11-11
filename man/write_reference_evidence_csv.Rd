@@ -4,7 +4,7 @@
 \alias{write_reference_evidence_csv}
 \title{Write reviewer-facing evidence CSV}
 \usage{
-write_reference_evidence_csv(rows, path, reference_label = "Code list")
+write_reference_evidence_csv(rows, path, reference_label = "Reference")
 }
 \arguments{
 \item{rows}{Data frame containing the columns intended for download.}

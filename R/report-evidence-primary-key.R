@@ -1,4 +1,5 @@
-# Retain the saved key findings and their physical rows; never rerun key checks.
+# Internal helpers ----------------------------------------------------------
+
 #' Collect recorded primary-key failures
 #' @param detail Formatted finding rows with kind, rule, value, expectation, location and public metadata columns.
 #' @param findings Original findings corresponding to detail, with structured key values and expectations.
@@ -41,6 +42,7 @@ collect_primary_key_evidence <- function(detail, findings, report, context_colum
 }
 
 # Reuse one form's evidence at every aggregate level, preserving form-local failures.
+
 #' Write primary-key evidence
 #' @param parts List of per-form prepared evidence data frames; empty entries may be `NULL`.
 #' @param directory Parent report directory receiving the evidence subdirectory.

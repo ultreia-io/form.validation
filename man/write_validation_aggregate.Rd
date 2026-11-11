@@ -16,7 +16,6 @@ write_validation_aggregate(
   stylesheet = NULL,
   logo = NULL,
   model_versions = NULL,
-  reference_provenance = NULL,
   reference_context_columns = character(),
   report_notes = character(),
   workers = 1L
@@ -46,9 +45,6 @@ write_validation_aggregate(
 
 \item{model_versions}{Optional model versions to show, including versions with no files.}
 
-\item{reference_provenance}{Retained for compatibility. Snapshot identity is
-already stored in each individual report's prepared evidence.}
-
 \item{reference_context_columns}{Descriptor columns to show in code summaries and source tables.}
 
 \item{report_notes}{Public validation-policy notes shown in the Warning
@@ -58,7 +54,7 @@ findings card on every aggregate page. Text is HTML-escaped.}
 }
 \value{
 Relative aggregate HTML paths, invisibly, with a \code{reference_report}
-attribute for code-list evidence, \code{registry_report} for registry evidence,
+attribute for catalogue evidence, \code{catalogues} for frozen catalogue metadata,
 and \code{conversion_report} for number, integer, boolean and temporal type failures.
 Attributes contain all contextual evidence report paths. Each aggregate's
 evidence includes only its forms, with counts and links scoped accordingly.

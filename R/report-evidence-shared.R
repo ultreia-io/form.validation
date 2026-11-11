@@ -1,4 +1,5 @@
-# Group saved findings without changing their raw value identity.
+# Internal helpers ----------------------------------------------------------
+
 #' Group evidence rows by exact column values
 #' @param rows Evidence data frame.
 #' @param keys Column names defining case identity.
@@ -14,6 +15,7 @@ reference_evidence_groups <- function(rows, keys) {
 }
 
 # Compress physical coordinates into exact A1 ranges, without truncating evidence.
+
 #' Compact exact Excel cell locations
 #' @param rows Positive physical Excel row numbers. Duplicates are removed.
 #' @param column One positive physical Excel column number.
@@ -38,6 +40,7 @@ reference_evidence_cells <- function(rows, column) {
 }
 
 # Preserve snapshot identity and compress repeated cells for each submitted value.
+
 #' Prepare reference evidence with snapshot identity
 #' @param rows Recorded findings with a reference identifier column.
 #' @param provenance Reference records keyed by identifier, including available status and SHA-256.
@@ -70,6 +73,7 @@ summarize_reference_evidence <- function(rows, provenance, report, context_colum
 }
 
 # Export reviewer-facing columns with readable headings.
+
 #' Write reviewer-facing evidence CSV
 #' @param rows Data frame containing the columns intended for download.
 #' @param path Destination CSV path.
@@ -77,7 +81,7 @@ summarize_reference_evidence <- function(rows, provenance, report, context_colum
 #' @return `NULL`, invisibly, after writing the CSV file.
 #' @details Maps technical column names to readable headings and uses the shared UTF-8 BOM CSV writer.
 #' @keywords internal
-write_reference_evidence_csv <- function(rows, path, reference_label = "Code list") {
+write_reference_evidence_csv <- function(rows, path, reference_label = "Reference") {
   labels <- c(input = "Reporting form", model_version = "Model version", reference = reference_label,
     value = "Submitted value", sheet = "Sheet", field = "Field", cells = "Cells",
     occurrences = "Occurrences", affected_files = "Affected forms")
@@ -90,7 +94,8 @@ write_reference_evidence_csv <- function(rows, path, reference_label = "Code lis
 }
 
 # Write a focused report alongside aggregate reports. All HTML lives in templates.
-#' Write code-list or registry evidence
+
+#' Write one catalogue's reference evidence
 #' @param parts List of per-form prepared evidence data frames; empty entries may be `NULL`.
 #' @param directory Parent report directory receiving the evidence subdirectory.
 #' @param report_filename Filename for the generated HTML page and parent report links.
@@ -100,18 +105,15 @@ write_reference_evidence_csv <- function(rows, path, reference_label = "Code lis
 #' @param evidence_assets Shared asset directory relative to the evidence subdirectory.
 #' @param scope Slash-separated aggregate path, or an empty string for the root.
 #' @param parent_label Label for the root or single-form parent breadcrumb.
-#' @param kind Either `code-list` or `registry`.
+#' @param catalogue Frozen catalogue identifier, label and safe folder name.
 #' @return Relative HTML path under `selected evidence`.
-#' @details Cases are separated by reference snapshot and value, with registry severity and reason where applicable. Source CSV files supply grouped browser tables and downloads with form names and cell locations. Detailed evidence remains a CSV download; counts are rendered directly in HTML.
+#' @details Cases are separated by reference snapshot and value, including severity and reason. Source CSV files supply grouped browser tables and downloads with form names and cell locations. Detailed evidence remains a CSV download; counts are rendered directly in HTML.
 #' @keywords internal
 write_reference_evidence <- function(parts, directory, report_filename, context_columns,
-                                     title, stylesheet, logo, kind = c("code-list", "registry"), evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
-  kind <- match.arg(kind)
-  registry <- kind == "registry"
-  extra_columns <- if (registry) c("severity", "reason") else character()
-  labels <- if (registry) list(reference = "Registry", cases = "Values to review", filename = "values") else
-    list(reference = "Code list", cases = "Codes to review", filename = "codes")
-  folder_name <- paste0(kind, "-evidence")
+                                     title, stylesheet, logo, catalogue, evidence_assets = "../report-assets", scope = "", parent_label = "All reports") {
+  extra_columns <- c("table", "lookup", "severity", "reason")
+  labels <- list(reference = "Reference", cases = "Values to review", filename = "values")
+  folder_name <- catalogue$folder
   folder <- file.path(directory, folder_name)
   dir.create(folder, recursive = TRUE, showWarnings = FALSE)
   parts <- Filter(Negate(is.null), parts)
@@ -140,9 +142,9 @@ write_reference_evidence <- function(parts, directory, report_filename, context_
   detail$field <- ifelse(nzchar(detail$sheet) & startsWith(detail$field, prefix),
     substring(detail$field, nchar(prefix) + 1L), detail$field)
   case_columns <- c("reference", "model_version", context_columns, "value", extra_columns, "occurrences", "affected_files")
-  evidence_columns <- c("input", "model_version", "reference", "value", extra_columns, "sheet", "field", "cells", "occurrences")
+  evidence_columns <- c("input", "model_version", "reference", "value", extra_columns, "sheet", "field", "cells", "occurrences", "snapshot_sha256")
   summary_file <- paste0(labels$filename, ".csv")
-  write_reference_evidence_csv(detail[unique(c("input", case_columns[!case_columns %in% "affected_files"], "sheet", "field", "cells"))],
+  write_reference_evidence_csv(detail[unique(c("input", case_columns[!case_columns %in% "affected_files"], "sheet", "field", "cells", "snapshot_sha256"))],
     file.path(folder, summary_file), labels$reference)
   write_reference_evidence_csv(detail[evidence_columns], file.path(folder, "evidence.csv"), labels$reference)
   summary <- list(
@@ -150,20 +152,18 @@ write_reference_evidence <- function(parts, directory, report_filename, context_
     totals = list(cases = nrow(cases), references = length(unique(detail$reference)),
       forms = length(unique(detail$input)), occurrences = sum(as.numeric(detail$occurrences)))
   )
-  evidence_label <- if (registry) "Registry evidence" else "Code-list evidence"
   write_evidence_page(directory, folder_name, report_filename, title, stylesheet, logo, list(
-    report_kind = kind, evidence_label = evidence_label, cases_label = labels$cases, category_total = "references",
-    references_label = if (registry) "Registries" else "Code lists",
-    description = if (registry)
-      "Values with no unique match in the registries used during validation." else
-      "Values not found in the code lists used during validation.",
-    instructions = if (registry) "Review each case before changing a form, a registry or its matching rules." else
-      "Review each case before changing a form, a code list or its mapping.",
-    summary_file = summary_file, summary_label = if (registry) "Values CSV" else "Codes CSV",
-    summary_description = if (registry) "Unmatched or ambiguous values by registry" else "Rejected values by code list"), summary = summary, evidence_assets = evidence_assets, scope = scope, parent_label = parent_label)
+    report_kind = "reference", evidence_label = paste(catalogue$label, "evidence"),
+    cases_label = "Values to review", category_total = "references", references_label = "Lookups",
+    description = paste("Reference findings from", catalogue$label),
+    instructions = "Review each case before changing a form, a reference table or its matching rules.",
+    summary_file = summary_file, summary_label = "Values CSV",
+    summary_description = "Reference values and their source locations"), summary = summary,
+    evidence_assets = evidence_assets, scope = scope, parent_label = parent_label)
 }
 
 # Render all evidence pages with the same external template and interactive assets.
+
 #' Render a shared evidence report page
 #' @param directory Parent report directory receiving the evidence subdirectory.
 #' @param folder_name Evidence subdirectory already containing its CSV data.

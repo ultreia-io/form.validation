@@ -6,22 +6,24 @@
 \usage{
 evidence_card_values(
   parts,
-  reference_report,
-  registry_report,
+  reference_reports,
   conversion_report,
-  primary_key_report = NULL
+  primary_key_report = NULL,
+  catalogues = list()
 )
 }
 \arguments{
 \item{parts}{Named list of evidence kinds, each containing a list of per-form
 data frames or \code{NULL} entries. Counts sum their \code{occurrences} columns.}
 
-\item{reference_report, registry_report, conversion_report, primary_key_report}{Relative HTML paths for nonempty evidence reports, or \code{NULL} when absent.}
+\item{reference_reports}{Named catalogue report paths.}
+
+\item{conversion_report, primary_key_report}{Relative HTML paths for nonempty evidence reports, or \code{NULL} when absent.}
+
+\item{catalogues}{Frozen catalogue identifiers, labels and folders.}
 }
 \value{
-Named template values: \verb{<kind>_count} is a formatted occurrence count,
-\verb{<kind>_report} supplies the active link, and \verb{<kind>_empty} supplies a disabled
-zero card. Only the applicable active or empty card is rendered.
+A list of card template values, one per catalogue and structural evidence kind.
 }
 \description{
 Prepare evidence navigation cards

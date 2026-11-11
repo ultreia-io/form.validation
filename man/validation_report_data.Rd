@@ -43,8 +43,19 @@ Optional \code{metadata$report_notes} is a character vector displayed as escaped
 text in the Warning findings card. Other metadata is retained without interpretation.
 }
 \examples{
-model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-result <- validate_data(validation_plan(model), list(), source = "submission.xlsx")
-report <- validation_report_data(result, model)
-report$summary
+# Load the requested form model.
+form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+# Read the named reference lookup settings.
+reference_configuration <- form.references::read_reference_configuration(
+  system.file("examples", "survey", "references.yaml", package = "form.references"))
+# Resolve reference lookups without changing the original form model.
+reference_resolved_form_model <- form.references::resolve_reference_lookups(
+  form_model_definition, reference_configuration)
+# Prepare the validation rules and their execution order.
+validation_result <- validate_data(
+  validation_plan(reference_resolved_form_model), list(), source = "submission.xlsx")
+# Prepare report.
+validation_report <- validation_report_data(validation_result, reference_resolved_form_model)
+# Display the returned values.
+validation_report$summary
 }

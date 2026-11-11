@@ -1,8 +1,8 @@
 test_that("table observations count loaded rows and warn only about internal blanks", {
   definition <- form.model::form_definition(field_model("string", mandatory = FALSE))
   definition$sheets$Values$layout$start_row <- 2L
-  model <- form.model::as_form_model(definition)
-  plan <- validation_plan(model)
+  model <- resolved_fixture_model(definition)
+  plan <- create_validation_plan(model)
   data <- list(Values = matrix(c("Header", NA, "A", "", "B", NA), ncol = 1))
   result <- validate_data(plan, data, prepare_data = function(data) {
     data$Values[4, 1] <- "filled during preparation"

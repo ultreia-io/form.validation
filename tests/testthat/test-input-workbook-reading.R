@@ -8,7 +8,7 @@ test_that("workbook reading preserves positions and mixed types", {
   openxlsx::writeData(wb, "First", TRUE, colNames = FALSE)
   openxlsx::saveWorkbook(wb, path)
   stages <- character()
-  data <- read_validation_workbook(path, function(stage, expression) {
+  data <- read_workbook_data(path, function(stage, expression) {
     stages <<- c(stages, stage)
     force(expression)
   })
@@ -48,7 +48,7 @@ test_that("reading uses cached formula values and treats Excel errors as missing
   utils::zip(path, list.files('.', recursive = TRUE, all.files = TRUE, no.. = TRUE), flags = "-q")
   setwd(old)
   before <- tools::md5sum(path)
-  data <- read_validation_workbook(path)
+  data <- read_workbook_data(path)
   expect_identical(data$Values[[1]][[2]], 42)
   expect_true(is.na(data$Values[[1]][[3]]))
   expect_true(is.na(data$Values[[1]][[4]]))
@@ -64,7 +64,7 @@ test_that("Excel dates are prepared only through the explicit conversion policy"
   openxlsx::writeData(wb, "Values", as.POSIXct("2023-01-02 12:00:00", tz = "UTC"),
                       startRow = 2, colNames = FALSE)
   openxlsx::saveWorkbook(wb, path)
-  raw <- read_validation_workbook(path)
+  raw <- read_workbook_data(path)
   expect_s3_class(raw$Values[[1]][[1]], "POSIXct")
   data <- prepare_validation_data(raw, field_model("date"))
   expect_identical(data$Values[[1]][[1]], as.Date("2023-01-02"))

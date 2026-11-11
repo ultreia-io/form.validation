@@ -1,10 +1,10 @@
 test_that('the bundled survey exposes hierarchy and field-rule failures', {
-  model <- form.model::load_form_model('survey', system.file('examples', package = 'form.model'))
-  path <- form.model::form_resource('examples/survey.xlsx', 'form.model')
-  plan <- validation_plan(model)
-  references <- list(stations = list(values = c('ST01', 'ST02')),
-    observers = list(values = c('observer-1', 'observer-2')),
-    'contacts.email' = list(values = 'survey@example.org'))
+  model <- upstream_model()
+  path <- form.model::form_resource('examples/survey/form.xlsx', 'form.model')
+  plan <- create_validation_plan(model)
+  references <- list("code_lists/stations/code" = list(values = c('ST01', 'ST02')),
+    "code_lists/observers/code" = list(values = c('observer-1', 'observer-2')),
+    'registries/contacts/email' = list(values = 'survey@example.org'))
   baseline <- validate_workbook(path, plan, references, log = function(...) NULL)
   expect_true(baseline$structure_passed)
   expect_true(baseline$complete)
@@ -14,11 +14,17 @@ test_that('the bundled survey exposes hierarchy and field-rule failures', {
     c('field/Observations.station/mandatory', 'field/Observations.count/mandatory',
       'field/Observations.active/mandatory', 'sheet/Observations/primary_key_present',
       'field/Samples.station/mandatory', 'field/Samples.observation_id/mandatory',
-      'field/Samples.sample_no/mandatory', 'sheet/Samples/primary_key_present'))
+      'field/Samples.sample_no/mandatory', 'sheet/Samples/primary_key_present',
+      'sheet/Notes/unique_key'))
   expect_setequal(baseline$findings$row[grepl('/empty_rows$', baseline$findings$rule_id)], c(7L, 8L))
   expect_false(any(baseline$execution$status %in% c('failed', 'incomplete')))
 
-  data <- read_validation_workbook(path, function(stage, expression) force(expression))
+  expect_identical(baseline$findings$row[baseline$findings$rule_id == 'sheet/Notes/unique_key'], c(6L, 7L))
+  expect_identical(baseline$findings$row[baseline$findings$rule_id == 'sheet/Notes/at_least_one'], 9L)
+  expect_identical(baseline$findings$severity[baseline$findings$rule_id == 'sheet/Notes/at_least_one'], 'warning')
+  expect_false(any(baseline$findings$sheet == 'Notes' & baseline$findings$row %in% c(10L, 11L, 12L)))
+
+  data <- read_workbook_data(path, function(stage, expression) force(expression))
   data$Samples[[6, 4]] <- 20
   data$Samples[[7, 1]] <- 'MISSING'
   data$Measurements[[9, 4]] <- 3

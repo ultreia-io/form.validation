@@ -5,7 +5,7 @@ test_that("a valid input writes a summary and informational findings", {
   directory <- tempfile()
   on.exit(unlink(directory, recursive = TRUE))
   result <- validate_fixture()
-  paths <- write_validation_results(result, directory)
+  paths <- write_validation_results_csv(result, directory)
   summary <- read_output(paths[["summary"]])
   details <- read_output(paths[["findings"]])
   expect_identical(summary$input, "submission.xlsx")
@@ -18,23 +18,23 @@ test_that("a valid input writes a summary and informational findings", {
   expect_identical(names(details), c("rule_id", "kind", "severity", "sheet", "field",
                                      "row", "column", "value", "expected", "message",
                                      "stage", "sheet_order", "layout", "field_label"))
-  expect_error(write_validation_results(result, directory), "already exists")
+  expect_error(write_validation_results_csv(result, directory), "already exists")
 })
 
 test_that("CSV preserves values and combines validation and execution problems", {
   directory <- tempfile()
   rule_files <- rule_paths()
   on.exit({ unlink(directory, recursive = TRUE); unlink(dirname(rule_files[[1L]]), recursive = TRUE) })
-  plan <- read_validation_rules(rule_files, fixture_model())
+  plan <- read_validation_plan_from_rules(rule_files, fixture_model())
   plan$rules <- c(plan$rules, list(
-    validation_rule("business/text", function(...) validation_finding('Review "é", please\nnext line',
+    create_validation_rule("business/text", function(...) create_validation_finding('Review "é", please\nnext line',
       value = "001", expected = list("a,b", "m", NULL)), severity = "info"),
-    validation_rule("business/broken", function(...) stop("Calculation failed"))
+    create_validation_rule("business/broken", function(...) stop("Calculation failed"))
   ))
   data <- fixture_data()
   data$Observations$amount[[1]] <- -1
   result <- validate_data(plan, data, references = list(), source = "submission.xlsx")
-  paths <- write_validation_results(result, directory)
+  paths <- write_validation_results_csv(result, directory)
   summary <- read_output(paths[["summary"]])
   details <- read_output(paths[["findings"]])
   expect_identical(summary$status, "failed")
@@ -59,10 +59,10 @@ test_that("both destinations are checked before overwriting either CSV", {
   dir.create(directory)
   on.exit(unlink(directory, recursive = TRUE))
   writeLines("keep", file.path(directory, "findings.csv"))
-  expect_error(write_validation_results(validate_fixture(), directory), "already exists")
+  expect_error(write_validation_results_csv(validate_fixture(), directory), "already exists")
   expect_false(file.exists(file.path(directory, "summary.csv")))
   expect_identical(readLines(file.path(directory, "findings.csv")), "keep")
-  write_validation_results(validate_fixture(), directory, overwrite = TRUE)
+  write_validation_results_csv(validate_fixture(), directory, overwrite = TRUE)
   expect_identical(read_output(file.path(directory, "summary.csv"))$status, "valid")
 })
 
@@ -70,13 +70,13 @@ test_that("both destinations are checked before overwriting either CSV", {
 test_that("prepared exports retain findings and add report metadata", {
   directory <- tempfile()
   on.exit(unlink(directory, recursive = TRUE))
-  rule <- validation_rule("review/value", function(...) validation_finding(
+  rule <- create_validation_rule("review/value", function(...) create_validation_finding(
     'Review "é", please\nnext line', value = as.Date("2024-02-29"),
     expected = list("001", "a,b", NULL)), severity = "info")
   result <- validate_fixture(references = list(), rules = list(rule))
-  original <- write_validation_results(result, file.path(directory, "original"))
-  report <- validation_report_data(result, fixture_model())
-  shared <- write_validation_results(report, file.path(directory, "shared"))
+  original <- write_validation_results_csv(result, file.path(directory, "original"))
+  report <- prepare_validation_report(result, fixture_model())
+  shared <- write_validation_results_csv(report, file.path(directory, "shared"))
   raw <- read_output(original[["findings"]])
   prepared <- read_output(shared[["findings"]])
   metadata <- c("sheet_order", "layout", "field_label")
@@ -87,6 +87,6 @@ test_that("prepared exports retain findings and add report metadata", {
   summary <- read_output(shared[["summary"]])
   expect_identical(summary$structure_passed, "TRUE")
   expect_identical(summary$generated_at, report$generated_at)
-  repeated <- write_validation_results(report, file.path(directory, "repeated"))
+  repeated <- write_validation_results_csv(report, file.path(directory, "repeated"))
   expect_identical(unname(tools::md5sum(shared)), unname(tools::md5sum(repeated)))
 })

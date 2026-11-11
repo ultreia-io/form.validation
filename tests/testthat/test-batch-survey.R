@@ -3,15 +3,15 @@ test_that('a survey batch freezes inputs and prepares reports from saved results
   input_dir <- file.path(root, 'input')
   dir.create(input_dir)
   source <- file.path(input_dir, 'survey.xlsx')
-  file.copy(form.model::form_resource('examples/survey.xlsx', 'form.model'), source)
-  model <- form.model::load_form_model('survey', system.file('examples', package = 'form.model'))
-  references <- list(stations = list(values = c('ST01', 'ST02')),
-    observers = list(values = c('observer-1', 'observer-2')),
-    'contacts.email' = list(values = 'survey@example.org'))
+  file.copy(form.model::form_resource('examples/survey/form.xlsx', 'form.model'), source)
+  model <- upstream_model()
+  references <- list("code_lists/stations/code" = list(values = c('ST01', 'ST02')),
+    "code_lists/observers/code" = list(values = c('observer-1', 'observer-2')),
+    'registries/contacts/email' = list(values = 'survey@example.org'))
   files <- data.frame(path = source, relative = '2026/survey.xlsx', job = 'survey', year = '2026')
   jobs <- data.frame(id = 'survey', resource = 'survey', plan = 'survey')
-  bundles <- list(survey = list(plans = list(survey = validation_plan(model)), references = references))
-  plan <- validation_batch_plan(files, jobs, bundles, file.path(root, 'batch'),
+  bundles <- list(survey = list(plans = list(survey = create_validation_plan(model)), references = references))
+  plan <- write_validation_batch_plan(files, jobs, bundles, file.path(root, 'batch'),
     group_columns = 'year', metadata = list(private_note = 'private-test-value'))
   state <- validate_batch(plan)
   expect_true(state$complete)
@@ -22,7 +22,7 @@ test_that('a survey batch freezes inputs and prepares reports from saved results
   expect_true('sheet/Samples/primary_key_present' %in% saved$findings$rule_id)
   reports <- write_validation_batch_reports(plan)
   expect_true(dir.exists(reports))
-  publication <- build_validation_publication(plan, comment = 'Survey batch')
+  publication <- write_validation_batch_publication(plan, comment = 'Survey batch')
   expect_true(file.exists(file.path(publication, 'index.html')))
   expect_true(file.exists(file.path(publication, '2026', 'survey.xlsx', 'index.html')))
   manifest <- jsonlite::read_json(paste0(publication, '.json'), simplifyVector = TRUE)
@@ -36,12 +36,12 @@ test_that('a changed planned workbook is rejected before validation', {
   root <- withr::local_tempdir()
   input_dir <- file.path(root, 'input'); dir.create(input_dir)
   source <- file.path(input_dir, 'survey.xlsx')
-  file.copy(form.model::form_resource('examples/survey.xlsx', 'form.model'), source)
-  model <- form.model::load_form_model('survey', system.file('examples', package = 'form.model'))
+  file.copy(form.model::form_resource('examples/survey/form.xlsx', 'form.model'), source)
+  model <- upstream_model()
   files <- data.frame(path = source, relative = 'survey.xlsx', job = 'survey')
   jobs <- data.frame(id = 'survey', resource = 'survey', plan = 'survey')
-  bundle <- list(survey = list(plans = list(survey = validation_plan(model)), references = list()))
-  plan <- validation_batch_plan(files, jobs, bundle, file.path(root, 'batch'))
+  bundle <- list(survey = list(plans = list(survey = create_validation_plan(model)), references = list()))
+  plan <- write_validation_batch_plan(files, jobs, bundle, file.path(root, 'batch'))
   writeLines('changed', source)
   expect_error(validate_batch(plan), 'input is missing or changed')
 })

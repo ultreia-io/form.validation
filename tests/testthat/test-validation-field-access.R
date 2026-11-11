@@ -1,6 +1,6 @@
 test_that("callbacks cannot change prepared values or reuse values from another input", {
   seen <- list()
-  rule <- validation_rule("business/cached", function(model, data, references, config) {
+  rule <- create_validation_rule("business/cached", function(model, data, references, config) {
     field <- config$field_values("Observations.amount")
     seen[[length(seen) + 1L]] <<- field
     field$original[[1L]] <- 999
@@ -22,21 +22,21 @@ test_that("callback masks preserve blanks, invalid values and physical coordinat
   model <- field_model("string", mandatory = FALSE)
   data <- list(Values = matrix(list("", NA_character_, FALSE, "ok"), ncol = 1))
   seen <- NULL
-  rule <- validation_rule("business/masks", function(model, data, references, config) {
+  rule <- create_validation_rule("business/masks", function(model, data, references, config) {
     seen <<- config$field_values("Values.value")
     NULL
   })
-  result <- validate_data(validation_plan(model, list(rule)), data, config = list(blank_strings = TRUE))
+  result <- validate_data(create_validation_plan(model, list(rule)), data, config = list(blank_strings = TRUE))
   expect_identical(seen$original, as.list(data$Values[, 1L]))
   expect_identical(seen$filled, c(FALSE, FALSE, TRUE, TRUE))
   expect_identical(seen$typed, c(FALSE, FALSE, FALSE, TRUE))
   expect_identical(seen$eligible, 4L)
   expect_identical(seen$rows, 1:4)
   expect_identical(declared_findings(result)$row, 3L)
-  unknown <- validation_rule("business/unknown", function(model, data, references, config) {
+  unknown <- create_validation_rule("business/unknown", function(model, data, references, config) {
     config$field_values("Values.absent")
   })
-  result <- validate_data(validation_plan(model, list(unknown)), data)
+  result <- validate_data(create_validation_plan(model, list(unknown)), data)
   expect_identical(tail(result$execution$status, 1), "failed")
   expect_match(tail(result$execution$message, 1), "Unknown field")
 })

@@ -13,7 +13,7 @@ test_that("explicit conversion preserves values outside the declared policy", {
 test_that("date conversion retains time components and skips preambles", {
   definition <- form.model::form_definition(field_model("date", mandatory = FALSE))
   definition$sheets$Values$layout$start_row <- 2L
-  model <- form.model::as_form_model(definition)
+  model <- resolved_fixture_model(definition)
   midnight <- as.POSIXct("2024-01-01", tz = "UTC")
   values <- list(midnight, midnight, midnight + 3600, NA_real_, "2024-01-02")
   data <- list(Values = data.frame(value = I(values)))
@@ -21,7 +21,7 @@ test_that("date conversion retains time components and skips preambles", {
   expect_identical(result[[1]], midnight)
   expect_identical(result[[2]], as.Date("2024-01-01"))
   expect_identical(result[3:5], data$Values$value[3:5])
-  plan <- validation_plan(model)
+  plan <- create_validation_plan(model)
   expect_identical(declared_findings(validate_data(plan, data))$row, c(2L, 3L))
   prepared <- validate_data(plan, data, prepare_data = function(data) prepare_validation_data(data, model))
   expect_identical(declared_findings(prepared)$row, 3L)

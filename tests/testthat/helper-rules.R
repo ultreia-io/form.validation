@@ -1,8 +1,8 @@
 rule_paths <- function() {
   directory <- tempfile()
   dir.create(directory)
-  paths <- file.path(directory, c("survey-structure-validation.yaml",
-                                  "survey-generated-validation.yaml"))
+  paths <- file.path(directory, c("structure-validation.yaml",
+                                  "generated-validation.yaml"))
   write_validation_rules(fixture_model(), paths[[1L]], paths[[2L]], version = "1")
   paths
 }
@@ -22,7 +22,7 @@ limit_check <- function(model, data, references, config) {
   values <- data$Observations$amount
   bad <- which(values > config$rule$maximum)
   if (length(bad)) do.call(rbind, lapply(bad, function(row) {
-    validation_finding("Amount exceeds review limit", "Observations", "amount", row, 2,
+    create_validation_finding("Amount exceeds review limit", "Observations", "amount", row, 2,
       values[[row]], config$rule$maximum)
   }))
 }

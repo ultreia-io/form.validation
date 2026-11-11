@@ -37,7 +37,7 @@ test_that("multi-row preambles are ignored and data retains physical coordinates
   grid[2, ] <- list("Different label", "Units", NULL, "Notes")
   grid[3, ] <- list("S01", 2, "cm", "north")
   data$Observations <- grid
-  model <- form.model::as_form_model(d)
+  model <- resolved_fixture_model(d)
   expect_true(validate_fixture(data, model = model)$valid)
   data$Observations[1:2, ] <- rep(list("Arbitrary preamble"), 8)
   expect_true(validate_fixture(data, model = model)$valid)
@@ -70,8 +70,8 @@ test_that("mandatory fields require a filled value", {
 
 test_that("all structure finishes before fields and business, and alone gates content", {
   calls <- 0L
-  callback <- validation_rule("business/counter", function(...) { calls <<- calls + 1L; NULL })
-  plan <- validation_plan(fixture_model(), list(callback))
+  callback <- create_validation_rule("business/counter", function(...) { calls <<- calls + 1L; NULL })
+  plan <- create_validation_plan(fixture_model(), list(callback))
   expect_identical(names(plan$rulesets), c("structure", "content"))
   expect_identical(tail(plan$rulesets$content, 1), "business/counter")
   stages <- vapply(plan$rules, `[[`, character(1), "stage")
@@ -94,17 +94,17 @@ test_that("all structure finishes before fields and business, and alone gates co
 
 test_that("failed or incomplete structural execution never invokes callbacks", {
   calls <- 0L
-  callback <- validation_rule("business/counter", function(...) { calls <<- calls + 1L; NULL })
+  callback <- create_validation_rule("business/counter", function(...) { calls <<- calls + 1L; NULL })
   original <- form.validation:::run_builtin
   for (problem in c("incomplete", "failed")) {
     local_mocked_bindings(run_builtin = function(rule, context) {
       if (rule$id == "workbook/sheets") {
-        if (problem == "incomplete") validation_incomplete("Structure unavailable")
+        if (problem == "incomplete") signal_validation_incomplete("Structure unavailable")
         stop("Structure failed")
       }
       original(rule, context)
     }, .package = "form.validation")
-    result <- validate_data(validation_plan(fixture_model(), list(callback)), fixture_data())
+    result <- validate_data(create_validation_plan(fixture_model(), list(callback)), fixture_data())
     expect_identical(result$status, problem)
     expect_identical(calls, 0L)
     expect_identical(result$execution$status[result$execution$rule_id == "sheet/Observations/layout"], "completed")
@@ -119,7 +119,7 @@ test_that("A1 cell locations retain physical finding coordinates", {
   data <- fixture_data()
   data$Cover <- matrix(vector("list", 54), 2, 27)
   data$Cover[[2, 27]] <- 42
-  result <- validate_fixture(data, model = form.model::as_form_model(d))
+  result <- validate_fixture(data, model = resolved_fixture_model(d))
   expect_identical(declared_findings(result)$rule_id, "field/Cover.title/type")
   expect_identical(declared_findings(result)$row, 2L)
   expect_identical(declared_findings(result)$column, 27L)

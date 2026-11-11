@@ -3,7 +3,7 @@
 # @param start First expected number in each group.
 # @return A checked synthetic form model.
 sequence_model <- function(type = "string", start = 1L) {
-  form.model::as_form_model(list(schema_version = "1.0.0",
+  resolved_fixture_model(list(schema_version = "1.0.0",
     form = list(id = "sequence", version = "1"), references = list(),
     sheets = list(Items = list(layout = list(kind = "table", start_row = 1L),
       fields = list(batch = list(mandatory = TRUE, type = "string"),
@@ -21,7 +21,7 @@ sequence_findings <- function(result) {
 }
 
 test_that("sequence follows worksheet order and rejects gaps and reversed values", {
-  plan <- validation_plan(sequence_model())
+  plan <- create_validation_plan(sequence_model())
   for (values in list(c("0002", "0001"), c("0001", "0003"))) {
     result <- validate_data(plan, list(Items = data.frame(batch = "A", group = "B", item = values)))
     rows <- sequence_findings(result)
@@ -36,7 +36,7 @@ test_that("sequence follows worksheet order and rejects gaps and reversed values
 test_that("interleaved composite groups keep independent numbering without collisions", {
   data <- data.frame(batch = c("A|B", "A", "A|B", "A"),
     group = c("C", "B|C", "C", "B|C"), item = c("0001", "0001", "0002", "0002"))
-  plan <- validation_plan(sequence_model())
+  plan <- create_validation_plan(sequence_model())
   result <- validate_data(plan, list(Items = data))
   expect_true(result$valid)
   expect_equal(nrow(sequence_findings(result)), 0L)
@@ -49,7 +49,7 @@ test_that("interleaved composite groups keep independent numbering without colli
 test_that("invalid sequence values keep their row positions without cascading findings", {
   data <- data.frame(batch = c(rep("A", 5), NA, "A"), group = "B",
     item = I(list("0001", "bad", NA_character_, 4L, "0005", "9999", "0006")))
-  result <- validate_data(validation_plan(sequence_model()), list(Items = data))
+  result <- validate_data(create_validation_plan(sequence_model()), list(Items = data))
   expect_true(result$complete)
   expect_equal(nrow(sequence_findings(result)), 0L)
   expect_true(all(c("field/Items.item/pattern", "field/Items.item/mandatory",
@@ -57,7 +57,7 @@ test_that("invalid sequence values keep their row positions without cascading fi
 })
 
 test_that("integer sequences support another start and empty tables", {
-  plan <- validation_plan(sequence_model("integer", 5L))
+  plan <- create_validation_plan(sequence_model("integer", 5L))
   data <- data.frame(batch = "A", group = "B", item = c(5L, 6L, 8L))
   result <- validate_data(plan, list(Items = data))
   expect_true(result$complete)

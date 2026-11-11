@@ -1,44 +1,51 @@
-# Public operations ---------------------------------------------------------
+# Internal helpers ---------------------------------------------------------
 
-#' Prepare reference lookups for reuse across submissions
-#' @param references Named list of reference snapshots accepted by [`validate_data()`][form.validation::validate_data].
-#' @param ids Character vector identifying reference snapshots to prepare.
-#'   Defaults to all supplied names.
-#' @return The supplied list with a private attribute containing shared indexes.
-#'   Snapshot values, aliases, versions, and existing attributes are preserved.
-#' @details Prepare once after loading a batch's reference snapshots, then pass
-#'   the result to each [`validate_data()`][form.validation::validate_data] call. No data is read or rewritten.
-#'   Indexes include canonical codes and validated aliases. Missing or malformed
-#'   snapshots are recorded, but signal incomplete or failed execution only when
-#'   an eligible reference rule runs after the structure gate. Unused references
-#'   do not fail a submission. Changed snapshots are detected and prepared anew
-#'   by the engine; call this function again to share the updated preparation.
-#' @examples
-#' # Prepare refs.
-#' reference_values <- prepare_validation_references(list(stations = list(
-#'   values = c("001", "002"), aliases = c(old = "001"))))
-#' # Display the returned values.
-#' reference_values$stations$values
-#' @export
-prepare_validation_references <- function(references, ids = names(references)) {
-  named_list(references, "references")
-  if (is.null(ids)) ids <- character()
-  if (!is.character(ids) || anyNA(ids) || any(!nzchar(ids))) {
-    stop("ids must contain nonempty reference names", call. = FALSE)
+# Arguments and execution configuration ---------------------------------------------------------
+
+#' Check one nonempty character argument
+#' @param x Value to check.
+#' @param name Argument name for the error message.
+#' @return Invisibly `NULL`, or an argument error.
+#' @keywords internal
+text_value <- function(x, name) {
+  if (!is.character(x) || length(x) != 1L || is.na(x) || !nzchar(x)) {
+    stop(name, " must be one nonempty string", call. = FALSE)
   }
-  ids <- unique(ids)
-  prepared <- lapply(ids, function(id) {
-    snapshot <- references[[id]]
-    outcome <- tryCatch(list(exact = snapshot_index(id, snapshot, FALSE),
-                             folded = snapshot_index(id, snapshot, TRUE)),
-                        error = function(e) list(error = e))
-    c(list(snapshot = snapshot), outcome)
-  })
-  attr(references, "validation_indexes") <- stats::setNames(prepared, ids)
-  references
+  invisible(NULL)
 }
 
-# Internal helpers ----------------------------------------------------------
+#' Check a uniquely named list argument
+#' @param x List to check; empty lists are allowed.
+#' @param name Argument name for errors.
+#' @return Invisibly `NULL`, or an argument error.
+#' @keywords internal
+named_list <- function(x, name) {
+  if (!is.list(x) || is.data.frame(x) || (length(x) &&
+      (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(names(x))) || anyDuplicated(names(x))))) {
+    stop(name, " must be a list with unique nonempty names", call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+#' Normalize explicit execution options
+#' @param config Named list of supported options.
+#' @return A list with both Boolean policies and a custom options list.
+#' @keywords internal
+execution_config <- function(config) {
+  named_list(config, "config")
+  result <- list(blank_strings = FALSE, allow_extra_sheets = TRUE, custom = list())
+  if (length(setdiff(names(config), names(result)))) stop("Unsupported configuration keys", call. = FALSE)
+  for (key in names(config)) result[key] <- config[key]
+  for (key in c("blank_strings", "allow_extra_sheets")) {
+    if (!is.logical(result[[key]]) || length(result[[key]]) != 1L || is.na(result[[key]])) {
+      stop(key, " must be TRUE or FALSE", call. = FALSE)
+    }
+  }
+  named_list(result$custom, "config$custom")
+  result
+}
+
+# Built-in dispatch and structural checks ---------------------------------------------------------
 
 #' Execute a generated workbook or sheet check
 #' @param rule Generated descriptor.
@@ -126,120 +133,17 @@ run_builtin <- function(rule, context) {
   stop("Unsupported generated rule kind: ", rule$kind, call. = FALSE)
 }
 
-#' Execute an explicit primary-key or unique-key rule
-#' @param rule Generated descriptor with ordered key fields and local field names.
-#' @param context Validation inputs and a cache cleared after preparation.
-#' @return One finding per affected physical row, or an empty finding table.
-#' @details Presence uses the configured missing-value policy. Uniqueness compares
-#'   complete, correctly typed keys using length-prefixed component encoding.
-#'   Primary-key lookups are shared with later parent-key checks. Unique keys use
-#'   a separate cache and never require missing components. Every duplicate row is reported.
+#' Get the last declared cell row
+#' @param model Checked form model.
+#' @param sheet Name of a sheet with a cell layout.
+#' @return Highest declared row as an integer, or zero when no cells are declared.
 #' @keywords internal
-run_primary_key <- function(rule, context) {
-  key_kind <- if (rule$kind == "unique_key") "unique_key" else "primary_key"
-  cache_key <- paste0(key_kind, "/", rule$sheet)
-  if (!exists(cache_key, context$cache, inherits = FALSE)) {
-    cells <- lapply(rule$key_fields, prepared_field, context = context)
-    names(cells) <- unlist(rule$value, use.names = FALSE)
-    complete <- Reduce(`&`, lapply(cells, `[[`, "filled"))
-    typed <- Reduce(`&`, lapply(cells, `[[`, "typed"))
-    eligible <- which(complete & typed)
-    encoded <- encode_key_rows(cells, eligible)
-    lookup <- new.env(hash = TRUE, parent = emptyenv())
-    if (length(encoded)) list2env(stats::setNames(rep(list(TRUE), length(unique(encoded))), unique(encoded)), lookup)
-    context$cache[[cache_key]] <- list(cells = cells, rows = cells[[1L]]$rows,
-      complete = complete, typed = typed, eligible = eligible,
-      duplicates = eligible[duplicated(encoded) | duplicated(encoded, fromLast = TRUE)], lookup = lookup)
-  }
-  key <- context$cache[[cache_key]]
-  if (rule$kind == "primary_key_present") {
-    bad <- which(!key$complete)
-    message <- "Primary key contains missing values."
-  } else {
-    bad <- key$duplicates
-    message <- if (key_kind == "unique_key") "Unique key is not unique." else "Primary key is not unique."
-  }
-  values <- lapply(bad, function(i) lapply(key$cells, function(cells) cells$original[[i]]))
-  validation_findings(message, row = key$rows[bad], sheet = rule$sheet,
-    value = values, expected = list(stats::setNames(list(unlist(rule$value, use.names = FALSE)), key_kind)))
+minimum_cell_rows <- function(model, sheet) {
+  fields <- form.model::form_fields(model, sheet)
+  as.integer(max(c(0L, vapply(fields, `[[`, numeric(1), "row"))))
 }
 
-#' Require one supplied value among selected fields on populated rows
-#' @param rule Generated sheet descriptor containing selected field definitions.
-#' @param context Execution inputs and prepared-value cache.
-#' @return One finding per populated row with no supplied selected value.
-#' @details Presence follows the configured missing-value policy after preparation.
-#'   All declared fields determine whether a row is populated. Zero and false count
-#'   as supplied values; type validity remains the responsibility of type checks.
-#' @keywords internal
-run_at_least_one <- function(rule, context) {
-  fields <- form.model::form_fields(context$model, rule$sheet)
-  all_cells <- lapply(fields, prepared_field, context = context)
-  selected <- lapply(rule$key_fields, prepared_field, context = context)
-  occupied <- Reduce(`|`, lapply(all_cells, `[[`, "filled"))
-  supplied <- Reduce(`|`, lapply(selected, `[[`, "filled"))
-  bad <- which(occupied & !supplied)
-  values <- lapply(bad, function(i) stats::setNames(
-    lapply(selected, function(cells) cells$original[[i]]), unlist(rule$value, use.names = FALSE)))
-  validation_findings("At least one of the selected fields must be supplied.",
-    row = selected[[1L]]$rows[bad], sheet = rule$sheet, value = values,
-    expected = list(list(at_least_one = unlist(rule$value, use.names = FALSE))))
-}
-
-#' Get a shared lookup using the active reference rule policy
-#' @param id Reference identifier.
-#' @param context Execution inputs and run-local cache.
-#' @param ignore_case Compare codes and aliases without case distinctions.
-#' @return A shared reference index, or an incomplete/failed execution condition.
-#' @keywords internal
-reference_lookup <- function(id, context, ignore_case = TRUE) {
-  key <- paste0("reference/", id, if (ignore_case) "/ignore-case" else "/exact")
-  if (exists(key, context$cache, inherits = FALSE)) return(context$cache[[key]])
-  snapshot <- context$references[[id]]
-  prepared <- attr(context$references, "validation_indexes", exact = TRUE)[[id]]
-  if (!is.null(prepared) && identical(prepared$snapshot, snapshot)) {
-    if (!is.null(prepared$error)) stop(prepared$error)
-    index <- if (ignore_case) prepared$folded else prepared$exact
-  } else index <- snapshot_index(id, snapshot, ignore_case)
-  context$cache[[key]] <- index
-  index
-}
-
-#' Check a reference snapshot and prepare its shared lookup
-#' @param id Reference identifier.
-#' @param snapshot Supplied reference snapshot.
-#' @param ignore_case Compare keys without case distinctions.
-#' @return A shared index; a missing snapshot signals incomplete validation.
-#' @keywords internal
-snapshot_index <- function(id, snapshot, ignore_case = TRUE) {
-  if (is.null(snapshot)) validation_incomplete(paste("Missing reference snapshot:", id))
-  if (!is.list(snapshot) || is.null(names(snapshot)) || anyDuplicated(names(snapshot)) ||
-      any(!names(snapshot) %in% c("values", "version", "aliases", "data", "column", "lookup", "indexes")) || !"values" %in% names(snapshot)) {
-    stop("Reference ", id, " must contain values and optional version, aliases, data, column, lookup and indexes", call. = FALSE)
-  }
-  values <- snapshot$values
-  if (!(is.atomic(values) || is.list(values)) || is.data.frame(values) || !is.null(dim(values))) {
-    stop("Reference values must be a vector or list of scalar keys: ", id, call. = FALSE)
-  }
-  keys <- lapply(seq_along(values), function(i) values[[i]])
-  if (any(!vapply(keys, value_type, logical(1), type = "string"))) {
-    stop("Reference keys must be strings: ", id, call. = FALSE)
-  }
-  keys <- vapply(keys, identity, character(1))
-  aliases <- snapshot$aliases
-  if (!is.null(aliases)) {
-    if (!(is.character(aliases) || is.list(aliases)) || !is.null(dim(aliases)) ||
-        (length(aliases) && (is.null(names(aliases)) || anyNA(names(aliases)) || any(!nzchar(names(aliases))))) ||
-        any(!vapply(aliases, value_type, logical(1), type = "string"))) {
-      stop("Reference aliases must map non-empty names to string codes: ", id, call. = FALSE)
-    }
-    targets <- vapply(as.list(aliases), identity, character(1))
-    if (any(!targets %in% keys)) stop("Reference alias target is absent from values: ", id, call. = FALSE)
-  }
-  form.references::reference_index(values, aliases = if (is.null(aliases)) character() else aliases,
-    matching = if (is.null(snapshot$lookup$matching)) "exact" else snapshot$lookup$matching,
-    ignore_case = ignore_case)
-}
+# Field checks and prepared values ---------------------------------------------------------
 
 #' Execute a generated field check
 #' @param rule Field rule descriptor.
@@ -338,14 +242,23 @@ run_field <- function(rule, context) {
                       column = cells$column, value = cells$original[bad], expected = list(expected))
 }
 
-#' Get the last declared cell row
-#' @param model Checked form model.
-#' @param sheet Name of a sheet with a cell layout.
-#' @return Highest declared row as an integer, or zero when no cells are declared.
+#' Cache field values for one validation run
+#' @param field Effective field definition.
+#' @param context Explicit execution inputs and a run-local cache.
+#' @return Original values, physical coordinates, and filled/type masks.
 #' @keywords internal
-minimum_cell_rows <- function(model, sheet) {
-  fields <- form.model::form_fields(model, sheet)
-  as.integer(max(c(0L, vapply(fields, `[[`, numeric(1), "row"))))
+prepared_field <- function(field, context) {
+  key <- paste0("field/", field$id)
+  if (exists(key, context$cache, inherits = FALSE)) return(context$cache[[key]])
+  cells <- field_cells(field, context$sheets[[field$sheet]], context$data, context$config)
+  cells$null <- vapply(cells$original, null_value, logical(1))
+  cells$filled <- cells$present & !cells$null
+  cells$typed <- rep(FALSE, length(cells$rows))
+  cells$typed[cells$filled] <- vapply(cells$original[cells$filled], value_type, logical(1), type = field$type)
+  cells$eligible <- which(cells$typed)
+  cells$values <- unlist(lapply(cells$original[cells$eligible], comparison_value, type = field$type), use.names = FALSE)
+  context$cache[[key]] <- cells
+  cells
 }
 
 #' Identify explicit null cells
@@ -395,40 +308,101 @@ equal_value <- function(x, y, type) {
   isTRUE(comparison_value(x, type) == comparison_value(y, type))
 }
 
-#' Cache field values for one validation run
-#' @param field Effective field definition.
-#' @param context Explicit execution inputs and a run-local cache.
-#' @return Original values, physical coordinates, and filled/type masks.
+# Reference lookups ---------------------------------------------------------
+
+#' Get a shared lookup using the active reference rule policy
+#' @param id Reference identifier.
+#' @param context Execution inputs and run-local cache.
+#' @param ignore_case Compare codes and aliases without case distinctions.
+#' @return A shared reference index, or an incomplete/failed execution condition.
 #' @keywords internal
-prepared_field <- function(field, context) {
-  key <- paste0("field/", field$id)
+reference_lookup <- function(id, context, ignore_case = TRUE) {
+  key <- paste0("reference/", id, if (ignore_case) "/ignore-case" else "/exact")
   if (exists(key, context$cache, inherits = FALSE)) return(context$cache[[key]])
-  cells <- field_cells(field, context$sheets[[field$sheet]], context$data, context$config)
-  cells$null <- vapply(cells$original, null_value, logical(1))
-  cells$filled <- cells$present & !cells$null
-  cells$typed <- rep(FALSE, length(cells$rows))
-  cells$typed[cells$filled] <- vapply(cells$original[cells$filled], value_type, logical(1), type = field$type)
-  cells$eligible <- which(cells$typed)
-  cells$values <- unlist(lapply(cells$original[cells$eligible], comparison_value, type = field$type), use.names = FALSE)
-  context$cache[[key]] <- cells
-  cells
+  snapshot <- context$references[[id]]
+  prepared <- attr(context$references, "validation_indexes", exact = TRUE)[[id]]
+  if (!is.null(prepared) && identical(prepared$snapshot, snapshot)) {
+    if (!is.null(prepared$error)) stop(prepared$error)
+    index <- if (ignore_case) prepared$folded else prepared$exact
+  } else index <- snapshot_index(id, snapshot, ignore_case)
+  context$cache[[key]] <- index
+  index
 }
 
-#' Encode complete key rows without separator collisions
-#' @param cells Ordered prepared field values, with compatible types on both sides.
-#' @param rows Local positions whose components are present and correctly typed.
-#' @return Character keys with byte-length-prefixed UTF-8 components. Numeric
-#'   values use 17 significant digits and normalize signed zero.
+#' Check a reference snapshot and prepare its shared lookup
+#' @param id Reference identifier.
+#' @param snapshot Supplied reference snapshot.
+#' @param ignore_case Compare keys without case distinctions.
+#' @return A shared index; a missing snapshot signals incomplete validation.
 #' @keywords internal
-encode_key_rows <- function(cells, rows) {
-  if (!length(rows)) return(character())
-  parts <- lapply(cells, function(cell) {
-    values <- cell$values[match(rows, cell$eligible)]
-    text <- if (is.numeric(values)) sprintf("%.17g", ifelse(values == 0, 0, values)) else as.character(values)
-    text <- enc2utf8(text)
-    paste0(nchar(text, type = "bytes"), ":", text)
-  })
-  do.call(paste0, parts)
+snapshot_index <- function(id, snapshot, ignore_case = TRUE) {
+  if (is.null(snapshot)) validation_incomplete(paste("Missing reference snapshot:", id))
+  if (!is.list(snapshot) || is.null(names(snapshot)) || anyDuplicated(names(snapshot)) ||
+      any(!names(snapshot) %in% c("values", "version", "aliases", "data", "column", "lookup", "indexes")) || !"values" %in% names(snapshot)) {
+    stop("Reference ", id, " must contain values and optional version, aliases, data, column, lookup and indexes", call. = FALSE)
+  }
+  values <- snapshot$values
+  if (!(is.atomic(values) || is.list(values)) || is.data.frame(values) || !is.null(dim(values))) {
+    stop("Reference values must be a vector or list of scalar keys: ", id, call. = FALSE)
+  }
+  keys <- lapply(seq_along(values), function(i) values[[i]])
+  if (any(!vapply(keys, value_type, logical(1), type = "string"))) {
+    stop("Reference keys must be strings: ", id, call. = FALSE)
+  }
+  keys <- vapply(keys, identity, character(1))
+  aliases <- snapshot$aliases
+  if (!is.null(aliases)) {
+    if (!(is.character(aliases) || is.list(aliases)) || !is.null(dim(aliases)) ||
+        (length(aliases) && (is.null(names(aliases)) || anyNA(names(aliases)) || any(!nzchar(names(aliases))))) ||
+        any(!vapply(aliases, value_type, logical(1), type = "string"))) {
+      stop("Reference aliases must map non-empty names to string codes: ", id, call. = FALSE)
+    }
+    targets <- vapply(as.list(aliases), identity, character(1))
+    if (any(!targets %in% keys)) stop("Reference alias target is absent from values: ", id, call. = FALSE)
+  }
+  form.references::reference_index(values, aliases = if (is.null(aliases)) character() else aliases,
+    matching = if (is.null(snapshot$lookup$matching)) "exact" else snapshot$lookup$matching,
+    ignore_case = ignore_case)
+}
+
+# Keys, row constraints and sequences ---------------------------------------------------------
+
+#' Execute an explicit primary-key or unique-key rule
+#' @param rule Generated descriptor with ordered key fields and local field names.
+#' @param context Validation inputs and a cache cleared after preparation.
+#' @return One finding per affected physical row, or an empty finding table.
+#' @details Presence uses the configured missing-value policy. Uniqueness compares
+#'   complete, correctly typed keys using length-prefixed component encoding.
+#'   Primary-key lookups are shared with later parent-key checks. Unique keys use
+#'   a separate cache and never require missing components. Every duplicate row is reported.
+#' @keywords internal
+run_primary_key <- function(rule, context) {
+  key_kind <- if (rule$kind == "unique_key") "unique_key" else "primary_key"
+  cache_key <- paste0(key_kind, "/", rule$sheet)
+  if (!exists(cache_key, context$cache, inherits = FALSE)) {
+    cells <- lapply(rule$key_fields, prepared_field, context = context)
+    names(cells) <- unlist(rule$value, use.names = FALSE)
+    complete <- Reduce(`&`, lapply(cells, `[[`, "filled"))
+    typed <- Reduce(`&`, lapply(cells, `[[`, "typed"))
+    eligible <- which(complete & typed)
+    encoded <- encode_key_rows(cells, eligible)
+    lookup <- new.env(hash = TRUE, parent = emptyenv())
+    if (length(encoded)) list2env(stats::setNames(rep(list(TRUE), length(unique(encoded))), unique(encoded)), lookup)
+    context$cache[[cache_key]] <- list(cells = cells, rows = cells[[1L]]$rows,
+      complete = complete, typed = typed, eligible = eligible,
+      duplicates = eligible[duplicated(encoded) | duplicated(encoded, fromLast = TRUE)], lookup = lookup)
+  }
+  key <- context$cache[[cache_key]]
+  if (rule$kind == "primary_key_present") {
+    bad <- which(!key$complete)
+    message <- "Primary key contains missing values."
+  } else {
+    bad <- key$duplicates
+    message <- if (key_kind == "unique_key") "Unique key is not unique." else "Primary key is not unique."
+  }
+  values <- lapply(bad, function(i) lapply(key$cells, function(cells) cells$original[[i]]))
+  validation_findings(message, row = key$rows[bad], sheet = rule$sheet,
+    value = values, expected = list(stats::setNames(list(unlist(rule$value, use.names = FALSE)), key_kind)))
 }
 
 #' Check child keys against an earlier sheet's cached primary key
@@ -454,6 +428,28 @@ run_parent_key <- function(rule, context) {
     row = cells[[1L]]$rows[bad], sheet = rule$sheet, value = values,
     expected = list(list(primary_key = unlist(rule$value$fields, use.names = FALSE),
       parent_sheet = rule$value$sheet, parent_key = names(parent$cells))))
+}
+
+#' Require one supplied value among selected fields on populated rows
+#' @param rule Generated sheet descriptor containing selected field definitions.
+#' @param context Execution inputs and prepared-value cache.
+#' @return One finding per populated row with no supplied selected value.
+#' @details Presence follows the configured missing-value policy after preparation.
+#'   All declared fields determine whether a row is populated. Zero and false count
+#'   as supplied values; type validity remains the responsibility of type checks.
+#' @keywords internal
+run_at_least_one <- function(rule, context) {
+  fields <- form.model::form_fields(context$model, rule$sheet)
+  all_cells <- lapply(fields, prepared_field, context = context)
+  selected <- lapply(rule$key_fields, prepared_field, context = context)
+  occupied <- Reduce(`|`, lapply(all_cells, `[[`, "filled"))
+  supplied <- Reduce(`|`, lapply(selected, `[[`, "filled"))
+  bad <- which(occupied & !supplied)
+  values <- lapply(bad, function(i) stats::setNames(
+    lapply(selected, function(cells) cells$original[[i]]), unlist(rule$value, use.names = FALSE)))
+  validation_findings("At least one of the selected fields must be supplied.",
+    row = selected[[1L]]$rows[bad], sheet = rule$sheet, value = values,
+    expected = list(list(at_least_one = unlist(rule$value, use.names = FALSE))))
 }
 
 #' Check consecutive numbering in worksheet order within each group
@@ -497,4 +493,82 @@ run_sequence <- function(rule, field, context) {
     row = cells$rows[bad], sheet = field$sheet, field = field$id,
     column = cells$column, value = cells$original[bad],
     expected = as.list(expected[bad]))
+}
+
+#' Encode complete key rows without separator collisions
+#' @param cells Ordered prepared field values, with compatible types on both sides.
+#' @param rows Local positions whose components are present and correctly typed.
+#' @return Character keys with byte-length-prefixed UTF-8 components. Numeric
+#'   values use 17 significant digits and normalize signed zero.
+#' @keywords internal
+encode_key_rows <- function(cells, rows) {
+  if (!length(rows)) return(character())
+  parts <- lapply(cells, function(cell) {
+    values <- cell$values[match(rows, cell$eligible)]
+    text <- if (is.numeric(values)) sprintf("%.17g", ifelse(values == 0, 0, values)) else as.character(values)
+    text <- enc2utf8(text)
+    paste0(nchar(text, type = "bytes"), ":", text)
+  })
+  do.call(paste0, parts)
+}
+
+# Finding validation and assembly ---------------------------------------------------------
+
+#' Verify a custom callback's finding contract
+#' @param x Callback return value: `NULL` or a finding data frame.
+#' @return A normalized finding data frame, or an error caught by the runner.
+#' @keywords internal
+check_findings <- function(x) {
+  if (is.null(x)) return(empty_findings())
+  columns <- c("message", "sheet", "field", "row", "column", "value", "expected")
+  if (!is.data.frame(x) || !identical(names(x), columns) ||
+      !is.list(x$value) || !is.list(x$expected)) {
+    stop("Custom rules must return NULL or rows from validation_finding()", call. = FALSE)
+  }
+  if (!nrow(x)) return(empty_findings())
+  if (any(vapply(x[columns[1:5]], function(column) !is.null(dim(column)), logical(1)))) {
+    stop("Finding metadata must be vectors", call. = FALSE)
+  }
+  if (!is.character(x$message) || anyNA(x$message) || any(!nzchar(x$message))) {
+    stop("message must contain nonempty strings", call. = FALSE)
+  }
+  for (name in c("sheet", "field")) {
+    values <- x[[name]]
+    if (!is.character(values) || any(!is.na(values) & !nzchar(values))) {
+      stop(name, " must contain names or NA_character_", call. = FALSE)
+    }
+  }
+  for (name in c("row", "column")) {
+    values <- x[[name]]
+    if (!is.numeric(values) || any(!is.na(values) &
+        (!is.finite(values) | values < 1 | values != floor(values) | values > .Machine$integer.max))) {
+      stop(name, " must contain positive integers or NA", call. = FALSE)
+    }
+    x[[name]] <- as.integer(values)
+  }
+  x$value <- I(unname(x$value))
+  x$expected <- I(unname(x$expected))
+  class(x) <- "data.frame"
+  rownames(x) <- NULL
+  x
+}
+
+#' Create an empty finding table
+#' @return Zero-row finding data frame, with list columns for values and expectations.
+#' @keywords internal
+empty_findings <- function() {
+  structure(list(message = character(), sheet = character(), field = character(),
+    row = integer(), column = integer(), value = I(list()), expected = I(list())),
+    class = "data.frame", row.names = integer())
+}
+
+#' Combine finding tables
+#' @param rows List of finding data frames, possibly empty.
+#' @return A finding data frame, with list columns preserved.
+#' @keywords internal
+bind_findings <- function(rows) {
+  if (!length(rows)) return(empty_findings())
+  result <- do.call(rbind, rows)
+  rownames(result) <- NULL
+  result
 }

@@ -1,5 +1,7 @@
 # Public operations ---------------------------------------------------------
 
+# Plan construction ---------------------------------------------------------
+
 #' Define a custom validation rule
 #'
 #' Add a check that model declarations cannot express. The callback runs once
@@ -202,65 +204,221 @@ validation_plan <- function(model, rules = list()) {
                  rules_version = NA_character_), class = "validation_plan")
 }
 
-# Internal helpers ----------------------------------------------------------
+# Reading ---------------------------------------------------------
 
-#' Describe one generated check
-#' @param id,kind,severity Rule identity, operation, and finding severity.
-#' @param sheet,field Model identifiers, when the check targets a sheet or field.
-#' @param stage Execution stage: `"structure"`, `"fields"`, or `"business"`.
-#' @return An ordinary rule descriptor consumed by the executor.
-#' @keywords internal
-rule_record <- function(id, kind, severity = "error", sheet = NULL, field = NULL,
-                        stage = "fields") {
-  list(id = id, kind = kind, stage = stage, severity = severity, sheet = sheet, field = field)
+#' Inspect the validation YAML contract
+#'
+#' Return the installed contract for structure, generated field, and business
+#' validation files.
+#' @param version Exact schema version, currently `"1.0.0"`.
+#' @return A nested list read from `schema/validation-1.0.0.yaml`.
+#' @examples
+#' # Display the returned values.
+#' validation_schema()$stages
+#' @export
+validation_schema <- function(version = "1.0.0") {
+  text_value(version, "version")
+  if (version != "1.0.0") stop("Unsupported validation schema version: ", version, call. = FALSE)
+  read_rules_yaml(system.file("schema/validation-1.0.0.yaml", package = "form.validation", mustWork = TRUE))
 }
 
-#' Group rules into structure and content stages
-#' @param rules Ordered rule descriptors.
-#' @return Structure and merged content rule IDs.
-#' @keywords internal
-execution_rulesets <- function(rules) {
-  ids <- vapply(rules, `[[`, character(1), "id")
-  structural <- vapply(rules, function(rule) rule$stage == "structure", logical(1))
-  list(structure = ids[structural], content = ids[!structural])
+#' Load a named model and validation process
+#' @param name Prefix of `<name>-form.yaml` and `<name>-validation.yaml`.
+#' @param directory Directory containing both files.
+#' @param checks Named callback functions; see [`read_validation_rules()`][form.validation::read_validation_rules].
+#' @param lookup_configuration Optional reference lookup definitions, resolved before rule loading.
+#' @return A `validation_plan` containing the model and its checks.
+#' @seealso [`read_validation_process()`][form.validation::read_validation_process] for a model and process stored separately.
+#' @export
+load_validation_plan <- function(name, directory, checks = list(), lookup_configuration = NULL) {
+  model <- form.model::load_form_model(name, directory)
+  if (!is.null(lookup_configuration))
+    model <- form.references::resolve_reference_lookups(model, lookup_configuration)
+  read_validation_process(file.path(directory, paste0(name, "-validation.yaml")), model, checks)
 }
 
-#' Extract portable model identity through its public API
-#' @param model Checked form model.
-#' @return Form ID and version.
-#' @keywords internal
-rules_model_identity <- function(model) {
-  meta <- form.model::form_metadata(model)
-  list(id = meta$form$id, version = meta$form$version)
+#' Load a complete validation process
+#'
+#' Read the ordered structure and content rulesets. Content merges generated
+#' field checks followed by explicitly listed business files.
+#' Ruleset paths are plain filenames resolved beside the process file.
+#' @param path Explicit `<name>-validation.yaml` process path.
+#' @param model Model used by every listed ruleset.
+#' @param checks Named callbacks required by structural and business rules.
+#' @param business Additional explicit business YAML paths, appended to content.
+#' @return A `validation_plan` ready for [`validate_data()`][form.validation::validate_data].
+#' @examples
+#' # Locate the installed example resources.
+#' validation_directory <- system.file("examples", "survey", package = "form.validation")
+#' # Load the requested form model.
+#' form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+#' # Read the named reference lookup settings.
+#' reference_configuration <- form.references::read_reference_configuration(
+#'   system.file("examples", "survey", "references.yaml", package = "form.references"))
+#' # Resolve reference lookups without changing the original form model.
+#' reference_resolved_form_model <- form.references::resolve_reference_lookups(
+#'   form_model_definition, reference_configuration)
+#' # Prepare validation callbacks.
+#' validation_callbacks <- new.env(parent = baseenv())
+#' # Load the example business callbacks.
+#' sys.source(file.path(validation_directory, "business.R"), validation_callbacks)
+#' # Prepare the validation rules and their execution order.
+#' validation_plan <- read_validation_process(
+#'   file.path(validation_directory, "validation.yaml"), reference_resolved_form_model,
+#'   checks = list(total_count = validation_callbacks$total_count))
+#' # Display the returned values.
+#' validation_plan$rules_version
+#' @export
+read_validation_process <- function(path, model, checks = list(), business = character()) {
+  process <- read_rules_yaml(path)
+  check_rule_keys(process, c("schema_version", "rules_version", "model", "rulesets"), path)
+  check_validation_header(process, model, path)
+  if (!identical(names(process$rulesets), c("structure", "content"))) {
+    stop(path, ": rulesets must be ordered: structure, content", call. = FALSE)
+  }
+  text_value(process$rulesets$structure, paste(path, "structure ruleset"))
+  content <- process$rulesets$content
+  if (!is.list(content) || !is.null(names(content)) || !length(content)) {
+    stop(path, ": content must be a nonempty sequence of filenames", call. = FALSE)
+  }
+  filenames <- vapply(c(list(process$rulesets$structure), content), function(filename) {
+    text_value(filename, paste(path, "ruleset"))
+    if (basename(filename) != filename || filename %in% c(".", "..")) {
+      stop(path, ": rulesets must be filenames in the process directory", call. = FALSE)
+    }
+    filename
+  }, character(1))
+  if (anyDuplicated(filenames)) stop(path, ": duplicate ruleset filename", call. = FALSE)
+  if (!is.character(business) || anyNA(business) || any(!nzchar(business))) {
+    stop("business must contain explicit YAML filenames", call. = FALSE)
+  }
+  plan <- read_validation_rules(c(file.path(dirname(path), filenames), business), model, checks)
+  if (!identical(plan$rules_version, process$rules_version)) {
+    stop(path, ": rules_version differs from its rulesets", call. = FALSE)
+  }
+  plan
 }
 
-#' Summarize model sheet dimensions
-#' @param model Checked form model.
-#' @return Named mappings in model sheet order.
-#' @keywords internal
-structure_sheets <- function(model) {
-  sheets <- form.model::form_sheets(model)
-  stats::setNames(lapply(names(sheets), function(name) {
-    sheet <- sheets[[name]]
-    result <- list()
-    if (!is.null(sheet$layout$row_count)) result$rows <- sheet$layout$row_count
-    else if (sheet$layout$kind == "cells") result$min_rows <- minimum_cell_rows(model, name)
-    if (!is.null(sheet$layout$column_count)) result$columns <- sheet$layout$column_count
-    if (!length(result)) stop("Sheet layout has no dimensions", call. = FALSE)
-    result
-  }), names(sheets))
+#' Load validation rules
+#' @param paths YAML paths ordered as structure, generated fields, then business files.
+#' @param model Checked model supplying field definitions and layouts.
+#' @param checks Named callback functions, keyed by the last component of each custom rule ID.
+#' @return A `validation_plan` for [`validate_data()`][form.validation::validate_data].
+#' @details Requires one structure and one field file, matching the model and rule version.
+#'   Generated rule order, values and severity must match; stale files need regeneration.
+#'   Enum and reference rules may set `ignore_case: false` for strict matching. Omitted or true
+#'   ignores case for character values, without rewriting submitted values.
+#'   Structural and business files may declare callbacks as `namespace/[field/]callback`.
+#'   Parameters reach callbacks through `config$rule`, including the optional field ID.
+#'   Severity defaults to `error`, and description to the rule ID.
+#'   YAML is parsed as data; callbacks must be supplied explicitly.
+#' @seealso [`read_validation_process()`][form.validation::read_validation_process], [`validation_schema()`][form.validation::validation_schema]
+#' @export
+read_validation_rules <- function(paths, model, checks = list()) {
+  if (!is.character(paths) || !length(paths) || anyNA(paths) || any(!nzchar(paths))) {
+    stop("paths must contain explicit YAML filenames", call. = FALSE)
+  }
+  named_list(checks, "checks")
+  if (any(!vapply(checks, is.function, logical(1)))) stop("checks must contain functions", call. = FALSE)
+  plan <- validation_plan(model)
+  documents <- lapply(paths, read_validation_document, model = plan$model)
+  version <- check_ruleset_sequence(documents)
+  plan <- bind_generated_rules(plan, documents)
+  business <- bind_custom_rules(documents, plan$model, checks)
+  ids <- c(vapply(plan$rules, `[[`, character(1), "id"),
+           vapply(business, `[[`, character(1), "id"))
+  if (anyDuplicated(ids)) stop("Duplicate rule IDs across validation files", call. = FALSE)
+  plan$rules <- c(plan$rules, business)
+  structural <- vapply(plan$rules, function(rule) rule$stage == "structure", logical(1))
+  plan$rules <- c(plan$rules[structural], plan$rules[!structural])
+  plan$rulesets <- execution_rulesets(plan$rules)
+  plan$rules_version <- version
+  plan
 }
 
-#' Describe generated field rules for serialization
-#' @param plan Generated validation plan.
-#' @return Ordered mapping from rule IDs to values and non-default severities.
-#' @keywords internal
-generated_rule_entries <- function(plan) {
-  rules <- Filter(function(rule) rule$stage == "fields", plan$rules)
-  entries <- lapply(rules, function(rule) {
-    entry <- list(value = rule$value)
-    if (rule$severity != "error") entry$severity <- rule$severity
-    entry
-  })
-  stats::setNames(entries, vapply(rules, `[[`, character(1), "id"))
+# Writing ---------------------------------------------------------
+
+#' Generate rules for a named model
+#' @param name Prefix of `<name>-form.yaml`.
+#' @param directory Directory containing the model.
+#' @param version Version shared by all validation files.
+#' @param overwrite Replace existing generated files; defaults to `FALSE`.
+#' @return Structure and generated field-rule paths, invisibly. Business files are untouched.
+#' @seealso [`write_validation_rules()`][form.validation::write_validation_rules], [`load_validation_plan()`][form.validation::load_validation_plan]
+#' @param lookup_configuration Optional reference lookup definitions, resolved before generation.
+#' @export
+generate_validation_rules <- function(name, directory, version = "1.0.0", overwrite = FALSE, lookup_configuration = NULL) {
+  model <- form.model::load_form_model(name, directory)
+  if (!is.null(lookup_configuration))
+    model <- form.references::resolve_reference_lookups(model, lookup_configuration)
+  paths <- file.path(directory, paste0(name, c("-structure-validation.yaml", "-generated-validation.yaml")))
+  write_validation_rules(model, paths[[1L]], paths[[2L]], version, overwrite)
+}
+
+#' Write model-derived validation files
+#' @param model Checked form.model model.
+#' @param structure_path Output structure YAML path.
+#' @param generated_path Output field-rule YAML path.
+#' @param version Version shared by all validation files.
+#' @param overwrite Replace existing matching generated files; defaults to `FALSE`.
+#' @return Both paths, invisibly.
+#' @details Preserves custom structural rules. Field rules use compact YAML;
+#'   edit the form and regenerate when its definition changes.
+#'   Explicit enum and reference `ignore_case` options are preserved when regenerating field rules.
+#' @seealso [`generate_validation_rules()`][form.validation::generate_validation_rules], [`read_validation_rules()`][form.validation::read_validation_rules]
+#' @export
+write_validation_rules <- function(model, structure_path, generated_path,
+                                   version = "1.0.0", overwrite = FALSE) {
+  text_value(structure_path, "structure_path")
+  text_value(generated_path, "generated_path")
+  text_value(version, "version")
+  if (identical(structure_path, generated_path)) stop("Validation paths must differ", call. = FALSE)
+  if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
+    stop("overwrite must be TRUE or FALSE", call. = FALSE)
+  }
+  plan <- validation_plan(model)
+  paths <- c(structure = structure_path, generated = generated_path)
+  stages <- c(structure = "structure", generated = "fields")
+  structure_rules <- NULL
+  case_options <- list()
+  for (name in names(paths)) {
+    path <- paths[[name]]
+    if (!dir.exists(dirname(path))) stop("Missing output directory: ", dirname(path), call. = FALSE)
+    if (file.exists(path)) {
+      if (!overwrite) stop("File exists: ", path, call. = FALSE)
+      previous <- read_rules_yaml(path)
+      if (name == "structure") structure_rules <- previous[["rules"]]
+      if (name == "generated") {
+        entries <- lapply(previous[["rules"]], function(rule) {
+          if (is.null(names(rule))) list(value = rule) else rule
+        })
+        check_generated_rules(entries, path)
+        case_options <- lapply(entries, function(rule) rule$ignore_case)
+      }
+      if (!identical(previous$stage, stages[[name]])) {
+        stop("Only the matching generated validation file can be replaced: ", path, call. = FALSE)
+      }
+    }
+  }
+  common <- list(schema_version = "1.0.0", rules_version = version,
+                 model = rules_model_identity(plan$model))
+  structure <- c(common, list(stage = "structure", sheets = structure_sheets(plan$model)))
+  if (!is.null(structure_rules)) structure$rules <- structure_rules
+  rules <- generated_rule_entries(plan)
+  header <- yaml::as.yaml(c(common, list(stage = "fields")))
+  lines <- vapply(names(rules), function(id) {
+    rule <- rules[[id]]
+    value <- flow_rule_value(rule$value)
+    ignore_case <- if (grepl("/(enum|reference)$", id)) case_options[[id]] else NULL
+    if (!is.null(rule$severity) || !is.null(names(rule$value)) || !is.null(ignore_case)) {
+      value <- paste0("{value: ", value,
+        if (!is.null(rule$severity)) paste0(", severity: ", rule$severity),
+        if (!is.null(ignore_case)) paste0(", ignore_case: ", flow_rule_value(ignore_case)), "}")
+    }
+    paste0("  ", id, ": ", value)
+  }, character(1))
+  yaml::write_yaml(structure, structure_path, fileEncoding = "UTF-8")
+  writeLines(c(sub("\n$", "", header), if (length(rules)) "rules:" else "rules: {}", lines),
+             generated_path, useBytes = TRUE)
+  invisible(paths)
 }

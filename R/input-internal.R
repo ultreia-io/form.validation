@@ -1,78 +1,3 @@
-# Public operations ---------------------------------------------------------
-
-#' Explicitly prepare field values using declared form types
-#'
-#' Optional value conversion for callers that accept textual representations of
-#' supplied values. No workbook reading or validation is performed.
-#' @param data Named worksheet grids, as for [`validate_data()`][form.validation::validate_data].
-#' @param model Checked form model from form.model.
-#' @param na_strings Text tokens interpreted as missing, or a function receiving
-#'   an effective field definition and returning its tokens. Defaults to none.
-#' @param na_ignore_case Match missing-text tokens without case distinctions.
-#'   Defaults to FALSE. Matching uses complete values, without trimming.
-#' @return Prepared grids with the same sheet order and dimensions. Matrices
-#'   become data frames; converted columns contain lists of scalar values.
-#' @details Nonmissing scalar values in string fields become character. Midnight
-#'   POSIXct values in date fields become Date in UTC; nonmidnight timestamps are
-#'   retained so type validation can report them. Numeric fields accept decimal
-#'   text with an optional sign and exponent, without separators or whitespace.
-#'   Integer conversion requires a whole value within the exact integer range
-#'   of a double. Boolean text accepts TRUE/T/YES/Y and FALSE/F/NO/N, ignoring case;
-#'   numeric values and numeric text are never interpreted as booleans.
-#'   Coordinate text uses numeric conversion; coordinate bounds remain validation
-#'   checks. Invalid or ambiguous values remain unchanged for validation.
-#'   ISO datetimes with Z or an explicit UTC offset are normalized to UTC,
-#'   adding zero seconds when only minutes are supplied. Calendar dates and
-#'   clock components must round-trip exactly. Dates already use YYYY-MM-DD.
-#'   Fractional seconds are retained. Date fields also accept day-first D/M/YYYY
-#'   and year-first YYYY.M.D, with optional leading zeros on day and month.
-#'   Four-digit years and valid calendar dates are required; month-first dates,
-#'   placeholders, partial dates and missing zones are not inferred.
-#'   No trimming is performed here.
-#'   Table preambles and undeclared cells are not converted.
-#'   This policy is never enabled implicitly. Use
-#'   `validate_data(plan, data, prepare_data = function(data)
-#'   prepare_validation_data(data, plan$model))` to run it after structure passes.
-#' @export
-prepare_validation_data <- function(data, model, na_strings = character(), na_ignore_case = FALSE) {
-  if (!is.logical(na_ignore_case) || length(na_ignore_case) != 1L || is.na(na_ignore_case))
-    stop("na_ignore_case must be TRUE or FALSE", call. = FALSE)
-  if (!is.function(na_strings) && (!is.character(na_strings) || anyNA(na_strings)))
-    stop("na_strings must supply character tokens without missing values", call. = FALSE)
-  named_list(data, "data")
-  for (name in names(data)) {
-    grid <- data[[name]]
-    if (!(is.data.frame(grid) || is.matrix(grid))) {
-      stop("Each supplied sheet must be a data frame or matrix: ", name, call. = FALSE)
-    }
-    if (is.matrix(grid)) data[[name]] <- as.data.frame(grid)
-  }
-  layouts <- form.model::form_sheets(model)
-  for (field in form.model::form_fields(model)) {
-    if (!field$sheet %in% names(data)) next
-    grid <- data[[field$sheet]]
-    if (field$column > ncol(grid)) next
-    layout <- layouts[[field$sheet]]$layout
-    rows <- if (layout$kind == "cells") field$row else which(seq_len(nrow(grid)) >= layout$start_row)
-    rows <- rows[rows <= nrow(grid)]
-    if (!length(rows)) next
-    tokens <- if (is.function(na_strings)) na_strings(field) else na_strings
-    if (!is.character(tokens) || anyNA(tokens))
-      stop("Missing-value tokens must be character values without NA: ", field$id, call. = FALSE)
-    if (na_ignore_case) tokens <- toupper(tokens)
-    # Assign each column once instead of repeatedly copying it for every cell.
-    column <- as.list(grid[[field$column]])
-    column[rows] <- lapply(column[rows], function(value) {
-      if (is.character(value) && length(value) == 1L && !is.na(value) &&
-          (if (na_ignore_case) toupper(value) else value) %in% tokens) return(NA_character_)
-      coerce_validation_value(value, field$type)
-    })
-    grid[[field$column]] <- column
-    data[[field$sheet]] <- grid
-  }
-  data
-}
-
 # Internal helpers ----------------------------------------------------------
 
 #' Coerce one scalar using an explicit declared-type policy
@@ -180,4 +105,27 @@ field_cells <- function(field, sheet, data, config) {
     present <- present & !blank
   }
   list(column = field$column, rows = rows, original = original, present = present)
+}
+
+#' Represent an unreadable input without executing its validation rules
+#' @param plan Validation plan whose rules are recorded as skipped.
+#' @param path Input label retained in the result; may be relative to the input root.
+#' @param message Reader failure explanation.
+#' @return A failed `validation_result` with an `input/read` execution record,
+#'   empty findings, and a closed structure gate.
+#' @keywords internal
+workbook_read_failure <- function(plan, path, message) {
+  execution <- do.call(rbind, lapply(plan$rules, function(rule) data.frame(
+    rule_id = rule$id, stage = rule$stage, severity = rule$severity,
+    sheet = if (is.null(rule$sheet)) NA_character_ else rule$sheet,
+    field = if (is.null(rule$field)) NA_character_ else rule$field,
+    status = "skipped", message = "Workbook could not be read", stringsAsFactors = FALSE)))
+  execution <- rbind(data.frame(rule_id = "input/read", stage = "structure", severity = "error",
+    sheet = NA_character_, field = NA_character_, status = "failed", message = message), execution)
+  findings <- cbind(data.frame(rule_id = character(), severity = character(), source = character()),
+    validation_finding("unused")[FALSE, ])
+  structure(list(status = "failed", valid = NA, complete = FALSE, structure_passed = FALSE,
+    findings = findings, execution = execution, model = form.model::form_metadata(plan$model),
+    source = path, rules_version = plan$rules_version,
+    metadata = plan$metadata), class = "validation_result")
 }

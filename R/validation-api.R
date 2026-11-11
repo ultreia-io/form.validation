@@ -1,5 +1,47 @@
 # Public operations ---------------------------------------------------------
 
+# Reference preparation ---------------------------------------------------------
+
+#' Prepare reference lookups for reuse across submissions
+#' @param references Named list of reference snapshots accepted by [`validate_data()`][form.validation::validate_data].
+#' @param ids Character vector identifying reference snapshots to prepare.
+#'   Defaults to all supplied names.
+#' @return The supplied list with a private attribute containing shared indexes.
+#'   Snapshot values, aliases, versions, and existing attributes are preserved.
+#' @details Prepare once after loading a batch's reference snapshots, then pass
+#'   the result to each [`validate_data()`][form.validation::validate_data] call. No data is read or rewritten.
+#'   Indexes include canonical codes and validated aliases. Missing or malformed
+#'   snapshots are recorded, but signal incomplete or failed execution only when
+#'   an eligible reference rule runs after the structure gate. Unused references
+#'   do not fail a submission. Changed snapshots are detected and prepared anew
+#'   by the engine; call this function again to share the updated preparation.
+#' @examples
+#' # Prepare refs.
+#' reference_values <- prepare_validation_references(list(stations = list(
+#'   values = c("001", "002"), aliases = c(old = "001"))))
+#' # Display the returned values.
+#' reference_values$stations$values
+#' @export
+prepare_validation_references <- function(references, ids = names(references)) {
+  named_list(references, "references")
+  if (is.null(ids)) ids <- character()
+  if (!is.character(ids) || anyNA(ids) || any(!nzchar(ids))) {
+    stop("ids must contain nonempty reference names", call. = FALSE)
+  }
+  ids <- unique(ids)
+  prepared <- lapply(ids, function(id) {
+    snapshot <- references[[id]]
+    outcome <- tryCatch(list(exact = snapshot_index(id, snapshot, FALSE),
+                             folded = snapshot_index(id, snapshot, TRUE)),
+                        error = function(e) list(error = e))
+    c(list(snapshot = snapshot), outcome)
+  })
+  attr(references, "validation_indexes") <- stats::setNames(prepared, ids)
+  references
+}
+
+# Execution ---------------------------------------------------------
+
 #' Execute a validation plan against supplied worksheet data
 #'
 #' Run structural checks first. Field and business checks run only when the
@@ -225,6 +267,111 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
                  metadata = plan$metadata, reference_lookups = reference_evidence_definitions(plan$model), reference_provenance = attr(references, "provenance")), class = "validation_result")
 }
 
+# Findings ---------------------------------------------------------
+
+#' Create one finding for a custom rule
+#'
+#' Describe one validation failure. The runner adds the rule ID, severity, and
+#' source label; callbacks cannot override those fields. Combine findings with
+#' `rbind()`, or return `NULL` when a rule finds no problem.
+#' @param message One nonempty explanation of the problem.
+#' @param sheet Workbook sheet name, or `NA_character_` for a whole-input finding.
+#' @param field Model field ID, or `NA_character_` when not applicable.
+#' @param row,column One-based physical coordinates, or `NA_integer_`.
+#' @param value,expected Relevant actual and expected values. Stored unchanged
+#'   in list columns, including `NULL`, dates, and vectors.
+#' @return A one-row data frame with `message`, `sheet`, `field`, `row`, `column`,
+#'   `value`, and `expected`. It is the return contract for custom rule callbacks.
+#' @examples
+#' # Display the returned values.
+#' validation_finding("Count exceeds capacity", sheet = "Observations",
+#'                    field = "count", row = 2, column = 3,
+#'                    value = 12L, expected = 10L)
+#' @export
+validation_finding <- function(message, sheet = NA_character_, field = NA_character_,
+                               row = NA_integer_, column = NA_integer_,
+                               value = NULL, expected = NULL) {
+  text_value(message, "message")
+  for (name in c("sheet", "field")) {
+    x <- get(name)
+    if (!is.character(x) || length(x) != 1L || (!is.na(x) && !nzchar(x))) {
+      stop(name, " must be a name or NA_character_", call. = FALSE)
+    }
+  }
+  for (name in c("row", "column")) {
+    x <- get(name)
+    if (!is.numeric(x) || length(x) != 1L ||
+        (!is.na(x) && (!is.finite(x) || x < 1 || x != floor(x) || x > .Machine$integer.max))) {
+      stop(name, " must be a positive integer or NA_integer_", call. = FALSE)
+    }
+  }
+  result <- data.frame(message = message, sheet = sheet, field = field,
+                       row = as.integer(row), column = as.integer(column),
+                       stringsAsFactors = FALSE)
+  result$value <- I(list(value))
+  result$expected <- I(list(expected))
+  result
+}
+
+#' Create a batch of findings without constructing individual rows
+#' @param message Character messages, one or one per finding.
+#' @param row Physical row numbers; their length determines the number of findings.
+#' @param sheet,field Character names or `NA`, one or one per finding.
+#' @param column Physical column numbers or `NA`, one or one per finding.
+#' @param value,expected Lists of original values, one or one per finding.
+#'   Wrap a shared vector or structured expectation in `list(...)`.
+#' @return A finding data frame with the same columns as [`validation_finding()`][form.validation::validation_finding].
+#'   Empty `row` produces an empty finding table. Values and order are preserved.
+#' @examples
+#' # Display the returned values.
+#' validation_findings("Unknown code", row = c(6L, 9L), sheet = "Observations",
+#'   field = "station", column = 1L, value = list("X", "Y"), expected = list("stations"))
+#' @export
+validation_findings <- function(message, row, sheet = NA_character_, field = NA_character_,
+                                column = NA_integer_, value = list(NULL), expected = list(NULL)) {
+  n <- length(row)
+  # Recycle a finding column to the row count
+  # @param x Vector or list of length one or the target finding count.
+  # @return Unnamed values matching the finding count; other lengths raise an error.
+  recycle <- function(x) {
+    if (length(x) == n) return(unname(x))
+    if (length(x) == 1L) return(rep(x, n))
+    stop("Finding columns must have length one or length(row)", call. = FALSE)
+  }
+  if (!is.list(value) || !is.list(expected) || is.data.frame(value) || is.data.frame(expected)) {
+    stop("value and expected must be lists", call. = FALSE)
+  }
+  result <- data.frame(message = recycle(message), sheet = recycle(sheet), field = recycle(field),
+                       row = row, column = recycle(column), stringsAsFactors = FALSE)
+  result$value <- I(recycle(value))
+  result$expected <- I(recycle(expected))
+  check_findings(result)
+}
+
+#' Signal that a rule lacks information needed to finish
+#'
+#' Use inside a custom rule when its prerequisites are unavailable. The runner
+#' records incomplete execution, rather than treating unverified data as valid.
+#' Ordinary errors and warnings are recorded as failed execution instead.
+#' @param message One nonempty explanation of the missing prerequisite.
+#' @param sheet,field Optional nonempty source identifiers locating the incomplete
+#'   check. A field may identify a missing declaration, not a field in the model.
+#' @return Does not return; signals a `validation_incomplete` error condition.
+#' @examples
+#' # Display the returned values.
+#' tryCatch(validation_incomplete("Reference snapshot unavailable"),
+#'          validation_incomplete = function(e) conditionMessage(e))
+#' @export
+validation_incomplete <- function(message, sheet = NULL, field = NULL) {
+  text_value(message, "message")
+  if (!is.null(sheet)) text_value(sheet, "sheet")
+  if (!is.null(field)) text_value(field, "field")
+  stop(structure(list(message = message, call = NULL, sheet = sheet, field = field),
+                 class = c("validation_incomplete", "error", "condition")))
+}
+
+# Result display ---------------------------------------------------------
+
 #' Print a validation result summary
 #' @param x A result from [`validate_data()`][form.validation::validate_data].
 #' @param ... Additional arguments, currently ignored.
@@ -246,24 +393,4 @@ print.validation_result <- function(x, ...) {
   cat(nrow(x$findings), "findings;", sum(x$execution$status == "completed"), "completed;",
       sum(x$execution$status == "incomplete"), "incomplete;", sum(x$execution$status == "failed"), "failed\n")
   invisible(x)
-}
-
-# Internal helpers ----------------------------------------------------------
-
-#' Normalize explicit execution options
-#' @param config Named list of supported options.
-#' @return A list with both Boolean policies and a custom options list.
-#' @keywords internal
-execution_config <- function(config) {
-  named_list(config, "config")
-  result <- list(blank_strings = FALSE, allow_extra_sheets = TRUE, custom = list())
-  if (length(setdiff(names(config), names(result)))) stop("Unsupported configuration keys", call. = FALSE)
-  for (key in names(config)) result[key] <- config[key]
-  for (key in c("blank_strings", "allow_extra_sheets")) {
-    if (!is.logical(result[[key]]) || length(result[[key]]) != 1L || is.na(result[[key]])) {
-      stop(key, " must be TRUE or FALSE", call. = FALSE)
-    }
-  }
-  named_list(result$custom, "config$custom")
-  result
 }

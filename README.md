@@ -1,79 +1,71 @@
 # form.validation
 
-[![Build](https://github.com/ultreia-io/form.validation/actions/workflows/Build.yaml/badge.svg?branch=develop)](https://github.com/ultreia-io/form.validation/actions/workflows/Build.yaml?query=branch%3Adevelop)
-[![Test Coverage](https://github.com/ultreia-io/form.validation/actions/workflows/TestCoverage.yaml/badge.svg?branch=main)](https://github.com/ultreia-io/form.validation/actions/workflows/TestCoverage.yaml?query=branch%3Amain)
-[![Coverage](https://img.shields.io/badge/dynamic/xml?url=https%3A%2F%2Fultreia-io.github.io%2Fform.validation%2Fcoverage%2Fcoverage.xml&query=round%28%2Fcoverage%2F%40line-rate+%2A+1000%29+div+10&label=coverage&suffix=%25&color=brightgreen)](https://ultreia-io.github.io/form.validation/articles/coverage.html)
-[![Website](https://img.shields.io/badge/website-documentation-blue)](https://ultreia-io.github.io/form.validation/)
-[![Latest
-release](https://img.shields.io/github/v/release/ultreia-io/form.validation?display_name=tag&sort=semver)](https://github.com/ultreia-io/form.validation/releases/latest)
-[![License](https://img.shields.io/github/license/ultreia-io/form.validation)](https://github.com/ultreia-io/form.validation/blob/main/LICENSE)
+[![Build](https://img.shields.io/github/actions/workflow/status/ultreia-io/form.validation/Build.yaml?branch=develop&label=Build&logo=githubactions&logoColor=white)](https://github.com/ultreia-io/form.validation/actions/workflows/Build.yaml?query=branch%3Adevelop)
+[![Website](https://img.shields.io/badge/website-documentation-blue?logo=readthedocs&logoColor=white)](https://ultreia-io.github.io/form.validation/index.html)
+[![License](https://img.shields.io/badge/license-LGPL--2.1-blue?logo=gnu&logoColor=white)](https://github.com/ultreia-io/form.validation/blob/main/LICENSE)
 
-Validate submitted form data and produce CSV and HTML reports.
+[![Latest release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2Fultreia-io%2Fform.validation%2Freleases%2Flatest&query=%24.tag_name&label=Latest%20release&color=blue&logo=github&logoColor=white)](https://github.com/ultreia-io/form.validation/releases/latest)
+![CRAN release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcrandb.r-pkg.org%2Fform.validation&query=%24.Version&label=CRAN%20release&color=brightgreen&logo=r&logoColor=white)
 
-Requires [form.model](https://ultreia-io.github.io/form.model/)
-for checked definitions and shared field-type checks.
+[![Coverage develop](https://img.shields.io/codecov/c/github/ultreia-io/form.validation/develop?label=coverage%20develop&logo=codecov)](https://app.codecov.io/gh/ultreia-io/form.validation/tree/develop)
+[![Coverage main](https://img.shields.io/codecov/c/github/ultreia-io/form.validation/main?label=coverage%20main&logo=codecov)](https://app.codecov.io/gh/ultreia-io/form.validation/tree/main)
+
+## About this project
+
+> `form.validation` checks submitted forms against their form models and produces findings with precise locations.
+
+Read the [Terminology](https://ultreia-io.github.io/form.validation/articles/terminology.html) for the concepts used throughout this documentation.
+
+It prepares validation rules from form models and accepts explicit reference values and custom business checks.
+
+Structural checks run first. Field and business checks run only when the form structure permits them.
+
+Consumers can validate an Excel form or supply worksheet data directly, then inspect findings or produce reports.
+
+Batch operations reuse prepared validation plans and references, and reports can be rebuilt from saved results.
+
+## Related packages
+
+- [form.model](https://github.com/ultreia-io/form.model) defines forms, their layouts and constraints.
+- [form.references](https://github.com/ultreia-io/form.references) loads reference catalogues and resolves lookups.
+- [form.tools](https://github.com/ultreia-io/form.tools) writes and splits forms using their layouts and keys.
 
 ## Installation
 
-Install the latest released version with Excel support:
+The first CRAN submission is pending. Once available, install the latest version from CRAN:
 
 ``` r
-install.packages("pak") # Once
+# Install form.validation from CRAN.
+install.packages("form.validation")
+```
+
+Alternatively, install the latest GitHub release:
+
+``` r
+# Install the package installer once.
+install.packages("pak")
+# Install the latest released form.validation package.
 pak::pak("ultreia-io/form.validation@*release")
 ```
 
-`pak` installs all required dependencies automatically: `form.model`, `yaml`, `readxl` and `cellranger`.
+`pak` downloads the package and installs its dependencies automatically.
 
 For the development version:
 
 ``` r
+# Install form.validation from the development branch.
 pak::pak("ultreia-io/form.validation@develop")
 ```
 
-## Start here
+## Getting started
 
-Validate your workbook against its form definition:
+Follow the [Getting started guide](https://ultreia-io.github.io/form.validation/articles/form.validation.html) for the runnable survey example and downloadable files.
 
-``` r
-library(form.validation)
-model <- form.model::read_form_model("my-form.yaml")
-plan <- validation_plan(model)
-data <- read_validation_workbook("submission.xlsx")
-result <- validate_data(plan, data)
-result$findings
-```
+## Guides
 
-Supply reference snapshots when the model declares code lists or registries.
-
-The [Getting started
-guide](https://ultreia-io.github.io/form.validation/articles/form.validation.html)
-provides a complete survey example.
-
-## What it does
-
-- Check workbook structure before submitted values.
-- Apply field types, constraints, code-list membership and registry matching.
-- Run explicitly supplied custom checks.
-- Record findings with physical cell locations.
-- Export CSV results and HTML reports.
-- Run batches and rebuild reports without repeating validation.
-- Review aggregate findings and evidence for code lists, registries and conversion errors.
-
-Accept a submission only when `result$complete` and
-`isTRUE(result$valid)` are both true.
-
-## Learn more
-
-- [Authoring validation rules](https://ultreia-io.github.io/form.validation/articles/rules-authoring.html): generate checks and add custom rules.
-- [Validation specification](https://ultreia-io.github.io/form.validation/articles/validation-specification.html): formats, execution and references.
-- [Using validation in your package](https://ultreia-io.github.io/form.validation/articles/downstream-packages.html): integrate and run validation.
-- [Validation
-  reports](https://ultreia-io.github.io/form.validation/articles/validation-reports.html):
-  CSV and HTML output.
-- [Batch workflow](https://ultreia-io.github.io/form.validation/reference/validation_batch_plan.html): plan, validate and prepare reports for publication.
-- [Aggregate reports](https://ultreia-io.github.io/form.validation/reference/write_validation_aggregate.html): combine reports and review evidence.
-- [Function
-  reference](https://ultreia-io.github.io/form.validation/reference/index.html).
+- [Authoring validation rules](https://ultreia-io.github.io/form.validation/articles/rules-authoring.html)
+- [Validation specification](https://ultreia-io.github.io/form.validation/articles/validation-specification.html)
+- [Downstream package integration](https://ultreia-io.github.io/form.validation/articles/downstream-packages.html)
+- [Validation reports](https://ultreia-io.github.io/form.validation/articles/validation-reports.html)
+- [API reference](https://ultreia-io.github.io/form.validation/reference/index.html)
 - [Contributing](https://ultreia-io.github.io/form.validation/CONTRIBUTING.html) and [maintenance](https://ultreia-io.github.io/form.validation/DEVELOPMENT.html)
-
-LGPL-2.1. See [LICENSE](https://github.com/ultreia-io/form.validation/blob/main/LICENSE).

@@ -13,19 +13,19 @@ Use this page to understand validation files, execution order and reference matc
 
 | File                               | Purpose                        |
 | ---------------------------------- | ------------------------------ |
-| `survey-validation.yaml`            | Execution order                |
-| `survey-structure-validation.yaml`  | Sheet order and dimensions     |
-| `survey-generated-validation.yaml`  | Generated field checks         |
-| `survey-business-validation.yaml`   | Custom business checks         |
+| `validation.yaml`                  | Execution order                |
+| `structure-validation.yaml`        | Sheet order and dimensions     |
+| `generated-validation.yaml`        | Generated field checks         |
+| `business-validation.yaml`         | Custom business checks         |
 
 The process file lists the rules to run against the supplied form model:
 
 ```yaml
 rulesets:
-  structure: survey-structure-validation.yaml
+  structure: structure-validation.yaml
   content:
-  - survey-generated-validation.yaml
-  - survey-business-validation.yaml
+  - generated-validation.yaml
+  - business-validation.yaml
 ```
 
 Validation runs in this order:
@@ -33,6 +33,14 @@ Validation runs in this order:
 1. Check the form structure. Any structural error or unfinished check blocks content validation.
 2. Run generated field checks.
 3. Run business checks, even when earlier content checks found problems.
+
+### Reuse plans and references
+
+Validation plans and prepared reference snapshots can be reused across submissions with the same rules and references.
+
+Missing or malformed references affect execution only when an eligible reference check needs them.
+
+Reference checks use the shared lookup mechanism from `form.references`, regardless of the catalogue name.
 
 ## Read a rule
 
@@ -52,7 +60,7 @@ Rules report errors by default. To report a warning instead, supply `value` and 
 
 ```yaml
 rules:
-  field/Observations.station/code_list: {value: stations, severity: warning}
+  field/Observations.station/reference: {value: {id: code_lists/stations/code, matching: exact}, severity: warning}
 ```
 
 Change generated rules by editing the form model and regenerating them.
@@ -66,10 +74,9 @@ rules:
 
 Omitting `ignore_case` defaults to `true`. This changes comparison only; submitted and declared values stay unchanged.
 
-A field's `registry` declaration generates a registry check. Its value records
-the table ID, column and matching mode; the supplied column snapshot
-must contain exactly one match for each submitted value.
-Supply aliases with the registry snapshot when alternative names are accepted.
+A field's `reference` binding generates a reference check with a catalogue/table/lookup ID and matching mode.
+
+Each submitted value must match exactly one reference row. Supply aliases to accept alternative spellings.
 
 For custom R callbacks, follow [Authoring validation rules](rules-authoring.html).
 
@@ -96,6 +103,32 @@ Checks run after value preparation. Findings retain physical Excel rows and name
 The engine caches key fields and compares tuples without joining values with separators.
 
 Regenerate rules after changing a key. The loader rejects generated rules that no longer match the model.
+
+## Optional composite keys and row completeness
+
+Table sheets can declare these independent constraints:
+
+```yaml
+unique_key: [station, category]
+at_least_one: {fields: [category, count], severity: warning}
+```
+
+`unique_key` checks uniqueness only when every component is supplied and correctly typed.
+It does not make its fields mandatory. Every occurrence of a duplicate complete key is reported as an error.
+A sheet may declare both a primary key and a unique key; they are checked independently.
+Parent relationships continue to reference a parent's primary key.
+
+`at_least_one` requires a supplied value in at least one selected field on each populated row.
+A row is populated when any declared field has a supplied value after preparation.
+Entirely empty rows are skipped. Zero and false count as supplied values.
+Both constraints use the validation engine's configured missing-value policy.
+
+Both field lists must be nonempty, contain no duplicates, and name declared fields in the same table.
+`at_least_one` accepts `error`, `warning`, or `info`; omitted severity defaults to `error`.
+
+Generated rule IDs are `sheet/<sheet>/unique_key` and `sheet/<sheet>/at_least_one`.
+Their values are the ordered field lists. The latter preserves the declared severity.
+Regenerate validation files after changing either declaration.
 
 ## Sequences
 
@@ -128,47 +161,58 @@ Accept a submission only when `result$complete` and `isTRUE(result$valid)` are b
 Supply aliases when more than one spelling is explicitly accepted for a code:
 
 ```r
-references <- list(units = list(values = c("cm", "kg"), aliases = c(CM = "cm")))
+# Prepare reference values.
+reference_values <- list("code_lists/units/code" = list(values = c("cm", "kg"), aliases = c(CM = "cm")))
 ```
 
-Code-list rules ignore case by default, including aliases. Submitted and reference values remain unchanged.
+Reference rules ignore case by default, including aliases. Submitted and reference values remain unchanged.
 
 ```yaml
 rules:
-  field/Observations.unit/code_list: {value: units, ignore_case: false}
+  field/Observations.unit/reference: {value: {id: code_lists/units/code, matching: exact}, ignore_case: false}
 ```
 
 Use strict matching if case variants identify different canonical codes. Regeneration preserves this option.
 
 Each alias must point to an existing reference value. A missing reference list leaves the check unfinished.
 
-## Match registry names
+## Match reference names
 
-Registry rules ignore case by default. Use `ignore_case: false` for case-sensitive comparison:
+Reference rules ignore case by default. Use `ignore_case: false` for case-sensitive comparison:
 
 ```yaml
 rules:
-  field/Observations.observer/registry:
-    value: {id: observers, column: name, matching: exact}
+  field/Observations.observer/reference:
+    value: {id: registries/contacts/name, matching: name}
     ignore_case: false
 ```
 
-The option also controls case in aliases and name fallback. Multiple matching registry rows remain ambiguous.
+The option also controls case in aliases and name fallback. Multiple matching reference rows remain ambiguous.
 
 Enable name matching when accents or word order may differ:
 
 ```r
-index <- registry_index(c("MARTIN Emile", "Jane Smith"), matching = "name",
+# Prepare reference index.
+reference_index <- form.references::reference_index(c("MARTIN Emile", "Jane Smith"), matching = "name",
   aliases = c("J. Smith" = "Jane Smith"))
-registry_match_counts(index, c("Emile Martin", "J. Smith", "Unknown"))
+# Display the number of matching rows for each submitted value.
+lengths(form.references::reference_match_rows(reference_index, c("Emile Martin", "J. Smith", "Unknown")))
 # 1 1 0
 ```
 
-The first two values each match one registry entry; `Unknown` matches none.
+The first two values each match one reference entry; `Unknown` matches none.
 
 A successful match must identify exactly one entry. Multiple matches remain ambiguous.
 
 ## Read next
 
-- [Authoring validation rules](rules-authoring.html): generate checks and add a custom rule.
-- [Function reference](https://ultreia-io.github.io/form.validation/reference/index.html): full API contracts.
+```{r resource-links-1, echo=FALSE, results="asis"}
+# Use relative website links and installed resources in the package guide.
+if (identical(Sys.getenv("IN_PKGDOWN"), "true")) {
+  # Render links relative to the website article.
+  cat("- [Authoring validation rules](rules-authoring.html): generate checks and add a custom rule.\n- [Function reference](../reference/index.html): full API contracts.\n")
+} else {
+  # Point readers to the installed package resources.
+  cat("- [Authoring validation rules](rules-authoring.html): generate checks and add a custom rule.\n- `help(package = \"form.validation\")`: full API contracts.\n")
+}
+```

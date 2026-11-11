@@ -15,10 +15,23 @@ This example copies the bundled survey into a temporary directory:
 
 ```{r}
 library(form.validation)
-directory <- tempfile("survey-rules-")
-dir.create(directory)
-file.copy(form.model::form_resource("examples/survey-form.yaml", "form.model"), directory)
-generate_validation_rules("survey", directory, version = "1")
+# Choose a temporary location for this example.
+validation_directory <- tempfile("survey-rules-")
+# Create the example output directory.
+dir.create(validation_directory)
+# Locate the installed example resources.
+file.copy(form.model::form_resource("examples/survey/form.yaml", "form.model"), validation_directory)
+# Load the requested form model.
+form_model_definition <- form.model::read_form_model(file.path(validation_directory, "form.yaml"))
+# Read the named reference lookup settings.
+reference_configuration <- form.references::read_reference_configuration(
+  system.file("examples", "survey", "references.yaml", package = "form.references"))
+# Resolve reference lookups without changing the original form model.
+reference_resolved_form_model <- form.references::resolve_reference_lookups(form_model_definition, reference_configuration)
+# Write the prepared results to the output directory.
+write_validation_rules(reference_resolved_form_model,
+  file.path(validation_directory, "structure-validation.yaml"),
+  file.path(validation_directory, "generated-validation.yaml"), version = "1")
 ```
 
 For your own form, use its name and directory. Regenerate after changing the definition, using `overwrite = TRUE`.
@@ -28,24 +41,40 @@ For your own form, use its name and directory. Regenerate after changing the def
 The bundled business rule warns when the total observation count exceeds its configured maximum:
 
 ```{r, echo=FALSE, results='asis'}
-examples <- system.file("examples", package = "form.validation")
-cat("```yaml\n", paste(readLines(file.path(examples, "survey-business-validation.yaml")), collapse="\n"), "\n```\n", sep="")
+# Locate the installed example resources.
+example_directory <- system.file("examples", "survey", package = "form.validation")
+# Display the example content in the guide.
+cat("```yaml\n", paste(readLines(file.path(example_directory, "business-validation.yaml")), collapse="\n"), "\n```\n", sep="")
 ```
 
 Its callback returns a finding when the total is too high:
 
 ```{r, echo=FALSE, results='asis'}
-cat("```r\n", paste(readLines(file.path(examples, "business.R")), collapse="\n"), "\n```\n", sep="")
+# Display the example content in the guide.
+cat("```r\n", paste(readLines(file.path(example_directory, "business.R")), collapse="\n"), "\n```\n", sep="")
 ```
 
-Return `NULL` when the check passes. Use `validation_incomplete()` when required information is unavailable.
+Return `NULL` when the check passes. Use `signal_validation_incomplete()` when required information is unavailable.
+
+### Reuse prepared field values
+
+Inside a callback, `config$field_values("Sheet.field")` returns the field data cached for the current validation run.
+
+It includes cell coordinates, presence and type masks, and these values:
+
+- `original`: values read from the data supplied to content validation.
+- `eligible`: positions of non-missing values that match the declared field type.
+- `values`: comparison values corresponding to those eligible positions.
+
+Content rules share this cache within one run. Each new validation run creates its own cache.
 
 ## 3. Declare the process
 
 The process lists the generated files followed by your business rules:
 
 ```{r, echo=FALSE, results='asis'}
-cat("```yaml\n", paste(readLines(file.path(examples, "survey-validation.yaml")), collapse="\n"), "\n```\n", sep="")
+# Display the example content in the guide.
+cat("```yaml\n", paste(readLines(file.path(example_directory, "validation.yaml")), collapse="\n"), "\n```\n", sep="")
 ```
 
 All files must identify the same model and rules version. Regeneration preserves your business file.
@@ -56,5 +85,6 @@ All files must identify the same model and rules version. Regeneration preserves
 - [Using validation in your package](downstream-packages.html): register callbacks and execute a plan.
 
 ```{r, include=FALSE}
-unlink(directory, recursive = TRUE)
+# Remove the temporary files created by this example.
+unlink(validation_directory, recursive = TRUE)
 ```

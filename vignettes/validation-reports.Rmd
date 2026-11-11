@@ -12,9 +12,12 @@ vignette: >
 After validation, use the result and its form model to create the report:
 
 ```r
-report <- validation_report_data(result, model)
-write_validation_results(report, "report")
-write_validation_report(report, "report/index.html")
+# Prepare report.
+validation_report <- prepare_validation_report(validation_result, form_model_definition)
+# Write the prepared results to the output directory.
+write_validation_results_csv(validation_report, "report")
+# Write the prepared results to the output directory.
+write_validation_report(validation_report, "report/index.html")
 ```
 
 The `report` directory contains the HTML page, CSV downloads and supporting assets.
@@ -42,12 +45,20 @@ Publish the entire `report` directory, keeping its files and subdirectories toge
 
 To regenerate an existing report, pass `overwrite = TRUE` to both writing functions.
 
-For multiple forms, use the [batch workflow](../reference/validation_batch_plan.html)
-or [aggregate existing reports](../reference/write_validation_aggregate.html).
+```{r resource-links-1, echo=FALSE, results="asis"}
+# Use relative website links and installed resources in the package guide.
+if (identical(Sys.getenv("IN_PKGDOWN"), "true")) {
+  # Render links relative to the website article.
+  cat("For multiple forms, use the [batch workflow](../reference/write_validation_batch_plan.html)\nor [aggregate existing reports](../reference/write_validation_report_summary.html).\n")
+} else {
+  # Point readers to the installed package resources.
+  cat("For multiple forms, use the `?write_validation_batch_plan`\nor `?write_validation_report_summary`.\n")
+}
+```
 
 ## Review evidence
 
-Individual reports include cards for code-list, registry, conversion and primary-key evidence.
+Individual reports include one evidence card per reference catalogue, plus conversion and primary-key cards.
 Zero-count cards stay disabled; no empty evidence report is generated.
 
 Extra reports read their summary CSV directly for interactive tables and downloads.
@@ -59,8 +70,18 @@ The combined Evidence CSV identifies the problem and affected Excel rows.
 Duplicate occurrences count all involved rows within each form; keys shared by different
 forms are not treated as duplicates.
 
-Reference evidence uses the snapshot provenance retained in the validation result.
-For saved results without it, pass `reference_provenance` to `validation_report_data()`.
+Reference evidence uses structured findings and the lookup definitions frozen in the validation result.
+Each catalogue generates its own report without package-specific collector or template code.
+An optional catalogue `label` in `references.yaml` supplies its display name; otherwise its identifier is used.
+Reports include table, lookup, submitted value, severity, reason, snapshot hash and exact source locations.
+Cases from different snapshots remain separate, including in interactive tables.
+
+Catalogue identifiers, labels and safe report folders are saved in prepared evidence schema version 3.
+Publication manifests expose a `catalogue_reports` entry per catalogue and the total `reference_reports` count.
+Old prepared evidence must be regenerated from saved validation results before aggregation.
+Saved results without lookup metadata use the model supplied to `prepare_validation_report()`.
+Reference evidence also requires the snapshot provenance retained in the validation result.
+For saved results without it, pass `reference_provenance` to `prepare_validation_report()`.
 
 The report writes prepared evidence to `evidence.json` alongside its CSV files.
 Keep this file locally for aggregation: aggregates reuse it without extracting evidence again from findings.

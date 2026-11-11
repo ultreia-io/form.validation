@@ -4,44 +4,68 @@
 
 ## Code organization
 
-| Area          | Files                                                                                   | Responsibility                                               |
-| ------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Input         | `input-workbook.R`, `input-values.R`                                                    | Read worksheets and prepare submitted values.                |
-| Rules         | `rules.R`, `rules-read.R`, `rules-write.R`                                              | Define plans and read or generate rule YAML.                 |
-| Validation    | `validation.R`, `validation-checks.R`, `validation-findings.R`, `validation-registry.R` | Execute checks, match registry entries and collect findings. |
-| Reporting     | `report.R`                                                                              | Prepare report data and write CSV and HTML.                  |
-| Documentation | `form.validation-package.R`                                                            | Provide package-level documentation.                         |
+The files organize functions in one package namespace. You do not source each file separately.
+
+Each functional area separates its public interface from its implementation helpers:
+
+* `-api.R`: exported functions and their documentation, intended for package consumers.
+* `-internal.R`: private helpers supporting the public interface.
+
+| File                            | Responsibility                                                      |
+| ------------------------------- | ------------------------------------------------------------------- |
+| `input-api.R`                   | Read forms, prepare data and run workbook validation.               |
+| `input-internal.R`              | Convert values, extract cells and handle workbook read failures.    |
+| `rules-api.R`                   | Construct plans, read validation definitions and write rule YAML.   |
+| `rules-internal.R`              | Build rule records, check definitions and bind loaded rules.        |
+| `validation-api.R`              | Prepare references, execute plans and construct findings.           |
+| `validation-internal.R`         | Run built-in checks, cache lookups and assemble findings.           |
+| `report-api.R`                  | Prepare reports, write CSV and HTML, and aggregate results.         |
+| `report-internal.R`             | Format result tables, render templates and copy report assets.      |
+| `report-evidence-internal.R`    | Prepare and render reference, conversion and primary-key evidence.  |
+| `batch-api.R`                   | Plan batches, validate inputs, render reports and build publications. |
+| `batch-internal.R`              | Manage batch state, workers, integrity checks and navigation.       |
+| `form.validation-package.R`     | Provide package-level documentation.                                |
 
 ## Local verification
 
-Run these commands from the repository root with the development dependencies installed.
+Run from the package root with development dependencies and LaTeX installed:
 
-1. **Generate documentation and run tests:**
+```sh
+Rscript tools/check.R
+```
 
-   ```sh
-   Rscript -e 'roxygen2::roxygenise(); testthat::test_local()'
-   ```
+This generates documentation, runs tests, builds and checks the archive with `--as-cran`, then builds the website.
 
-2. **Build and check the package:**
+Local and CI checks share the CRAN mirror settings in `tools/check.Renviron`. All CRAN checks remain enabled.
 
-   ```sh
-   mkdir -p build
-   (cd build && R CMD build --no-manual ..)
-   package_version=$(Rscript -e 'cat(read.dcf("DESCRIPTION")[1, "Version"])')
-   R CMD check --no-manual --output=build "build/form.validation_${package_version}.tar.gz"
-   ```
+The **Build** workflow measures coverage with `covr` on Linux after successful checks and uploads it to Codecov.
 
-3. **Build the documentation website:**
+The README coverage badges link to the Codecov report.
 
-   ```sh
-   Rscript tools/build-site.R
-   ```
+Archives and check output stay in `build/`.
 
-## Release
+`roxygen2`, `rcmdcheck`, and `pkgload` are development tools, not runtime dependencies.
+
+Review coverage gaps for missing behaviour. Check installed resources, runnable examples, and website navigation.
+
+## Website
+
+Run from the package root with website dependencies installed:
+
+``` r
+# Prepare example downloads and the licence from their source files.
+source("tools/prepare-site-assets.R")
+# Build the website with pkgdown.
+pkgdown::build_site()
+```
+
+Generated copies in `pkgdown/assets/` are replaced before building. Example sources remain in `inst/examples/`.
+
+## GitHub Release
 
 1. **Prepare the release on `develop`:**
 
-   1. **Prepare the release files:** update the version in `DESCRIPTION`, finalize `NEWS.md` and documentation.
+   1. **Prepare the release files:** update the version in `DESCRIPTION`, finalize `NEWS.md`, `cran-comments.md` and documentation.
    2. **Perform the [local checks](#local-verification).**
    3. **Commit the changes:** use `[form.validation] Release <version>`.
    4. **Push the release commit.**
@@ -56,21 +80,36 @@ Run these commands from the repository root with the development dependencies in
 
    1. **Wait for the checks:** all checks on the release PR must be green.
    2. **Merge:** click **Merge pull request**, then **Confirm merge**.
+   3. Merging automatically starts the **Publish Release** workflow.
 
-**Publish Release** publishes the package, checksum and documentation automatically.
+The **Publish Release** workflow:
 
-## Execution
+1. Publishes the package archive, checksum and documentation.
+2. **Submits the same archive to CRAN**.
 
-Structural checks run first and block content checks when they fail or cannot finish.
+## Manual CRAN submission
 
-Content checks reuse each field's extracted values, coordinates, and missing/type masks within one validation run.
+Use this fallback only if the release has not already been submitted by CI.
 
-Callbacks can access these through `config$field_values("Sheet.field")`.
+Start from a clean working tree. Replace `version` with the release version to submit.
 
-`original` retains submitted values; `eligible` identifies typed, filled cells; `values` holds comparison values.
+```sh
+# Fetch the published release tags.
+git fetch origin --tags
+# Check out the release tag.
+git switch --detach version
+```
 
-Plans and prepared reference snapshots can be reused across submissions. Field caches are specific to each run.
+Run these commands in R from the package root, with `devtools` installed.
 
-Use `prepare_validation_references()` for code lists and `registry_index()` for registries.
+```r
+# Build and run R CMD check --as-cran, including the PDF manual and incoming checks.
+devtools::check(args = "--as-cran", manual = TRUE, remote = TRUE, error_on = "warning")
 
-Only references needed by executed rules can cause incomplete or failed validation.
+# After resolving errors and warnings and reviewing NOTES, submit the release to CRAN.
+devtools::submit_cran()
+```
+
+This manual route rebuilds from the release tag. CI submits the existing GitHub archive unchanged.
+
+Confirm CRAN's email, then wait for its checks and response.

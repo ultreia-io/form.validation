@@ -1,0 +1,33 @@
+---
+title: "Terminology"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Terminology}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Main concepts
+
+| Term         | Meaning                                                                      |
+| ------------ | ---------------------------------------------------------------------------- |
+| Form         | An Excel workbook used to collect data.                                      |
+| Form model   | A versioned definition of a form’s sheets, fields, layout and constraints.   |
+| Consumer     | A package, tool or application that uses the package’s operations.           |
+
+## Validation
+
+| Term                 | Meaning                                                                           |
+| -------------------- | --------------------------------------------------------------------------------- |
+| Submission           | The form or worksheet data supplied for validation.                               |
+| Validation rule      | A check of structure, field values or a business requirement.                     |
+| Validation plan      | An ordered set of rules prepared for a particular form model.                     |
+| Validation process   | A YAML file that selects and orders the rule files to execute.                    |
+| Validation stage     | A group of structural, field or business checks in the validation process.        |
+| Finding              | A reported issue with its severity and location in the submitted form.            |
+| Severity             | The level assigned to a finding: error, warning or information.                   |
+| Validation result    | The findings and execution status returned after running a validation plan.       |
+| Complete result      | A result in which all applicable checks finished successfully.                    |
+| Valid result         | A complete result containing no error findings.                                   |
+| Validation batch     | A collection of submissions validated with selected plans and references.         |
+| Evidence report      | A report grouping findings with the values and locations needed to review them.   |

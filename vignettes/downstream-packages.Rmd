@@ -20,6 +20,7 @@ Store the survey files and callback in these locations:
 ```text
 inst/forms/
   survey-form.yaml
+  references.yaml
   survey-validation.yaml
   survey-structure-validation.yaml
   survey-generated-validation.yaml
@@ -28,58 +29,56 @@ R/
   checks.R
 ```
 
-## 2. Load the validation plan
+## 2. Load the form model and references
 
-Replace `your.package` with your package name. Register the callback defined in `R/checks.R`:
+Replace `your.package` with your package name and configure catalogue sources and lookups together in `references.yaml`.
 
 ```r
-directory <- system.file("forms", package = "your.package")
-plan <- form.validation::load_validation_plan(
-  "survey", directory,
-  checks = list(total_count = total_count)
-)
+# Locate the installed form definitions and validation files.
+validation_directory <- system.file("forms", package = "your.package")
+# Load the survey form model.
+form_model_definition <- form.model::load_form_model("survey", validation_directory)
+# Read the lookup settings shipped with the consumer package.
+reference_configuration <- form.references::read_reference_configuration(
+  file.path(validation_directory, "references.yaml"))
+# Retrieve the tables required by the form model using the deployment source configuration.
+reference_preparation <- form.references::prepare_model_references(
+  form_model_definition, reference_configuration)
+```
+
+Preparation retains catalogue file paths and checksums for evidence reports.
+
+## 3. Load the validation plan
+
+Register the callback defined in `R/checks.R`:
+
+```r
+# Prepare validation from the resolved form model, leaving the original definition unchanged.
+validation_plan <- form.validation::read_validation_plan(
+  file.path(validation_directory, "survey-validation.yaml"), reference_preparation$model,
+  checks = list(total_count = total_count))
 ```
 
 You can reuse this plan for submissions using the same form and rules.
 
-## 3. Load the required references
-
-Use the verified survey catalogues here. Replace `source_directory` with your
-own reference URL or directory when adapting the example.
-
-```r
-source_directory <- system.file("examples", package = "form.references")
-cache <- file.path(tempdir(), "survey-references")
-code_list_source <- form.references::reference_source(source_directory, cache)
-registry_source <- form.references::reference_source(
-  source_directory, cache, catalogue = "registries"
-)
-code_lists <- form.references::get_form_code_lists(plan$model, code_list_source)
-registries <- form.references::get_form_registries(plan$model, registry_source)
-references <- form.validation::prepare_validation_references(list(
-  observers = list(values = code_lists$data$observers$code),
-  stations = list(values = code_lists$data$stations$code),
-  "contacts.email" = list(values = registries$data$contacts$email)
-))
-```
-
-The [Getting started guide](form.validation.html) also shows how to retain
-catalogue checksums for code-list and registry evidence reports.
-
 ## 4. Validate a submission
 
 ```r
-data <- form.validation::read_validation_workbook("submission.xlsx")
-result <- form.validation::validate_data(
-  plan, data, references, source = "submission.xlsx"
+# Read the submitted form while preserving Excel cell positions.
+submission_data <- form.validation::read_workbook_data("submission.xlsx")
+# Execute validation using the prepared rules and reference values.
+validation_result <- form.validation::validate_data(
+  validation_plan, submission_data, reference_preparation$references, source = "submission.xlsx"
 )
 ```
 
 Inspect the findings and check whether the submission passed:
 
 ```r
-result$findings
-accepted <- result$complete && isTRUE(result$valid)
+# Display the validation findings.
+validation_result$findings
+# Accept only a completed validation with no errors.
+validation_accepted <- validation_result$complete && isTRUE(validation_result$valid)
 ```
 
 Use the [report guide](validation-reports.html) to generate HTML and CSV output from this result.
@@ -89,10 +88,11 @@ Use the [report guide](validation-reports.html) to generate HTML and CSV output 
 If your application accepts values such as numeric text or textual booleans, use this validation call instead:
 
 ```r
-result <- form.validation::validate_data(
-  plan, data, references, source = "submission.xlsx",
+# Execute validation using the prepared rules and reference values.
+validation_result <- form.validation::validate_data(
+  validation_plan, data, reference_values, source = "submission.xlsx",
   prepare_data = function(data) {
-    form.validation::prepare_validation_data(data, plan$model)
+    form.validation::prepare_validation_data(data, validation_plan$model)
   }
 )
 ```
@@ -101,4 +101,13 @@ Preparation runs after structural checks pass and uses the types declared in the
 
 Supported values are converted; invalid values remain available for validation to report.
 
-See [value preparation](../reference/prepare_validation_data.html) for accepted formats and missing-value options.
+```{r resource-links-1, echo=FALSE, results="asis"}
+# Use relative website links and installed resources in the package guide.
+if (identical(Sys.getenv("IN_PKGDOWN"), "true")) {
+  # Render links relative to the website article.
+  cat("See [value preparation](../reference/prepare_validation_data.html) for accepted formats and missing-value options.\n")
+} else {
+  # Point readers to the installed package resources.
+  cat("See `?prepare_validation_data` for accepted formats and missing-value options.\n")
+}
+```

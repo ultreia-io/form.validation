@@ -7,73 +7,75 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+Read the [Terminology](terminology.html) for the concepts used in this guide.
+
+
 ```{r setup, include=FALSE}
+# Configure the display of code output.
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 library(form.validation)
 ```
 
-## About this example
+## About this guide
 
-This guide demonstrates the bundled survey example, using its form definition, validation rules and sample data.
+This guide demonstrates the bundled survey example, using its form model, validation rules and sample data.
 
 You will load the rules, validate sample data, inspect findings, and export CSV and HTML reports.
 
-`form.model` supplies the survey definition, `form.references` supplies verified reference data,
-and `form.validation` supplies the validation rules.
-
-## Load the validation plan
-
-Load the form, register the business callback, and read the process that lists the rules to execute.
+## Load the form model
 
 ```{r}
-model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-directory <- system.file("examples", package = "form.validation")
-callbacks <- new.env(parent = baseenv())
-sys.source(file.path(directory, "business.R"), callbacks)
-plan <- read_validation_process(
-  file.path(directory, "survey-validation.yaml"), model,
-  checks = list(total_count = callbacks$total_count)
-)
+# Load the survey form model with its named reference bindings.
+form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+```
+
+## Prepare the references
+
+```{r}
+# Read the catalogue sources and lookup settings for the survey references.
+reference_configuration <- form.references::read_reference_configuration(
+  system.file("examples", "survey", "references.yaml", package = "form.references"))
+# Retrieve the reference tables selected by the form model using the configured sources.
+reference_preparation <- form.references::prepare_model_references(
+  form_model_definition, reference_configuration)
+# Retain the reference values for the validation examples below.
+reference_values <- reference_preparation$references
+```
+
+## Prepare the validation plan
+
+```{r}
+# Locate the survey validation process, rule files and business callback.
+validation_directory <- system.file("examples", "survey", package = "form.validation")
+# Create an environment for the example business callback.
+validation_callbacks <- new.env(parent = baseenv())
+# Load the business callback used by the validation process.
+sys.source(file.path(validation_directory, "business.R"), validation_callbacks)
+# Prepare validation using the resolved form model; the original definition remains unchanged.
+validation_rule_plan <- read_validation_plan(
+  file.path(validation_directory, "validation.yaml"), reference_preparation$model,
+  checks = list(total_count = validation_callbacks$total_count))
 ```
 
 Structure checks run first. Content checks run only when structure passes.
 
-For your own form, use `write_validation_rules()` to generate its structure and field rules.
+## Validate the bundled form
 
-Keep handwritten business rules separate; regeneration preserves them.
-
-## Load verified references
-
-The survey model declares two code lists and one registry. Load only those tables
-from the installed `form.references` example; the same calls accept an HTTP source.
+The same catalogues cover the populated form supplied by `form.model`.
 
 ```{r}
-reference_directory <- system.file("examples", package = "form.references")
-cache <- tempfile("survey-references-")
-code_list_source <- form.references::reference_source(reference_directory, cache)
-registry_source <- form.references::reference_source(
-  reference_directory, cache, catalogue = "registries"
+# Execute validation using the prepared rules and reference values.
+validation_workbook_result <- validate_workbook(
+  form.model::form_resource("examples/survey/form.xlsx", "form.model"),
+  validation_rule_plan, reference_values, log = function(...) NULL
 )
-code_lists <- form.references::get_form_code_lists(model, code_list_source)
-registries <- form.references::get_form_registries(model, registry_source)
-references <- prepare_validation_references(list(
-  observers = list(values = code_lists$data$observers$code),
-  stations = list(values = code_lists$data$stations$code),
-  "contacts.email" = list(values = registries$data$contacts$email)
-))
+# Inspect the validation execution status.
+validation_workbook_result$status
+# Display the validation findings.
+validation_workbook_result$findings[grepl("/reference$", validation_workbook_result$findings$rule_id), ]
 ```
 
-Keep the verified CSV hashes with the snapshots so evidence reports can identify
-the exact reference files used for validation.
-
-```{r}
-catalogue_hash <- function(loaded, id) loaded$catalogue$sha256[[match(id, loaded$catalogue$id)]]
-attr(references, "provenance") <- list(
-  observers = list(status = "available", sha256 = catalogue_hash(code_lists, "observers")),
-  stations = list(status = "available", sha256 = catalogue_hash(code_lists, "stations")),
-  "contacts.email" = list(status = "available", sha256 = catalogue_hash(registries, "contacts"))
-)
-```
+Reference values match. The workbook remains intentionally invalid because it contains blank internal rows.
 
 ## Supply data
 
@@ -82,24 +84,31 @@ Provide named worksheet grids with physical row and column positions intact.
 List matrices preserve mixed cell types, including header text above numeric values.
 
 ```{r}
-metadata <- matrix(list(NULL), nrow = 5, ncol = 3)
-metadata[2:4, 3] <- list("001", "2026-10-03", "alice@example.org")
-observations <- matrix(list(NULL), nrow = 7, ncol = 11)
-observations[5, ] <- as.list(c(
+# Allocate the metadata grid with its physical Excel dimensions.
+submission_metadata <- matrix(list(NULL), nrow = 5, ncol = 3)
+# Fill the identifier, date and contact cells.
+submission_metadata[2:4, 3] <- list("001", "2026-10-03", "alice@example.org")
+# Allocate the observations grid with its physical Excel dimensions.
+submission_observations <- matrix(list(NULL), nrow = 7, ncol = 11)
+# Write the observation column headers on row 5.
+submission_observations[5, ] <- as.list(c(
   "STATION", "COUNT", "LENGTH", "UNIT", "ACTIVE", "OBSERVED_AT",
   "LATITUDE", "LONGITUDE", "OBSERVATION_ID", "QUALITY", "OBSERVER"
 ))
-observations[6, ] <- list(
+# Add the first observation on row 6.
+submission_observations[6, ] <- list(
   "001", 2, 12.5, "cm", TRUE, "2026-10-03T12:00:00Z",
   -20.5, 55.5, "OBS-001", 1L, "ALICE"
 )
-observations[7, ] <- list(
+# Add the second observation on row 7.
+submission_observations[7, ] <- list(
   "002", 3, NA_real_, NA_character_, FALSE, "2026-10-03T13:00:00Z",
   -21, 56, "OBS-002", 2L, "ALICE"
 )
-data <- list(
-  Metadata = metadata,
-  Observations = observations,
+# Prepare submission data.
+submission_data <- list(
+  Metadata = submission_metadata,
+  Observations = submission_observations,
   Samples = matrix(list(NULL), nrow = 5, ncol = 6),
   Measurements = matrix(list(NULL), nrow = 5, ncol = 5),
   Equipment = matrix(list(NULL), nrow = 5, ncol = 3)
@@ -108,25 +117,32 @@ data <- list(
 
 The loader downloads and verifies references. The validation engine receives their values explicitly.
 
-For Excel files, `read_validation_workbook()` reads grids while preserving cell types and positions.
+For Excel files, `read_workbook_data()` reads grids while preserving cell types and positions.
 
 ## Validate and inspect findings
 
 ```{r}
-result <- validate_data(plan, data, references, source = "submission.xlsx")
-result$status
-result$complete
-result$valid
+# Execute validation using the prepared rules and reference values.
+validation_result <- validate_data(validation_rule_plan, submission_data, reference_values, source = "submission.xlsx")
+# Inspect the validation execution status.
+validation_result$status
+# Display the returned values.
+validation_result$complete
+# Display the returned values.
+validation_result$valid
 ```
 
-Before accepting a submission, require `result$complete` and `isTRUE(result$valid)`.
+Before accepting a submission, require `validation_result$complete` and `isTRUE(validation_result$valid)`.
 
 Now submit a negative count and inspect the resulting finding:
 
 ```{r}
-data$Observations[6, 2] <- list(-1)
-result <- validate_data(plan, data, references, source = "submission.xlsx")
-result$findings[c("sheet", "field", "row", "column", "message")]
+# Introduce a negative count to demonstrate a validation finding.
+submission_data$Observations[6, 2] <- list(-1)
+# Execute validation using the prepared rules and reference values.
+validation_result <- validate_data(validation_rule_plan, submission_data, reference_values, source = "submission.xlsx")
+# Display the validation findings.
+validation_result$findings[c("sheet", "field", "row", "column", "message")]
 ```
 
 Findings identify the rule, severity, physical location, submitted value, and expected value.
@@ -138,31 +154,54 @@ Missing prerequisites make validation incomplete. Check `result$execution` when 
 Prepare report data once, then write the CSV files and HTML page into one directory.
 
 ```{r}
+# Choose a temporary location for this example.
 output <- tempfile("survey-report-")
-report <- validation_report_data(result, model)
-write_validation_results(report, output)
-write_validation_report(report, file.path(output, "report.html"))
+# Prepare report.
+validation_report <- prepare_validation_report(validation_result, form_model_definition)
+# Write the prepared results to the output directory.
+write_validation_results_csv(validation_report, output)
+# Write the prepared results to the output directory.
+write_validation_report(validation_report, file.path(output, "report.html"))
 ```
 
 `summary.csv` records status and counts. `findings.csv` records problems and their locations.
 
-Both files include metadata used by the HTML report, such as stages, sheet order, and field labels.
+Both files include submission_metadata used by the HTML report, such as stages, sheet order, and field labels.
 
 Serve the directory over HTTP. The HTML loads its CSV files and local `report-assets`; keep them together.
 
 Use `assets_directory` to share assets across reports. Optional `stylesheet` and `logo` paths customize presentation.
 
-See `?validate_data`, `?write_validation_results`, and `?write_validation_report` for the full contracts.
+See `?validate_data`, `?write_validation_results_csv`, and `?write_validation_report` for the full contracts.
 
 ```{r cleanup, include=FALSE}
+# Remove the temporary files created by this example.
 unlink(output, recursive = TRUE)
-unlink(cache, recursive = TRUE)
+# Remove the temporary files created by this example.
 ```
 
 ## Read next
 
-- [Authoring validation rules](rules-authoring.html): generate checks and add custom rules.
-- [Validation specification](validation-specification.html): formats, execution and references.
-- [Using validation in your package](downstream-packages.html): integrate and run validation.
-- [Validation reports](validation-reports.html): export and publish CSV and HTML reports.
-- [Function reference](https://ultreia-io.github.io/form.validation/reference/index.html): API details.
+```{r resource-links-1, echo=FALSE, results="asis"}
+# Use relative website links and installed resources in the package guide.
+if (identical(Sys.getenv("IN_PKGDOWN"), "true")) {
+  # Render links relative to the website article.
+  cat("- [Authoring validation rules](rules-authoring.html): generate checks and add custom rules.\n- [Validation specification](validation-specification.html): formats, execution and references.\n- [Using validation in your package](downstream-packages.html): integrate and run validation.\n- [Validation reports](validation-reports.html): export and publish CSV and HTML reports.\n- [Function reference](../reference/index.html): API details.\n")
+} else {
+  # Point readers to the installed package resources.
+  cat("- [Authoring validation rules](rules-authoring.html): generate checks and add custom rules.\n- [Validation specification](validation-specification.html): formats, execution and references.\n- [Using validation in your package](downstream-packages.html): integrate and run validation.\n- [Validation reports](validation-reports.html): export and publish CSV and HTML reports.\n- `help(package = \"form.validation\")`: API details.\n")
+}
+```
+
+## Download the example files
+
+```{r resource-links-2, echo=FALSE, results="asis"}
+# Use relative website links and installed resources in the package guide.
+if (identical(Sys.getenv("IN_PKGDOWN"), "true")) {
+  # Render links relative to the website article.
+  cat("- [Form model \u2014 form.yaml](../examples/survey/form.yaml)\n- [Populated form \u2014 form.xlsx](../examples/survey/form.xlsx)\n- [Empty form \u2014 form-empty.xlsx](../examples/survey/form-empty.xlsx)\n- [Validation process](../examples/survey/validation.yaml)\n- [Structure rules](../examples/survey/structure-validation.yaml)\n- [Field rules](../examples/survey/generated-validation.yaml)\n- [Business rules](../examples/survey/business-validation.yaml)\n- [Business callback](../examples/survey/business.R)\n")
+} else {
+  # Point readers to the installed package resources.
+  cat("Find the validation files with `system.file(\"examples\", \"survey\", package = \"form.validation\")` and the form files with `system.file(\"examples\", \"survey\", package = \"form.model\")`.\n")
+}
+```

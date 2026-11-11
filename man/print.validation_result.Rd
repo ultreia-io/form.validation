@@ -18,6 +18,14 @@
 Print a validation result summary
 }
 \examples{
-model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-print(validate_data(validation_plan(model), list()))
+# Load the requested form model.
+form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+# Read the named reference lookup settings.
+reference_configuration <- form.references::read_reference_configuration(
+  system.file("examples", "survey", "references.yaml", package = "form.references"))
+# Resolve reference lookups without changing the original form model.
+reference_resolved_form_model <- form.references::resolve_reference_lookups(
+  form_model_definition, reference_configuration)
+# Prepare the validation rules and their execution order.
+print(validate_data(validation_plan(reference_resolved_form_model), list()))
 }

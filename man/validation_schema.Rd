@@ -17,5 +17,6 @@ Return the installed contract for structure, generated field, and business
 validation files.
 }
 \examples{
+# Display the returned values.
 validation_schema()$stages
 }

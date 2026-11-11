@@ -21,6 +21,7 @@ records incomplete execution, rather than treating unverified data as valid.
 Ordinary errors and warnings are recorded as failed execution instead.
 }
 \examples{
+# Display the returned values.
 tryCatch(validation_incomplete("Reference snapshot unavailable"),
          validation_incomplete = function(e) conditionMessage(e))
 }

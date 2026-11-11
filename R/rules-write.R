@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Generate rules for a named model
 #' @param name Prefix of `<name>-form.yaml`.
 #' @param directory Directory containing the model.
@@ -5,9 +7,12 @@
 #' @param overwrite Replace existing generated files; defaults to `FALSE`.
 #' @return Structure and generated field-rule paths, invisibly. Business files are untouched.
 #' @seealso [`write_validation_rules()`][form.validation::write_validation_rules], [`load_validation_plan()`][form.validation::load_validation_plan]
+#' @param lookup_configuration Optional reference lookup definitions, resolved before generation.
 #' @export
-generate_validation_rules <- function(name, directory, version = "1.0.0", overwrite = FALSE) {
+generate_validation_rules <- function(name, directory, version = "1.0.0", overwrite = FALSE, lookup_configuration = NULL) {
   model <- form.model::load_form_model(name, directory)
+  if (!is.null(lookup_configuration))
+    model <- form.references::resolve_reference_lookups(model, lookup_configuration)
   paths <- file.path(directory, paste0(name, c("-structure-validation.yaml", "-generated-validation.yaml")))
   write_validation_rules(model, paths[[1L]], paths[[2L]], version, overwrite)
 }
@@ -21,7 +26,7 @@ generate_validation_rules <- function(name, directory, version = "1.0.0", overwr
 #' @return Both paths, invisibly.
 #' @details Preserves custom structural rules. Field rules use compact YAML;
 #'   edit the form and regenerate when its definition changes.
-#'   Explicit enum, code-list and registry `ignore_case` options are preserved when regenerating field rules.
+#'   Explicit enum and reference `ignore_case` options are preserved when regenerating field rules.
 #' @seealso [`generate_validation_rules()`][form.validation::generate_validation_rules], [`read_validation_rules()`][form.validation::read_validation_rules]
 #' @export
 write_validation_rules <- function(model, structure_path, generated_path,
@@ -66,7 +71,7 @@ write_validation_rules <- function(model, structure_path, generated_path,
   lines <- vapply(names(rules), function(id) {
     rule <- rules[[id]]
     value <- flow_rule_value(rule$value)
-    ignore_case <- if (grepl("/(enum|code_list|registry)$", id)) case_options[[id]] else NULL
+    ignore_case <- if (grepl("/(enum|reference)$", id)) case_options[[id]] else NULL
     if (!is.null(rule$severity) || !is.null(names(rule$value)) || !is.null(ignore_case)) {
       value <- paste0("{value: ", value,
         if (!is.null(rule$severity)) paste0(", severity: ", rule$severity),
@@ -79,6 +84,8 @@ write_validation_rules <- function(model, structure_path, generated_path,
              generated_path, useBytes = TRUE)
   invisible(paths)
 }
+
+# Internal helpers ----------------------------------------------------------
 
 #' Serialize a generated parameter as a single-line YAML value
 #' @param value Scalar or sequence of scalars from the checked form.

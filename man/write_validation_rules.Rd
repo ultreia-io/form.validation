@@ -32,7 +32,7 @@ Write model-derived validation files
 \details{
 Preserves custom structural rules. Field rules use compact YAML;
 edit the form and regenerate when its definition changes.
-Explicit enum, code-list and registry \code{ignore_case} options are preserved when regenerating field rules.
+Explicit enum and reference \code{ignore_case} options are preserved when regenerating field rules.
 }
 \seealso{
 \code{\link[=generate_validation_rules]{generate_validation_rules()}}, \code{\link[=read_validation_rules]{read_validation_rules()}}

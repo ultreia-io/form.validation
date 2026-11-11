@@ -28,7 +28,7 @@ Optional \code{aliases} map alternate codes to canonical \code{values}; both are
 Alias targets must exist in \code{values}; submitted values are not rewritten.
 Missing snapshots make affected rules incomplete; malformed snapshot values
 make them fail execution. Use \code{\link[=prepare_validation_references]{prepare_validation_references()}} to reuse
-checked code-list keys across submissions.}
+checked reference keys across submissions.}
 
 \item{source}{One diagnostic label identifying the input file or submission.}
 
@@ -100,22 +100,40 @@ records rather than being confused with submitted-data validation failures.
 }
 
 \examples{
-model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-plan <- validation_plan(model)
-data <- list(Metadata = matrix(vector("list", 15), 5, 3),
+# Load the requested form model.
+form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+# Read the named reference lookup settings.
+reference_configuration <- form.references::read_reference_configuration(
+  system.file("examples", "survey", "references.yaml", package = "form.references"))
+# Resolve reference lookups without changing the original form model.
+reference_resolved_form_model <- form.references::resolve_reference_lookups(
+  form_model_definition, reference_configuration)
+# Prepare the validation rules and their execution order.
+validation_plan <- validation_plan(reference_resolved_form_model)
+# Prepare submission data.
+submission_data <- list(Metadata = matrix(vector("list", 15), 5, 3),
              Observations = matrix(vector("list", 66), 6, 11))
-data$Metadata[[2, 3]] <- "001"
-data$Metadata[[3, 3]] <- "2026-10-03"
-data$Observations[5, ] <- as.list(c(
+# Set the submission identifier in its declared cell.
+submission_data$Metadata[[2, 3]] <- "001"
+# Set the submission date in its declared cell.
+submission_data$Metadata[[3, 3]] <- "2026-10-03"
+# Populate the observation header row.
+submission_data$Observations[5, ] <- as.list(c(
   "STATION", "COUNT", "LENGTH", "UNIT", "ACTIVE", "OBSERVED_AT", "LATITUDE",
   "LONGITUDE", "OBSERVATION_ID", "QUALITY", "OBSERVER"))
-data$Observations[6, ] <- list(
+# Populate one observation record.
+submission_data$Observations[6, ] <- list(
   "001", 2L, NULL, NULL, TRUE, "2026-10-03T12:00:00Z",
   -20.5, 55.5, "OBS-001", 1L, "ALICE")
-refs <- list(
-  observers = list(values = "ALICE"),
-  stations = list(values = c("001", "002"), version = "1"))
-result <- validate_data(plan, data, refs, source = "sample.xlsx")
-result
-result$findings
+# Prepare refs.
+reference_values <- list(
+  "code_lists/observers/code" = list(values = "ALICE"),
+  "code_lists/stations/code" = list(values = c("001", "002"), version = "1"))
+# Execute validation using the prepared rules and reference values.
+validation_result <- validate_data(
+  validation_plan, submission_data, reference_values, source = "sample.xlsx")
+# Display the returned values.
+validation_result
+# Display the validation findings.
+validation_result$findings
 }

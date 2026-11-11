@@ -36,6 +36,7 @@ source label; callbacks cannot override those fields. Combine findings with
 \code{rbind()}, or return \code{NULL} when a rule finds no problem.
 }
 \examples{
+# Display the returned values.
 validation_finding("Count exceeds capacity", sheet = "Observations",
                    field = "count", row = 2, column = 3,
                    value = 12L, expected = 10L)

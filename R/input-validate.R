@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Read and validate a workbook without generating reports
 #' @param path Input workbook path, left unchanged.
 #' @param plan A rule plan from [`validation_plan()`][form.validation::validation_plan] or [`read_validation_rules()`][form.validation::read_validation_rules].
@@ -49,6 +51,8 @@ validate_workbook <- function(path, plan, references = list(), source = path, co
   }
   result
 }
+
+# Internal helpers ----------------------------------------------------------
 
 #' Represent an unreadable input without executing its validation rules
 #' @param plan Validation plan whose rules are recorded as skipped.

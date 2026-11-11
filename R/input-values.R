@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Explicitly prepare field values using declared form types
 #'
 #' Optional value conversion for callers that accept textual representations of
@@ -70,6 +72,8 @@ prepare_validation_data <- function(data, model, na_strings = character(), na_ig
   }
   data
 }
+
+# Internal helpers ----------------------------------------------------------
 
 #' Coerce one scalar using an explicit declared-type policy
 #' @param value Submitted cell value.

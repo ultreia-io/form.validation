@@ -34,6 +34,7 @@ Empty \code{row} produces an empty finding table. Values and order are preserved
 Create a batch of findings without constructing individual rows
 }
 \examples{
+# Display the returned values.
 validation_findings("Unknown code", row = c(6L, 9L), sheet = "Observations",
   field = "station", column = 1L, value = list("X", "Y"), expected = list("stations"))
 }

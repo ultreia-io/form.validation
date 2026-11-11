@@ -2,7 +2,7 @@
 % Please edit documentation in R/validation-checks.R
 \name{run_primary_key}
 \alias{run_primary_key}
-\title{Execute an explicit primary-key rule}
+\title{Execute an explicit primary-key or unique-key rule}
 \usage{
 run_primary_key(rule, context)
 }
@@ -15,11 +15,12 @@ run_primary_key(rule, context)
 One finding per affected physical row, or an empty finding table.
 }
 \description{
-Execute an explicit primary-key rule
+Execute an explicit primary-key or unique-key rule
 }
 \details{
 Presence uses the configured missing-value policy. Uniqueness compares
 complete, correctly typed keys using length-prefixed component encoding.
-The cached lookup is shared with later parent-key checks. Every duplicate row is reported.
+Primary-key lookups are shared with later parent-key checks. Unique keys use
+a separate cache and never require missing components. Every duplicate row is reported.
 }
 \keyword{internal}

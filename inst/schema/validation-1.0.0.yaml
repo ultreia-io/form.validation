@@ -29,11 +29,9 @@ stages:
     optional_rule_values: [severity]
     enum_optional_rule_values: [ignore_case]
     enum_ignore_case_type: boolean
-    code_list_optional_rule_values: [ignore_case]
-    code_list_ignore_case_type: boolean
-    registry_optional_rule_values: [ignore_case]
-    registry_ignore_case_type: boolean
-    checks: [row_count, empty_rows, primary_key_present, primary_key_unique, mandatory, required_field, type, code_list, registry, enum, minimum, maximum, pattern, unique]
+    reference_optional_rule_values: [ignore_case]
+    reference_ignore_case_type: boolean
+    checks: [row_count, empty_rows, primary_key_present, primary_key_unique, unique_key, at_least_one, mandatory, required_field, type, reference, enum, minimum, maximum, pattern, unique]
   business:
     keys: [schema_version, rules_version, model, stage, rules]
     rule_id: <namespace>/[<field>/]<callback>
@@ -44,5 +42,4 @@ defaults:
   severity: error
   description: rule_id
   enum_ignore_case: true
-  code_list_ignore_case: true
-  registry_ignore_case: true
+  reference_ignore_case: true

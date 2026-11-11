@@ -26,12 +26,14 @@ sheet and field checks. Append explicit custom rules without modifying the model
 \details{
 Supported declarations include declared sheets, sheet order,
 row/column counts, table start rows, mandatory fields,
-all nine field types, enums, bounds, patterns, uniqueness, code-list membership,
-registry matching,
+all nine field types, enums, bounds, patterns, uniqueness, reference matching,
 and same-sheet conditional requiredness. Generated content rules also include
 table row counts (info) and internal empty-row checks (warning).
 Sequence declarations generate consecutive numbering checks in worksheet order, within each group.
 Declared primary keys generate presence and composite uniqueness rules (error).
+Unique keys generate uniqueness checks for complete, correctly typed tuples only.
+\code{at_least_one} checks populated rows for a supplied selected value, using its
+declared severity or error by default. Zero and false are supplied values.
 
 Uniqueness applies only to table fields. Unsupported schema versions, types, layouts, or constraints
 are explicit generation errors; they are never silently discarded.
@@ -43,7 +45,16 @@ duplicate rule IDs, and unsupported declarations raise generation errors.
 }
 
 \examples{
-model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-plan <- validation_plan(model)
-vapply(plan$rules, function(rule) rule$id, character(1))
+# Load the requested form model.
+form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+# Read the named reference lookup settings.
+reference_configuration <- form.references::read_reference_configuration(
+  system.file("examples", "survey", "references.yaml", package = "form.references"))
+# Resolve reference lookups without changing the original form model.
+reference_resolved_form_model <- form.references::resolve_reference_lookups(
+  form_model_definition, reference_configuration)
+# Prepare the validation rules and their execution order.
+validation_plan <- validation_plan(reference_resolved_form_model)
+# Display the returned values.
+vapply(validation_plan$rules, function(rule) rule$id, character(1))
 }

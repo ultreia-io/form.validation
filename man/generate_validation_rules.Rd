@@ -8,7 +8,8 @@ generate_validation_rules(
   name,
   directory,
   version = "1.0.0",
-  overwrite = FALSE
+  overwrite = FALSE,
+  lookup_configuration = NULL
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ generate_validation_rules(
 \item{version}{Version shared by all validation files.}
 
 \item{overwrite}{Replace existing generated files; defaults to \code{FALSE}.}
+
+\item{lookup_configuration}{Optional reference lookup definitions, resolved before generation.}
 }
 \value{
 Structure and generated field-rule paths, invisibly. Business files are untouched.

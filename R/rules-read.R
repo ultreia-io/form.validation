@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Inspect the validation YAML contract
 #'
 #' Return the installed contract for structure, generated field, and business
@@ -5,6 +7,7 @@
 #' @param version Exact schema version, currently `"1.0.0"`.
 #' @return A nested list read from `schema/validation-1.0.0.yaml`.
 #' @examples
+#' # Display the returned values.
 #' validation_schema()$stages
 #' @export
 validation_schema <- function(version = "1.0.0") {
@@ -17,11 +20,14 @@ validation_schema <- function(version = "1.0.0") {
 #' @param name Prefix of `<name>-form.yaml` and `<name>-validation.yaml`.
 #' @param directory Directory containing both files.
 #' @param checks Named callback functions; see [`read_validation_rules()`][form.validation::read_validation_rules].
+#' @param lookup_configuration Optional reference lookup definitions, resolved before rule loading.
 #' @return A `validation_plan` containing the model and its checks.
 #' @seealso [`read_validation_process()`][form.validation::read_validation_process] for a model and process stored separately.
 #' @export
-load_validation_plan <- function(name, directory, checks = list()) {
+load_validation_plan <- function(name, directory, checks = list(), lookup_configuration = NULL) {
   model <- form.model::load_form_model(name, directory)
+  if (!is.null(lookup_configuration))
+    model <- form.references::resolve_reference_lookups(model, lookup_configuration)
   read_validation_process(file.path(directory, paste0(name, "-validation.yaml")), model, checks)
 }
 
@@ -36,13 +42,26 @@ load_validation_plan <- function(name, directory, checks = list()) {
 #' @param business Additional explicit business YAML paths, appended to content.
 #' @return A `validation_plan` ready for [`validate_data()`][form.validation::validate_data].
 #' @examples
-#' directory <- system.file("examples", package = "form.validation")
-#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-#' callbacks <- new.env(parent = baseenv())
-#' sys.source(file.path(directory, "business.R"), callbacks)
-#' plan <- read_validation_process(file.path(directory, "survey-validation.yaml"), model,
-#'   checks = list(total_count = callbacks$total_count))
-#' plan$rules_version
+#' # Locate the installed example resources.
+#' validation_directory <- system.file("examples", "survey", package = "form.validation")
+#' # Load the requested form model.
+#' form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+#' # Read the named reference lookup settings.
+#' reference_configuration <- form.references::read_reference_configuration(
+#'   system.file("examples", "survey", "references.yaml", package = "form.references"))
+#' # Resolve reference lookups without changing the original form model.
+#' reference_resolved_form_model <- form.references::resolve_reference_lookups(
+#'   form_model_definition, reference_configuration)
+#' # Prepare validation callbacks.
+#' validation_callbacks <- new.env(parent = baseenv())
+#' # Load the example business callbacks.
+#' sys.source(file.path(validation_directory, "business.R"), validation_callbacks)
+#' # Prepare the validation rules and their execution order.
+#' validation_plan <- read_validation_process(
+#'   file.path(validation_directory, "validation.yaml"), reference_resolved_form_model,
+#'   checks = list(total_count = validation_callbacks$total_count))
+#' # Display the returned values.
+#' validation_plan$rules_version
 #' @export
 read_validation_process <- function(path, model, checks = list(), business = character()) {
   process <- read_rules_yaml(path)
@@ -81,7 +100,7 @@ read_validation_process <- function(path, model, checks = list(), business = cha
 #' @return A `validation_plan` for [`validate_data()`][form.validation::validate_data].
 #' @details Requires one structure and one field file, matching the model and rule version.
 #'   Generated rule order, values and severity must match; stale files need regeneration.
-#'   Enum, code-list and registry rules may set `ignore_case: false` for strict matching. Omitted or true
+#'   Enum and reference rules may set `ignore_case: false` for strict matching. Omitted or true
 #'   ignores case for character values, without rewriting submitted values.
 #'   Structural and business files may declare callbacks as `namespace/[field/]callback`.
 #'   Parameters reach callbacks through `config$rule`, including the optional field ID.
@@ -110,6 +129,8 @@ read_validation_rules <- function(paths, model, checks = list()) {
   plan$rules_version <- version
   plan
 }
+
+# Internal helpers ----------------------------------------------------------
 
 #' Validate one parsed validation document
 #' @param path YAML path.
@@ -188,7 +209,9 @@ bind_generated_rules <- function(plan, documents) {
     rule <- plan$rules[[i]]
     if (rule$stage == "fields") {
       plan$rules[[i]]$value <- fields$rules[[rule$id]]$value
-      if (rule$kind %in% c("enum", "code_list", "registry")) plan$rules[[i]]$ignore_case <- fields$rules[[rule$id]]$ignore_case
+      if (rule$kind %in% c("enum", "reference") &&
+          !is.null(fields$rules[[rule$id]]$ignore_case))
+        plan$rules[[i]]$ignore_case <- fields$rules[[rule$id]]$ignore_case
     }
   }
   plan
@@ -252,7 +275,7 @@ check_generated_rules <- function(rules, path) {
   for (id in names(rules)) {
     rule <- rules[[id]]
     named_list(rule, paste(path, id))
-    allowed <- c("value", "severity", if (grepl("/(enum|code_list|registry)$", id)) "ignore_case")
+    allowed <- c("value", "severity", if (grepl("/(enum|reference)$", id)) "ignore_case")
     if (!"value" %in% names(rule) || length(setdiff(names(rule), allowed))) {
       stop(path, ": generated rule requires value and optional severity: ", id, call. = FALSE)
     }

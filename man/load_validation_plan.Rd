@@ -4,7 +4,12 @@
 \alias{load_validation_plan}
 \title{Load a named model and validation process}
 \usage{
-load_validation_plan(name, directory, checks = list())
+load_validation_plan(
+  name,
+  directory,
+  checks = list(),
+  lookup_configuration = NULL
+)
 }
 \arguments{
 \item{name}{Prefix of \verb{<name>-form.yaml} and \verb{<name>-validation.yaml}.}
@@ -12,6 +17,8 @@ load_validation_plan(name, directory, checks = list())
 \item{directory}{Directory containing both files.}
 
 \item{checks}{Named callback functions; see \code{\link[=read_validation_rules]{read_validation_rules()}}.}
+
+\item{lookup_configuration}{Optional reference lookup definitions, resolved before rule loading.}
 }
 \value{
 A \code{validation_plan} containing the model and its checks.

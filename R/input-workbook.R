@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Read stored Excel values into worksheet grids
 #'
 #' Read XLSX input. Reading does not validate, convert declared field

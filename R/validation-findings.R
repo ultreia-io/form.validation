@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Create one finding for a custom rule
 #'
 #' Describe one validation failure. The runner adds the rule ID, severity, and
@@ -12,6 +14,7 @@
 #' @return A one-row data frame with `message`, `sheet`, `field`, `row`, `column`,
 #'   `value`, and `expected`. It is the return contract for custom rule callbacks.
 #' @examples
+#' # Display the returned values.
 #' validation_finding("Count exceeds capacity", sheet = "Observations",
 #'                    field = "count", row = 2, column = 3,
 #'                    value = 12L, expected = 10L)
@@ -51,6 +54,7 @@ validation_finding <- function(message, sheet = NA_character_, field = NA_charac
 #' @return A finding data frame with the same columns as [`validation_finding()`][form.validation::validation_finding].
 #'   Empty `row` produces an empty finding table. Values and order are preserved.
 #' @examples
+#' # Display the returned values.
 #' validation_findings("Unknown code", row = c(6L, 9L), sheet = "Observations",
 #'   field = "station", column = 1L, value = list("X", "Y"), expected = list("stations"))
 #' @export
@@ -75,15 +79,6 @@ validation_findings <- function(message, row, sheet = NA_character_, field = NA_
   check_findings(result)
 }
 
-#' Create an empty finding table
-#' @return Zero-row finding data frame, with list columns for values and expectations.
-#' @keywords internal
-empty_findings <- function() {
-  structure(list(message = character(), sheet = character(), field = character(),
-    row = integer(), column = integer(), value = I(list()), expected = I(list())),
-    class = "data.frame", row.names = integer())
-}
-
 #' Signal that a rule lacks information needed to finish
 #'
 #' Use inside a custom rule when its prerequisites are unavailable. The runner
@@ -94,6 +89,7 @@ empty_findings <- function() {
 #'   check. A field may identify a missing declaration, not a field in the model.
 #' @return Does not return; signals a `validation_incomplete` error condition.
 #' @examples
+#' # Display the returned values.
 #' tryCatch(validation_incomplete("Reference snapshot unavailable"),
 #'          validation_incomplete = function(e) conditionMessage(e))
 #' @export
@@ -103,6 +99,17 @@ validation_incomplete <- function(message, sheet = NULL, field = NULL) {
   if (!is.null(field)) text_value(field, "field")
   stop(structure(list(message = message, call = NULL, sheet = sheet, field = field),
                  class = c("validation_incomplete", "error", "condition")))
+}
+
+# Internal helpers ----------------------------------------------------------
+
+#' Create an empty finding table
+#' @return Zero-row finding data frame, with list columns for values and expectations.
+#' @keywords internal
+empty_findings <- function() {
+  structure(list(message = character(), sheet = character(), field = character(),
+    row = integer(), column = integer(), value = I(list()), expected = I(list())),
+    class = "data.frame", row.names = integer())
 }
 
 #' Check one nonempty character argument

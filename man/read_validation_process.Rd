@@ -24,11 +24,24 @@ field checks followed by explicitly listed business files.
 Ruleset paths are plain filenames resolved beside the process file.
 }
 \examples{
-directory <- system.file("examples", package = "form.validation")
-model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-callbacks <- new.env(parent = baseenv())
-sys.source(file.path(directory, "business.R"), callbacks)
-plan <- read_validation_process(file.path(directory, "survey-validation.yaml"), model,
-  checks = list(total_count = callbacks$total_count))
-plan$rules_version
+# Locate the installed example resources.
+validation_directory <- system.file("examples", "survey", package = "form.validation")
+# Load the requested form model.
+form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+# Read the named reference lookup settings.
+reference_configuration <- form.references::read_reference_configuration(
+  system.file("examples", "survey", "references.yaml", package = "form.references"))
+# Resolve reference lookups without changing the original form model.
+reference_resolved_form_model <- form.references::resolve_reference_lookups(
+  form_model_definition, reference_configuration)
+# Prepare validation callbacks.
+validation_callbacks <- new.env(parent = baseenv())
+# Load the example business callbacks.
+sys.source(file.path(validation_directory, "business.R"), validation_callbacks)
+# Prepare the validation rules and their execution order.
+validation_plan <- read_validation_process(
+  file.path(validation_directory, "validation.yaml"), reference_resolved_form_model,
+  checks = list(total_count = validation_callbacks$total_count))
+# Display the returned values.
+validation_plan$rules_version
 }

@@ -1,3 +1,5 @@
+# Public operations ---------------------------------------------------------
+
 #' Define a custom validation rule
 #'
 #' Add a check that model declarations cannot express. The callback runs once
@@ -23,12 +25,15 @@
 #'   This is separate from caller-supplied `config$custom`.
 #' @return A `validation_rule` list holding the ID, callback, severity, and description.
 #' @examples
-#' rule <- validation_rule("review/source", function(model, data, references, config) {
+#' # Prepare rule.
+#' validation_custom_rule <- validation_rule(
+#'   "review/source", function(model, data, references, config) {
 #'   if (!"Observations" %in% names(data)) {
 #'     validation_finding("Observations are missing", sheet = "Observations")
 #'   }
 #' }, severity = "warning", description = "Review missing observations")
-#' rule$id
+#' # Display the returned values.
+#' validation_custom_rule$id
 #' @export
 validation_rule <- function(id, check, severity = "error", description = id, parameters = list(), stage = "business") {
   text_value(id, "id")
@@ -59,12 +64,14 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 #'   use [`write_validation_rules()`][form.validation::write_validation_rules] and [`read_validation_rules()`][form.validation::read_validation_rules] for versioned files.
 #' @details Supported declarations include declared sheets, sheet order,
 #'   row/column counts, table start rows, mandatory fields,
-#'   all nine field types, enums, bounds, patterns, uniqueness, code-list membership,
-#'   registry matching,
+#'   all nine field types, enums, bounds, patterns, uniqueness, reference matching,
 #'   and same-sheet conditional requiredness. Generated content rules also include
 #'   table row counts (info) and internal empty-row checks (warning).
 #'   Sequence declarations generate consecutive numbering checks in worksheet order, within each group.
 #'   Declared primary keys generate presence and composite uniqueness rules (error).
+#'   Unique keys generate uniqueness checks for complete, correctly typed tuples only.
+#'   `at_least_one` checks populated rows for a supplied selected value, using its
+#'   declared severity or error by default. Zero and false are supplied values.
 #'
 #' Uniqueness applies only to table fields. Unsupported schema versions, types, layouts, or constraints
 #' are explicit generation errors; they are never silently discarded.
@@ -72,13 +79,24 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 #' Invalid model definitions raise form.model errors. Invalid custom rules,
 #' duplicate rule IDs, and unsupported declarations raise generation errors.
 #' @examples
-#' model <- form.model::read_form_model("examples/survey-form.yaml", "form.model")
-#' plan <- validation_plan(model)
-#' vapply(plan$rules, function(rule) rule$id, character(1))
+#' # Load the requested form model.
+#' form_model_definition <- form.model::read_form_model("examples/survey/form.yaml", "form.model")
+#' # Read the named reference lookup settings.
+#' reference_configuration <- form.references::read_reference_configuration(
+#'   system.file("examples", "survey", "references.yaml", package = "form.references"))
+#' # Resolve reference lookups without changing the original form model.
+#' reference_resolved_form_model <- form.references::resolve_reference_lookups(
+#'   form_model_definition, reference_configuration)
+#' # Prepare the validation rules and their execution order.
+#' validation_plan <- validation_plan(reference_resolved_form_model)
+#' # Display the returned values.
+#' vapply(validation_plan$rules, function(rule) rule$id, character(1))
 #' @export
 validation_plan <- function(model, rules = list()) {
+  lookups <- attr(model, "reference_lookups", exact = TRUE)
   meta <- form.model::form_metadata(model)
   model <- form.model::as_form_model(form.model::form_definition(model))
+  attr(model, "reference_lookups") <- lookups
   if (!identical(meta$schema_version, "1.0.0")) {
     stop("Unsupported model schema version: ", meta$schema_version, call. = FALSE)
   }
@@ -107,22 +125,28 @@ validation_plan <- function(model, rules = list()) {
       unsupported <- setdiff(names(field),
                              c("id", "name", "sheet", "location", "row", "column", "type",
                                "mandatory", "enum", "minimum", "maximum", "maximum_field", "pattern", "sequence", "unique",
-                               "code_list", "registry", "required_field"))
+                               "reference", "required_field"))
       if (length(unsupported)) stop("Unsupported constraints: ", paste(unsupported, collapse = ", "), call. = FALSE)
       if (isTRUE(field$unique) && layout$kind != "table") {
         stop("unique is only supported for table fields: ", field$id, call. = FALSE)
       }
       kinds <- c(if (field$mandatory) "mandatory",
                  if (!is.null(field$required_field)) "required_field", "type",
-                 intersect(c("code_list", "registry", "enum", "minimum", "maximum", "maximum_field", "pattern", "sequence", "unique"),
+                 intersect(c("reference", "enum", "minimum", "maximum", "maximum_field", "pattern", "sequence", "unique"),
                            names(field)))
       for (kind in kinds) {
         if (kind == "unique" && !isTRUE(field$unique)) next
-        severity <- if (kind %in% c("code_list", "registry")) field[[kind]]$severity else "error"
+        severity <- if (kind %in% c("reference")) field[[kind]]$severity else "error"
         rule <- rule_record(paste("field", field$id, kind, sep = "/"), kind,
                             severity, sheet_name, field$id, stage = "fields")
-        rule$value <- if (kind == "code_list") field[[kind]]$id else
-          if (kind == "registry") Filter(Negate(is.null), field$registry[c("id", "column", "matching")]) else field[[kind]]
+        if (kind == "reference") {
+          binding <- field$reference
+          key <- paste(binding$catalogue, binding$table, binding$lookup, sep = "/")
+          lookup <- lookups[[key]]
+          if (is.null(lookup)) stop("Resolve named lookups before generating rules: ", field$id, call. = FALSE)
+          rule$ignore_case <- lookup$ignore_case
+          rule$value <- list(id = key, matching = lookup$matching)
+        } else rule$value <- field[[kind]]
         generated[[length(generated) + 1L]] <- rule
       }
     }
@@ -135,6 +159,17 @@ validation_plan <- function(model, rules = list()) {
         rule$key_fields <- fields[key_ids]
         generated[[length(generated) + 1L]] <- rule
       }
+    }
+    for (kind in c("unique_key", "at_least_one")) {
+      declaration <- sheet[[kind]]
+      if (is.null(declaration)) next
+      selected <- if (kind == "at_least_one") declaration$fields else declaration
+      severity <- if (kind == "at_least_one" && !is.null(declaration$severity)) declaration$severity else "error"
+      rule <- rule_record(paste("sheet", sheet_name, kind, sep = "/"), kind,
+                          severity = severity, sheet = sheet_name, stage = "fields")
+      rule$value <- selected
+      rule$key_fields <- fields[paste(sheet_name, unlist(selected, use.names = FALSE), sep = ".")]
+      generated[[length(generated) + 1L]] <- rule
     }
     if (!is.null(sheet$parent_key)) {
       rule <- rule_record(paste("sheet", sheet_name, "parent_key", sep = "/"), "parent_key",
@@ -166,6 +201,8 @@ validation_plan <- function(model, rules = list()) {
   structure(list(model = model, rules = all_rules, rulesets = execution_rulesets(all_rules),
                  rules_version = NA_character_), class = "validation_plan")
 }
+
+# Internal helpers ----------------------------------------------------------
 
 #' Describe one generated check
 #' @param id,kind,severity Rule identity, operation, and finding severity.

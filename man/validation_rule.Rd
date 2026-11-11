@@ -47,10 +47,13 @@ Structural callbacks run with all other structural checks and gate content.
 Field findings or execution failures never suppress business checks.
 }
 \examples{
-rule <- validation_rule("review/source", function(model, data, references, config) {
+# Prepare rule.
+validation_custom_rule <- validation_rule(
+  "review/source", function(model, data, references, config) {
   if (!"Observations" \%in\% names(data)) {
     validation_finding("Observations are missing", sheet = "Observations")
   }
 }, severity = "warning", description = "Review missing observations")
-rule$id
+# Display the returned values.
+validation_custom_rule$id
 }

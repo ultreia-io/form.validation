@@ -16,3 +16,5 @@ sheets:
     columns: 5
   Equipment:
     columns: 3
+  Notes:
+    columns: 5

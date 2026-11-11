@@ -43,7 +43,9 @@ jobs:
         config:
           - os: ubuntu-latest
             r: release
-            container: rocker/r-ver:latest
+            container:
+              image: rocker/r-ver:latest
+              options: --dns 1.1.1.1
           - os: macos-latest
             r: release
             container: ""
@@ -97,6 +99,15 @@ jobs:
         run: |
           brew install tidy-html5
           echo "$(brew --prefix tidy-html5)/bin" >> "$GITHUB_PATH"
+
+      # Bypass the runner's default DNS resolver before downloading R-devel dependencies.
+      - name: Configure DNS on the Linux runner
+        if: runner.os == 'Linux' && matrix.config.container == ''
+        run: |
+          network_interface=$(ip -4 route show default | awk 'NR == 1 {print $5}')
+          sudo resolvectl dns "$network_interface" 1.1.1.1
+          sudo resolvectl domain "$network_interface" '~.'
+          sudo resolvectl flush-caches
 
       - name: Set up cached Linux R-devel
         if: matrix.config.r == 'devel'

@@ -26,7 +26,9 @@ jobs:
        startsWith(github.head_ref, 'release/'))
     runs-on: ubuntu-latest
     # R is preinstalled in this Ubuntu image; no R download or installation is needed.
-    container: rocker/r-ver:latest
+    container:
+      image: rocker/r-ver:latest
+      options: --dns 1.1.1.1
     defaults:
       run:
         shell: bash

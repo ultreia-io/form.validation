@@ -10,7 +10,7 @@ validate_workbook(
   references = list(),
   source = path,
   config = list(),
-  reader = read_validation_workbook,
+  reader = read_workbook_data,
   prepare_data = prepare_validation_data,
   log = message
 )
@@ -18,7 +18,7 @@ validate_workbook(
 \arguments{
 \item{path}{Input workbook path, left unchanged.}
 
-\item{plan}{A rule plan from \code{\link[=validation_plan]{validation_plan()}} or \code{\link[=read_validation_rules]{read_validation_rules()}}.}
+\item{plan}{A rule plan from \code{\link[=create_validation_plan]{create_validation_plan()}} or \code{\link[=read_validation_plan_from_rules]{read_validation_plan_from_rules()}}.}
 
 \item{references}{Explicit reference snapshots, reusable across inputs.}
 

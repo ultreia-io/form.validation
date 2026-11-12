@@ -14,7 +14,7 @@ validate_data(
 )
 }
 \arguments{
-\item{plan}{A plan from \code{\link[=validation_plan]{validation_plan()}} or \code{\link[=read_validation_rules]{read_validation_rules()}}.
+\item{plan}{A plan from \code{\link[=create_validation_plan]{create_validation_plan()}} or \code{\link[=read_validation_plan_from_rules]{read_validation_plan_from_rules()}}.
 Optional caller-owned \code{plan$metadata} is retained in the result unchanged.}
 
 \item{data}{Named list of data frames or two-dimensional matrices, keyed by
@@ -27,7 +27,7 @@ or list of string codes) and may include a caller-owned \code{version} label.
 Optional \code{aliases} map alternate codes to canonical \code{values}; both are accepted.
 Alias targets must exist in \code{values}; submitted values are not rewritten.
 Missing snapshots make affected rules incomplete; malformed snapshot values
-make them fail execution. Use \code{\link[=prepare_validation_references]{prepare_validation_references()}} to reuse
+make them fail execution. Use \code{\link[=prepare_validation_reference_indexes]{prepare_validation_reference_indexes()}} to reuse
 checked reference keys across submissions.}
 
 \item{source}{One diagnostic label identifying the input file or submission.}
@@ -109,7 +109,7 @@ reference_configuration <- form.references::read_reference_configuration(
 reference_resolved_form_model <- form.references::resolve_reference_lookups(
   form_model_definition, reference_configuration)
 # Prepare the validation rules and their execution order.
-validation_plan <- validation_plan(reference_resolved_form_model)
+validation_plan <- create_validation_plan(reference_resolved_form_model)
 # Prepare submission data.
 submission_data <- list(Metadata = matrix(vector("list", 15), 5, 3),
              Observations = matrix(vector("list", 66), 6, 11))

@@ -172,7 +172,7 @@ bind_custom_rules <- function(documents, model, checks) {
     description <- if (is.null(rule$description)) id else rule$description
     parameters <- rule[setdiff(names(rule), c("severity", "description"))]
     if (!is.null(target$field)) parameters$field <- target$field
-    rules[[length(rules) + 1L]] <- validation_rule(
+    rules[[length(rules) + 1L]] <- create_validation_rule(
       id, check, severity, description, parameters, stage = document$stage)
   }
   rules

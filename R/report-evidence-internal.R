@@ -57,7 +57,7 @@ read_report_evidence <- function(path) {
 }
 
 #' Write individual evidence reports and their reusable data
-#' @param report Prepared report from [validation_report_data()].
+#' @param report Prepared report from [prepare_validation_report()].
 #' @param directory Destination directory of the individual form report.
 #' @param report_filename Filename of that form's HTML report, used for back links.
 #' @param title Parent report title, extended by each evidence report's label.
@@ -73,7 +73,7 @@ read_report_evidence <- function(path) {
 write_individual_evidence <- function(report, directory, report_filename, title,
                                       stylesheet, logo, assets_directory, overwrite) {
   evidence <- report$evidence
-  if (is.null(evidence)) stop("Report has no prepared evidence; call validation_report_data() again")
+  if (is.null(evidence)) stop("Report has no prepared evidence; call prepare_validation_report() again")
   kinds <- c(conversion = "conversion", primary_key = "primary-key")
   reference_reports <- list()
   old_path <- file.path(directory, "evidence.json")

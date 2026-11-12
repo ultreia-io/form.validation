@@ -262,7 +262,7 @@ render_batch_input_report <- function(file, plan, validation, stage, report_file
       stop("Saved result differs from the plan")
     job <- plan$jobs[match(file$job, plan$jobs$id), ]
     context <- as.list(file[reference_context_columns])
-    report <- validation_report_data(saved$result, saved$model,
+    report <- prepare_validation_report(saved$result, saved$model,
       reference_provenance = plan$resources[[job$resource]]$references, context = context)
     depth <- length(strsplit(file$relative, "/", fixed = TRUE)[[1L]])
     write_validation_report(report, file.path(stage, file$relative, report_filename),

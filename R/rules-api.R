@@ -10,8 +10,8 @@
 #' Field findings or execution failures never suppress business checks.
 #' @param id One unique nonempty rule ID. IDs must not collide with generated IDs.
 #' @param check Function accepting `model`, `data`, `references`, and `config`.
-#'   Return `NULL` on success or rows from [`validation_finding()`][form.validation::validation_finding] on failure.
-#'   Signal [`validation_incomplete()`][form.validation::validation_incomplete] when prerequisites are missing.
+#'   Return `NULL` on success or rows from [`create_validation_finding()`][form.validation::create_validation_finding] on failure.
+#'   Signal [`signal_validation_incomplete()`][form.validation::signal_validation_incomplete] when prerequisites are missing.
 #'   `config$field_values("Sheet.field")` reuses the run's prepared field data.
 #'   It returns `sheet`, `field`, `type`, physical `rows` and `column`, and
 #'   `original` values as a list. Logical `present`, `null`, `filled`, and `typed`
@@ -28,16 +28,16 @@
 #' @return A `validation_rule` list holding the ID, callback, severity, and description.
 #' @examples
 #' # Prepare rule.
-#' validation_custom_rule <- validation_rule(
+#' validation_custom_rule <- create_validation_rule(
 #'   "review/source", function(model, data, references, config) {
 #'   if (!"Observations" %in% names(data)) {
-#'     validation_finding("Observations are missing", sheet = "Observations")
+#'     create_validation_finding("Observations are missing", sheet = "Observations")
 #'   }
 #' }, severity = "warning", description = "Review missing observations")
 #' # Display the returned values.
 #' validation_custom_rule$id
 #' @export
-validation_rule <- function(id, check, severity = "error", description = id, parameters = list(), stage = "business") {
+create_validation_rule <- function(id, check, severity = "error", description = id, parameters = list(), stage = "business") {
   text_value(id, "id")
   text_value(description, "description")
   named_list(parameters, "parameters")
@@ -57,13 +57,13 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 #' Recheck the definition through form.model's public API, then generate ordered
 #' sheet and field checks. Append explicit custom rules without modifying the model.
 #' @param model A `form_model` from form.model.
-#' @param rules List of custom rules created by [`validation_rule()`][form.validation::validation_rule].
+#' @param rules List of custom rules created by [`create_validation_rule()`][form.validation::create_validation_rule].
 #' @return A `validation_plan` with checked `model`, ordered `rules`, and
 #'   `rulesets` grouping rule IDs into structure and merged content.
 #'   Each rule has a stable `id`, `kind`, and `severity`; generated field rules
 #'   also identify their model sheet and field. Treat plans as read-only and
 #'   regenerate after editing a model. Direct plans have no `rules_version`;
-#'   use [`write_validation_rules()`][form.validation::write_validation_rules] and [`read_validation_rules()`][form.validation::read_validation_rules] for versioned files.
+#'   use [`write_validation_rules()`][form.validation::write_validation_rules] and [`read_validation_plan_from_rules()`][form.validation::read_validation_plan_from_rules] for versioned files.
 #' @details Supported declarations include declared sheets, sheet order,
 #'   row/column counts, table start rows, mandatory fields,
 #'   all nine field types, enums, bounds, patterns, uniqueness, reference matching,
@@ -90,11 +90,11 @@ validation_rule <- function(id, check, severity = "error", description = id, par
 #' reference_resolved_form_model <- form.references::resolve_reference_lookups(
 #'   form_model_definition, reference_configuration)
 #' # Prepare the validation rules and their execution order.
-#' validation_plan <- validation_plan(reference_resolved_form_model)
+#' validation_plan <- create_validation_plan(reference_resolved_form_model)
 #' # Display the returned values.
 #' vapply(validation_plan$rules, function(rule) rule$id, character(1))
 #' @export
-validation_plan <- function(model, rules = list()) {
+create_validation_plan <- function(model, rules = list()) {
   lookups <- attr(model, "reference_lookups", exact = TRUE)
   meta <- form.model::form_metadata(model)
   model <- form.model::as_form_model(form.model::form_definition(model))
@@ -105,9 +105,9 @@ validation_plan <- function(model, rules = list()) {
   if (!is.list(rules)) stop("rules must be a list", call. = FALSE)
   for (rule in rules) {
     if (!inherits(rule, "validation_rule") || !identical(rule$kind, "custom")) {
-      stop("rules must contain validation_rule() objects", call. = FALSE)
+      stop("rules must contain create_validation_rule() objects", call. = FALSE)
     }
-    validation_rule(rule$id, rule$check, rule$severity, rule$description, rule$parameters, rule$stage)
+    create_validation_rule(rule$id, rule$check, rule$severity, rule$description, rule$parameters, rule$stage)
   }
   generated <- list(rule_record("workbook/sheets", "sheets", stage = "structure"))
   sheets <- form.model::form_sheets(model)
@@ -225,19 +225,19 @@ validation_schema <- function(version = "1.0.0") {
 #' Load a named model and validation process
 #' @param name Prefix of `<name>-form.yaml` and `<name>-validation.yaml`.
 #' @param directory Directory containing both files.
-#' @param checks Named callback functions; see [`read_validation_rules()`][form.validation::read_validation_rules].
+#' @param checks Named callback functions; see [`read_validation_plan_from_rules()`][form.validation::read_validation_plan_from_rules].
 #' @param lookup_configuration Optional reference lookup definitions, resolved before rule loading.
 #' @return A `validation_plan` containing the model and its checks.
-#' @seealso [`read_validation_process()`][form.validation::read_validation_process] for a model and process stored separately.
+#' @seealso [`read_validation_plan()`][form.validation::read_validation_plan] for a model and process stored separately.
 #' @export
 load_validation_plan <- function(name, directory, checks = list(), lookup_configuration = NULL) {
   model <- form.model::load_form_model(name, directory)
   if (!is.null(lookup_configuration))
     model <- form.references::resolve_reference_lookups(model, lookup_configuration)
-  read_validation_process(file.path(directory, paste0(name, "-validation.yaml")), model, checks)
+  read_validation_plan(file.path(directory, paste0(name, "-validation.yaml")), model, checks)
 }
 
-#' Load a complete validation process
+#' Read a validation plan from a process file
 #'
 #' Read the ordered structure and content rulesets. Content merges generated
 #' field checks followed by explicitly listed business files.
@@ -263,13 +263,13 @@ load_validation_plan <- function(name, directory, checks = list(), lookup_config
 #' # Load the example business callbacks.
 #' sys.source(file.path(validation_directory, "business.R"), validation_callbacks)
 #' # Prepare the validation rules and their execution order.
-#' validation_plan <- read_validation_process(
+#' validation_plan <- read_validation_plan(
 #'   file.path(validation_directory, "validation.yaml"), reference_resolved_form_model,
 #'   checks = list(total_count = validation_callbacks$total_count))
 #' # Display the returned values.
 #' validation_plan$rules_version
 #' @export
-read_validation_process <- function(path, model, checks = list(), business = character()) {
+read_validation_plan <- function(path, model, checks = list(), business = character()) {
   process <- read_rules_yaml(path)
   check_rule_keys(process, c("schema_version", "rules_version", "model", "rulesets"), path)
   check_validation_header(process, model, path)
@@ -292,14 +292,14 @@ read_validation_process <- function(path, model, checks = list(), business = cha
   if (!is.character(business) || anyNA(business) || any(!nzchar(business))) {
     stop("business must contain explicit YAML filenames", call. = FALSE)
   }
-  plan <- read_validation_rules(c(file.path(dirname(path), filenames), business), model, checks)
+  plan <- read_validation_plan_from_rules(c(file.path(dirname(path), filenames), business), model, checks)
   if (!identical(plan$rules_version, process$rules_version)) {
     stop(path, ": rules_version differs from its rulesets", call. = FALSE)
   }
   plan
 }
 
-#' Load validation rules
+#' Read a validation plan from explicit rule files
 #' @param paths YAML paths ordered as structure, generated fields, then business files.
 #' @param model Checked model supplying field definitions and layouts.
 #' @param checks Named callback functions, keyed by the last component of each custom rule ID.
@@ -312,15 +312,15 @@ read_validation_process <- function(path, model, checks = list(), business = cha
 #'   Parameters reach callbacks through `config$rule`, including the optional field ID.
 #'   Severity defaults to `error`, and description to the rule ID.
 #'   YAML is parsed as data; callbacks must be supplied explicitly.
-#' @seealso [`read_validation_process()`][form.validation::read_validation_process], [`validation_schema()`][form.validation::validation_schema]
+#' @seealso [`read_validation_plan()`][form.validation::read_validation_plan], [`validation_schema()`][form.validation::validation_schema]
 #' @export
-read_validation_rules <- function(paths, model, checks = list()) {
+read_validation_plan_from_rules <- function(paths, model, checks = list()) {
   if (!is.character(paths) || !length(paths) || anyNA(paths) || any(!nzchar(paths))) {
     stop("paths must contain explicit YAML filenames", call. = FALSE)
   }
   named_list(checks, "checks")
   if (any(!vapply(checks, is.function, logical(1)))) stop("checks must contain functions", call. = FALSE)
-  plan <- validation_plan(model)
+  plan <- create_validation_plan(model)
   documents <- lapply(paths, read_validation_document, model = plan$model)
   version <- check_ruleset_sequence(documents)
   plan <- bind_generated_rules(plan, documents)
@@ -338,7 +338,7 @@ read_validation_rules <- function(paths, model, checks = list()) {
 
 # Writing ---------------------------------------------------------
 
-#' Generate rules for a named model
+#' Write validation rules for a named form model
 #' @param name Prefix of `<name>-form.yaml`.
 #' @param directory Directory containing the model.
 #' @param version Version shared by all validation files.
@@ -347,7 +347,7 @@ read_validation_rules <- function(paths, model, checks = list()) {
 #' @seealso [`write_validation_rules()`][form.validation::write_validation_rules], [`load_validation_plan()`][form.validation::load_validation_plan]
 #' @param lookup_configuration Optional reference lookup definitions, resolved before generation.
 #' @export
-generate_validation_rules <- function(name, directory, version = "1.0.0", overwrite = FALSE, lookup_configuration = NULL) {
+write_named_validation_rules <- function(name, directory, version = "1.0.0", overwrite = FALSE, lookup_configuration = NULL) {
   model <- form.model::load_form_model(name, directory)
   if (!is.null(lookup_configuration))
     model <- form.references::resolve_reference_lookups(model, lookup_configuration)
@@ -365,7 +365,7 @@ generate_validation_rules <- function(name, directory, version = "1.0.0", overwr
 #' @details Preserves custom structural rules. Field rules use compact YAML;
 #'   edit the form and regenerate when its definition changes.
 #'   Explicit enum and reference `ignore_case` options are preserved when regenerating field rules.
-#' @seealso [`generate_validation_rules()`][form.validation::generate_validation_rules], [`read_validation_rules()`][form.validation::read_validation_rules]
+#' @seealso [`write_named_validation_rules()`][form.validation::write_named_validation_rules], [`read_validation_plan_from_rules()`][form.validation::read_validation_plan_from_rules]
 #' @export
 write_validation_rules <- function(model, structure_path, generated_path,
                                    version = "1.0.0", overwrite = FALSE) {
@@ -376,7 +376,7 @@ write_validation_rules <- function(model, structure_path, generated_path,
   if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
     stop("overwrite must be TRUE or FALSE", call. = FALSE)
   }
-  plan <- validation_plan(model)
+  plan <- create_validation_plan(model)
   paths <- c(structure = structure_path, generated = generated_path)
   stages <- c(structure = "structure", generated = "fields")
   structure_rules <- NULL

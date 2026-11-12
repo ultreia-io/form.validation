@@ -61,14 +61,14 @@ run_builtin <- function(rule, context) {
     expected <- names(sheets)
     if (!config$allow_extra_sheets) {
       for (name in setdiff(names(data), expected)) {
-        findings[[length(findings) + 1L]] <- validation_finding("Unexpected sheet", sheet = name,
+        findings[[length(findings) + 1L]] <- create_validation_finding("Unexpected sheet", sheet = name,
                                                               value = name, expected = expected)
       }
     }
     actual <- as.character(names(data)[names(data) %in% expected])
     order <- expected[expected %in% names(data)]
     if (!identical(unname(actual), unname(order))) {
-      findings[[length(findings) + 1L]] <- validation_finding("Sheets are out of definition order",
+      findings[[length(findings) + 1L]] <- create_validation_finding("Sheets are out of definition order",
                                                             value = actual, expected = order)
     }
     return(bind_findings(findings))
@@ -76,7 +76,7 @@ run_builtin <- function(rule, context) {
   sheet <- sheets[[rule$sheet]]
   grid <- data[[rule$sheet]]
   if (rule$kind == "presence") {
-    if (is.null(grid)) return(validation_finding("Mandatory sheet is absent",
+    if (is.null(grid)) return(create_validation_finding("Mandatory sheet is absent",
       sheet = rule$sheet, value = FALSE, expected = TRUE))
     return(NULL)
   }
@@ -89,7 +89,7 @@ run_builtin <- function(rule, context) {
   layout <- sheet$layout
   if (rule$kind == "row_count") {
     count <- max(0L, nrow(grid) - layout$start_row + 1L)
-    return(validation_finding("Number of data rows in the table.",
+    return(create_validation_finding("Number of data rows in the table.",
       sheet = rule$sheet, value = count))
   }
   if (rule$kind == "empty_rows") {
@@ -108,7 +108,7 @@ run_builtin <- function(rule, context) {
     if (length(filled) < 2L) return(NULL)
     gaps <- which(!occupied & seq_along(rows) > min(filled) & seq_along(rows) < max(filled))
     if (!length(gaps)) return(NULL)
-    return(validation_findings("Empty row between populated rows", row = rows[gaps], sheet = rule$sheet))
+    return(create_validation_findings("Empty row between populated rows", row = rows[gaps], sheet = rule$sheet))
   }
   if (rule$kind == "layout") {
     for (key in c("row_count", "column_count")) {
@@ -116,7 +116,7 @@ run_builtin <- function(rule, context) {
       if (!is.null(layout[[key]]) && actual != layout[[key]]) {
         dimension <- if (key == "row_count") "row" else "column"
         message <- sprintf("Expected %s count: %s; found: %s", dimension, layout[[key]], actual)
-        findings[[length(findings) + 1L]] <- validation_finding(message,
+        findings[[length(findings) + 1L]] <- create_validation_finding(message,
           sheet = rule$sheet, value = actual, expected = layout[[key]])
       }
     }
@@ -124,7 +124,7 @@ run_builtin <- function(rule, context) {
       minimum <- minimum_cell_rows(context$model, rule$sheet)
       if (nrow(grid) < minimum) {
         message <- sprintf("Expected at least %s rows for declared cells; found: %s", minimum, nrow(grid))
-        findings[[length(findings) + 1L]] <- validation_finding(message,
+        findings[[length(findings) + 1L]] <- create_validation_finding(message,
           sheet = rule$sheet, value = nrow(grid), expected = minimum)
       }
     }
@@ -201,7 +201,7 @@ run_field <- function(rule, context) {
     ignore_case <- !identical(rule$ignore_case, FALSE)
     id <- value$id
     snapshot <- context$references[[id]]
-    if (is.null(snapshot)) validation_incomplete(paste("Missing reference snapshot:", id))
+    if (is.null(snapshot)) signal_validation_incomplete(paste("Missing reference snapshot:", id))
     if (!is.list(snapshot) || is.null(snapshot$values) ||
         !(is.atomic(snapshot$values) || is.list(snapshot$values)))
       stop("Reference snapshot needs values: ", id, call. = FALSE)
@@ -231,14 +231,14 @@ run_field <- function(rule, context) {
     messages <- ifelse(counts[selected] == 0L,
       paste("Value not found in reference", id),
       paste("Value has", counts[selected], "matches in reference", paste0(id, "; expected exactly one")))
-    return(validation_findings(messages, row = cells$rows[bad], sheet = field$sheet,
+    return(create_validation_findings(messages, row = cells$rows[bad], sheet = field$sheet,
       field = field$id, column = cells$column, value = cells$original[bad],
       expected = list(list(reference = id, matches = 1L))))
   } else if (kind == "unique") {
     bad <- eligible[duplicated(values)]
     problem <- "Duplicate field value"; expected <- "unique"
   } else stop("Unsupported field check: ", kind, call. = FALSE)
-  validation_findings(problem, row = cells$rows[bad], sheet = field$sheet, field = field$id,
+  create_validation_findings(problem, row = cells$rows[bad], sheet = field$sheet, field = field$id,
                       column = cells$column, value = cells$original[bad], expected = list(expected))
 }
 
@@ -336,7 +336,7 @@ reference_lookup <- function(id, context, ignore_case = TRUE) {
 #' @return A shared index; a missing snapshot signals incomplete validation.
 #' @keywords internal
 snapshot_index <- function(id, snapshot, ignore_case = TRUE) {
-  if (is.null(snapshot)) validation_incomplete(paste("Missing reference snapshot:", id))
+  if (is.null(snapshot)) signal_validation_incomplete(paste("Missing reference snapshot:", id))
   if (!is.list(snapshot) || is.null(names(snapshot)) || anyDuplicated(names(snapshot)) ||
       any(!names(snapshot) %in% c("values", "version", "aliases", "data", "column", "lookup", "indexes")) || !"values" %in% names(snapshot)) {
     stop("Reference ", id, " must contain values and optional version, aliases, data, column, lookup and indexes", call. = FALSE)
@@ -401,7 +401,7 @@ run_primary_key <- function(rule, context) {
     message <- if (key_kind == "unique_key") "Unique key is not unique." else "Primary key is not unique."
   }
   values <- lapply(bad, function(i) lapply(key$cells, function(cells) cells$original[[i]]))
-  validation_findings(message, row = key$rows[bad], sheet = rule$sheet,
+  create_validation_findings(message, row = key$rows[bad], sheet = rule$sheet,
     value = values, expected = list(stats::setNames(list(unlist(rule$value, use.names = FALSE)), key_kind)))
 }
 
@@ -424,7 +424,7 @@ run_parent_key <- function(rule, context) {
   present <- vapply(keys, exists, logical(1), envir = parent$lookup, inherits = FALSE)
   bad <- eligible[!present]
   values <- lapply(bad, function(i) lapply(cells, function(cell) cell$original[[i]]))
-  validation_findings(paste("Parent key does not exist in", rule$value$sheet),
+  create_validation_findings(paste("Parent key does not exist in", rule$value$sheet),
     row = cells[[1L]]$rows[bad], sheet = rule$sheet, value = values,
     expected = list(list(primary_key = unlist(rule$value$fields, use.names = FALSE),
       parent_sheet = rule$value$sheet, parent_key = names(parent$cells))))
@@ -447,7 +447,7 @@ run_at_least_one <- function(rule, context) {
   bad <- which(occupied & !supplied)
   values <- lapply(bad, function(i) stats::setNames(
     lapply(selected, function(cells) cells$original[[i]]), unlist(rule$value, use.names = FALSE)))
-  validation_findings("At least one of the selected fields must be supplied.",
+  create_validation_findings("At least one of the selected fields must be supplied.",
     row = selected[[1L]]$rows[bad], sheet = rule$sheet, value = values,
     expected = list(list(at_least_one = unlist(rule$value, use.names = FALSE))))
 }
@@ -489,7 +489,7 @@ run_sequence <- function(rule, field, context) {
     numbers[valid] <- suppressWarnings(as.numeric(values[valid]))
   } else numbers <- values
   bad <- eligible[!is.finite(numbers) | numbers != expected[eligible]]
-  validation_findings("Value is out of sequence within its group",
+  create_validation_findings("Value is out of sequence within its group",
     row = cells$rows[bad], sheet = field$sheet, field = field$id,
     column = cells$column, value = cells$original[bad],
     expected = as.list(expected[bad]))
@@ -523,7 +523,7 @@ check_findings <- function(x) {
   columns <- c("message", "sheet", "field", "row", "column", "value", "expected")
   if (!is.data.frame(x) || !identical(names(x), columns) ||
       !is.list(x$value) || !is.list(x$expected)) {
-    stop("Custom rules must return NULL or rows from validation_finding()", call. = FALSE)
+    stop("Custom rules must return NULL or rows from create_validation_finding()", call. = FALSE)
   }
   if (!nrow(x)) return(empty_findings())
   if (any(vapply(x[columns[1:5]], function(column) !is.null(dim(column)), logical(1)))) {

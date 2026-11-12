@@ -17,12 +17,12 @@
 #'   by the engine; call this function again to share the updated preparation.
 #' @examples
 #' # Prepare refs.
-#' reference_values <- prepare_validation_references(list(stations = list(
+#' reference_values <- prepare_validation_reference_indexes(list(stations = list(
 #'   values = c("001", "002"), aliases = c(old = "001"))))
 #' # Display the returned values.
 #' reference_values$stations$values
 #' @export
-prepare_validation_references <- function(references, ids = names(references)) {
+prepare_validation_reference_indexes <- function(references, ids = names(references)) {
   named_list(references, "references")
   if (is.null(ids)) ids <- character()
   if (!is.character(ids) || anyNA(ids) || any(!nzchar(ids))) {
@@ -47,7 +47,7 @@ prepare_validation_references <- function(references, ids = names(references)) {
 #' Run structural checks first. Field and business checks run only when the
 #' complete structure stage passes. No workbook readers, network lookups, or
 #' report rendering are invoked. Data, references, and configuration are caller-owned.
-#' @param plan A plan from [`validation_plan()`][form.validation::validation_plan] or [`read_validation_rules()`][form.validation::read_validation_rules].
+#' @param plan A plan from [`create_validation_plan()`][form.validation::create_validation_plan] or [`read_validation_plan_from_rules()`][form.validation::read_validation_plan_from_rules].
 #'   Optional caller-owned `plan$metadata` is retained in the result unchanged.
 #' @param data Named list of data frames or two-dimensional matrices, keyed by
 #'   exact workbook sheet names. Retain all physical preamble rows.
@@ -58,7 +58,7 @@ prepare_validation_references <- function(references, ids = names(references)) {
 #'   Optional `aliases` map alternate codes to canonical `values`; both are accepted.
 #'   Alias targets must exist in `values`; submitted values are not rewritten.
 #'   Missing snapshots make affected rules incomplete; malformed snapshot values
-#'   make them fail execution. Use [`prepare_validation_references()`][form.validation::prepare_validation_references] to reuse
+#'   make them fail execution. Use [`prepare_validation_reference_indexes()`][form.validation::prepare_validation_reference_indexes] to reuse
 #'   checked reference keys across submissions.
 #' @param source One diagnostic label identifying the input file or submission.
 #' @param config Named list with optional `blank_strings` (default `FALSE`),
@@ -124,7 +124,7 @@ prepare_validation_references <- function(references, ids = names(references)) {
 #' reference_resolved_form_model <- form.references::resolve_reference_lookups(
 #'   form_model_definition, reference_configuration)
 #' # Prepare the validation rules and their execution order.
-#' validation_plan <- validation_plan(reference_resolved_form_model)
+#' validation_plan <- create_validation_plan(reference_resolved_form_model)
 #' # Prepare submission data.
 #' submission_data <- list(Metadata = matrix(vector("list", 15), 5, 3),
 #'              Observations = matrix(vector("list", 66), 6, 11))
@@ -154,7 +154,7 @@ prepare_validation_references <- function(references, ids = names(references)) {
 #' @export
 validate_data <- function(plan, data, references = list(), source = "<data>", config = list(), prepare_data = NULL) {
   if (!inherits(plan, "validation_plan") || !is.list(plan$rules) || !length(plan$rules)) {
-    stop("plan must come from validation_plan()", call. = FALSE)
+    stop("plan must come from create_validation_plan()", call. = FALSE)
   }
   if (!is.null(prepare_data) && !is.function(prepare_data)) stop("prepare_data must be a function or NULL", call. = FALSE)
   named_list(data, "data")
@@ -284,11 +284,11 @@ validate_data <- function(plan, data, references = list(), source = "<data>", co
 #'   `value`, and `expected`. It is the return contract for custom rule callbacks.
 #' @examples
 #' # Display the returned values.
-#' validation_finding("Count exceeds capacity", sheet = "Observations",
+#' create_validation_finding("Count exceeds capacity", sheet = "Observations",
 #'                    field = "count", row = 2, column = 3,
 #'                    value = 12L, expected = 10L)
 #' @export
-validation_finding <- function(message, sheet = NA_character_, field = NA_character_,
+create_validation_finding <- function(message, sheet = NA_character_, field = NA_character_,
                                row = NA_integer_, column = NA_integer_,
                                value = NULL, expected = NULL) {
   text_value(message, "message")
@@ -320,14 +320,14 @@ validation_finding <- function(message, sheet = NA_character_, field = NA_charac
 #' @param column Physical column numbers or `NA`, one or one per finding.
 #' @param value,expected Lists of original values, one or one per finding.
 #'   Wrap a shared vector or structured expectation in `list(...)`.
-#' @return A finding data frame with the same columns as [`validation_finding()`][form.validation::validation_finding].
+#' @return A finding data frame with the same columns as [`create_validation_finding()`][form.validation::create_validation_finding].
 #'   Empty `row` produces an empty finding table. Values and order are preserved.
 #' @examples
 #' # Display the returned values.
-#' validation_findings("Unknown code", row = c(6L, 9L), sheet = "Observations",
+#' create_validation_findings("Unknown code", row = c(6L, 9L), sheet = "Observations",
 #'   field = "station", column = 1L, value = list("X", "Y"), expected = list("stations"))
 #' @export
-validation_findings <- function(message, row, sheet = NA_character_, field = NA_character_,
+create_validation_findings <- function(message, row, sheet = NA_character_, field = NA_character_,
                                 column = NA_integer_, value = list(NULL), expected = list(NULL)) {
   n <- length(row)
   # Recycle a finding column to the row count
@@ -359,10 +359,10 @@ validation_findings <- function(message, row, sheet = NA_character_, field = NA_
 #' @return Does not return; signals a `validation_incomplete` error condition.
 #' @examples
 #' # Display the returned values.
-#' tryCatch(validation_incomplete("Reference snapshot unavailable"),
+#' tryCatch(signal_validation_incomplete("Reference snapshot unavailable"),
 #'          validation_incomplete = function(e) conditionMessage(e))
 #' @export
-validation_incomplete <- function(message, sheet = NULL, field = NULL) {
+signal_validation_incomplete <- function(message, sheet = NULL, field = NULL) {
   text_value(message, "message")
   if (!is.null(sheet)) text_value(sheet, "sheet")
   if (!is.null(field)) text_value(field, "field")
@@ -386,7 +386,7 @@ validation_incomplete <- function(message, sheet = NULL, field = NULL) {
 #' reference_resolved_form_model <- form.references::resolve_reference_lookups(
 #'   form_model_definition, reference_configuration)
 #' # Prepare the validation rules and their execution order.
-#' print(validate_data(validation_plan(reference_resolved_form_model), list()))
+#' print(validate_data(create_validation_plan(reference_resolved_form_model), list()))
 #' @export
 print.validation_result <- function(x, ...) {
   cat("<validation_result> ", x$status, "\n", sep = "")

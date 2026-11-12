@@ -16,7 +16,7 @@ load_validation_plan(
 
 \item{directory}{Directory containing both files.}
 
-\item{checks}{Named callback functions; see \code{\link[=read_validation_rules]{read_validation_rules()}}.}
+\item{checks}{Named callback functions; see \code{\link[=read_validation_plan_from_rules]{read_validation_plan_from_rules()}}.}
 
 \item{lookup_configuration}{Optional reference lookup definitions, resolved before rule loading.}
 }
@@ -27,5 +27,5 @@ A \code{validation_plan} containing the model and its checks.
 Load a named model and validation process
 }
 \seealso{
-\code{\link[=read_validation_process]{read_validation_process()}} for a model and process stored separately.
+\code{\link[=read_validation_plan]{read_validation_plan()}} for a model and process stored separately.
 }

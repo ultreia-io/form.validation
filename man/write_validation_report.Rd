@@ -17,7 +17,7 @@ write_validation_report(
 )
 }
 \arguments{
-\item{report}{Prepared data from \code{\link[=validation_report_data]{validation_report_data()}}.}
+\item{report}{Prepared data from \code{\link[=prepare_validation_report]{prepare_validation_report()}}.}
 
 \item{path}{Destination HTML filename.}
 

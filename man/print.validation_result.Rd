@@ -27,5 +27,5 @@ reference_configuration <- form.references::read_reference_configuration(
 reference_resolved_form_model <- form.references::resolve_reference_lookups(
   form_model_definition, reference_configuration)
 # Prepare the validation rules and their execution order.
-print(validate_data(validation_plan(reference_resolved_form_model), list()))
+print(validate_data(create_validation_plan(reference_resolved_form_model), list()))
 }

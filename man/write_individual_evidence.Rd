@@ -16,7 +16,7 @@ write_individual_evidence(
 )
 }
 \arguments{
-\item{report}{Prepared report from \code{\link[=validation_report_data]{validation_report_data()}}.}
+\item{report}{Prepared report from \code{\link[=prepare_validation_report]{prepare_validation_report()}}.}
 
 \item{directory}{Destination directory of the individual form report.}
 

@@ -2,9 +2,9 @@
 
 # Planning ---------------------------------------------------------
 
-#' Freeze an explicit inventory for staged batch validation
+#' Write a batch plan with frozen inputs and resources
 #'
-#' A batch plan describes work to execute. A [`validation_plan()`][form.validation::validation_plan] describes the
+#' A batch plan describes work to execute. A [`create_validation_plan()`][form.validation::create_validation_plan] describes the
 #' rules for one form; several such rule plans may belong to a batch.
 #' @param inputs Data frame with `path`, unique relative `relative` paths and
 #'   `job` identifiers. Additional grouping columns and `title` are optional.
@@ -28,10 +28,10 @@
 #'   metadata; local paths, resources, callbacks and private metadata are excluded.
 #'   Extra job columns must contain only public metadata.
 #' @export
-validation_batch_plan <- function(inputs, jobs, resources, directory,
+write_validation_batch_plan <- function(inputs, jobs, resources, directory,
                                   group_columns = character(), identity_columns = group_columns,
                                   model_versions = character(), metadata = list(), packages = character(),
-                                  config = list(), reader = read_validation_workbook,
+                                  config = list(), reader = read_workbook_data,
                                   prepare_data = prepare_validation_data) {
   required <- unique(c("path", "relative", "job", group_columns, identity_columns))
   if (!is.data.frame(inputs) || !all(required %in% names(inputs)))
@@ -296,10 +296,10 @@ write_validation_batch_reports <- function(plan, report_filename = "index.html",
 
 # Publication ---------------------------------------------------------
 
-#' Build a publication tree from a completed validation batch
+#' Write a publication directory from a completed validation batch
 #' @inheritParams read_validation_batch_plan
 #' @param output New directory, defaulting to `publication` inside the batch.
-#' @inheritParams write_validation_aggregate
+#' @inheritParams write_validation_report_summary
 #' @param comment Optional plain-text publication note for the batch catalog.
 #' @param workers Number of top-level aggregate directories to build concurrently.
 #' @return The prepared directory, invisibly. No upload is performed.
@@ -309,7 +309,7 @@ write_validation_batch_reports <- function(plan, report_filename = "index.html",
 #'   Private results, resources and prepared evidence JSON are excluded. Local links and artifact counts
 #'   are checked before the staged directory is finalized.
 #' @export
-build_validation_publication <- function(plan, output = NULL, report_filename = "index.html",
+write_validation_batch_publication <- function(plan, output = NULL, report_filename = "index.html",
                                          title = "Validation reports", author = NULL,
                                          stylesheet = NULL, logo = NULL,
                                          reference_context_columns = character(), report_notes = character(),
@@ -374,7 +374,7 @@ build_validation_publication <- function(plan, output = NULL, report_filename = 
   for (name in c("validation.log", "report.log")) copy(file.path(plan$directory, name), file.path("logs", name))
   message(sprintf("Publication copy and navigation: %.1fs", proc.time()[["elapsed"]] - phase_started))
   phase_started <- proc.time()[["elapsed"]]
-  pages <- write_validation_aggregate(descriptors, stage,
+  pages <- write_validation_report_summary(descriptors, stage,
     group_columns = plan$group_columns, identity_columns = plan$identity_columns,
     report_filename = report_filename, title = title, author = author, stylesheet = stylesheet, logo = logo,
     model_versions = plan$model_versions,

@@ -123,7 +123,7 @@ workbook_read_failure <- function(plan, path, message) {
   execution <- rbind(data.frame(rule_id = "input/read", stage = "structure", severity = "error",
     sheet = NA_character_, field = NA_character_, status = "failed", message = message), execution)
   findings <- cbind(data.frame(rule_id = character(), severity = character(), source = character()),
-    validation_finding("unused")[FALSE, ])
+    create_validation_finding("unused")[FALSE, ])
   structure(list(status = "failed", valid = NA, complete = FALSE, structure_passed = FALSE,
     findings = findings, execution = execution, model = form.model::form_metadata(plan$model),
     source = path, rules_version = plan$rules_version,

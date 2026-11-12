@@ -2,7 +2,7 @@
 
 # Report preparation ---------------------------------------------------------
 
-#' Prepare one input's validation report
+#' Prepare a validation report from one input's result
 #'
 #' Prepare plain tables once for HTML output or a future interactive consumer.
 #' No workbook is read and no validation rule is executed.
@@ -20,7 +20,7 @@
 #'   individual findings in Validation messages, including fixed-cell sheets. Whole-workbook findings have a
 #'   separate section.
 #'   Incomplete and failed execution remain separate from validation findings.
-#'   Pass the report to [`write_validation_results()`][form.validation::write_validation_results] to reuse its formatted
+#'   Pass the report to [`write_validation_results_csv()`][form.validation::write_validation_results_csv] to reuse its formatted
 #'   `tables` for CSV export without preparing them again.
 #'   Optional `metadata$report_notes` is a character vector displayed as escaped
 #'   text in the Warning findings card. Other metadata is retained without interpretation.
@@ -35,13 +35,13 @@
 #'   form_model_definition, reference_configuration)
 #' # Prepare the validation rules and their execution order.
 #' validation_result <- validate_data(
-#'   validation_plan(reference_resolved_form_model), list(), source = "submission.xlsx")
+#'   create_validation_plan(reference_resolved_form_model), list(), source = "submission.xlsx")
 #' # Prepare report.
-#' validation_report <- validation_report_data(validation_result, reference_resolved_form_model)
+#' validation_report <- prepare_validation_report(validation_result, reference_resolved_form_model)
 #' # Display the returned values.
 #' validation_report$summary
 #' @export
-validation_report_data <- function(result, model, reference_provenance = result$reference_provenance,
+prepare_validation_report <- function(result, model, reference_provenance = result$reference_provenance,
                                    context = list()) {
   if (!inherits(result, "validation_result")) stop("result must come from validate_data()", call. = FALSE)
   if (!identical(result$model, form.model::form_metadata(model))) {
@@ -116,7 +116,7 @@ validation_report_data <- function(result, model, reference_provenance = result$
 #' Create `summary.csv` with one row and `findings.csv` with one row per finding
 #' or incomplete/failed check. Successful checks produce no detail rows.
 #' @param result A result from [`validate_data()`][form.validation::validate_data] or a prepared
-#'   [`validation_report_data()`][form.validation::validation_report_data] report. A report reuses its formatted tables.
+#'   [`prepare_validation_report()`][form.validation::prepare_validation_report] report. A report reuses its formatted tables.
 #' @param directory Output folder for this one input. Created if necessary.
 #' @param overwrite Whether to replace existing CSV outputs. Defaults to `FALSE`.
 #' @return A named character vector with `summary` and `findings` paths, invisibly.
@@ -155,19 +155,19 @@ validation_report_data <- function(result, model, reference_provenance = result$
 #'   form_model_definition, reference_configuration)
 #' # Prepare the validation rules and their execution order.
 #' validation_result <- validate_data(
-#'   validation_plan(reference_resolved_form_model), list(), source = "submission.xlsx")
+#'   create_validation_plan(reference_resolved_form_model), list(), source = "submission.xlsx")
 #' # Choose a temporary location for this example.
 #' validation_directory <- tempfile()
 #' # Write the prepared results to the output directory.
-#' write_validation_results(validation_result, validation_directory)
+#' write_validation_results_csv(validation_result, validation_directory)
 #' # Display the returned values.
 #' read.csv(file.path(validation_directory, "summary.csv"))
 #' # Remove the temporary files created by this example.
 #' unlink(validation_directory, recursive = TRUE)
 #' @export
-write_validation_results <- function(result, directory, overwrite = FALSE) {
+write_validation_results_csv <- function(result, directory, overwrite = FALSE) {
   if (!inherits(result, "validation_result") && !inherits(result, "validation_report")) {
-    stop("result must come from validate_data() or validation_report_data()", call. = FALSE)
+    stop("result must come from validate_data() or prepare_validation_report()", call. = FALSE)
   }
   text_value(directory, "directory")
   if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
@@ -191,7 +191,7 @@ write_validation_results <- function(result, directory, overwrite = FALSE) {
 #'
 #' Write an HTML overview with counts and load adjacent findings.csv for tables.
 #' Serve the output over HTTP using Apache or a Shiny static resource directory.
-#' @param report Prepared data from [`validation_report_data()`][form.validation::validation_report_data].
+#' @param report Prepared data from [`prepare_validation_report()`][form.validation::prepare_validation_report].
 #' @param path Destination HTML filename.
 #' @param title Report title.
 #' @param author Optional author text, or `NULL`.
@@ -213,7 +213,7 @@ write_validation_results <- function(result, directory, overwrite = FALSE) {
 write_validation_report <- function(report, path, title = "Validation report", author = NULL,
                                     overwrite = FALSE, assets_directory = "report-assets",
                                     stylesheet = NULL, logo = NULL, parent_report = NULL) {
-  if (!inherits(report, "validation_report")) stop("report must come from validation_report_data()", call. = FALSE)
+  if (!inherits(report, "validation_report")) stop("report must come from prepare_validation_report()", call. = FALSE)
   notes <- report$metadata$report_notes
   if (!is.null(notes) && (!is.character(notes) || anyNA(notes)))
     stop("metadata$report_notes must be character text without missing values", call. = FALSE)
@@ -235,11 +235,11 @@ write_validation_report <- function(report, path, title = "Validation report", a
   }
   csv_paths <- file.path(directory, c("summary.csv", "findings.csv"))
   if (overwrite || !any(file.exists(csv_paths))) {
-    write_validation_results(report, directory, overwrite = overwrite)
+    write_validation_results_csv(report, directory, overwrite = overwrite)
   } else {
     expected <- tempfile("report-csv-")
     on.exit(unlink(expected, recursive = TRUE), add = TRUE)
-    write_validation_results(report, expected)
+    write_validation_results_csv(report, expected)
     if (!all(file.exists(csv_paths)) ||
         !identical(unname(tools::md5sum(csv_paths)), unname(tools::md5sum(file.path(expected, basename(csv_paths)))))) {
       stop("Existing CSV files differ from report; use overwrite = TRUE", call. = FALSE)
@@ -286,7 +286,7 @@ write_validation_report <- function(report, path, title = "Validation report", a
 
 # Aggregate reports ---------------------------------------------------------
 
-#' Aggregate completed validation reports without running validation
+#' Write grouped summaries of completed validation reports
 #'
 #' @param descriptors Data frame with `directory` (existing report directory),
 #'   `report` (HTML filename), and public grouping metadata columns.
@@ -318,7 +318,7 @@ write_validation_report <- function(report, path, title = "Validation report", a
 #'   directory, at descriptor paths. Evidence is reused, never extracted from CSV.
 #'   No input workbook is read, copied or revalidated. Existing outputs are refused.
 #' @export
-write_validation_aggregate <- function(descriptors, directory, group_columns,
+write_validation_report_summary <- function(descriptors, directory, group_columns,
                                        identity_columns = group_columns,
                                        report_filename = "index.html", title = "Validation reports", notes = character(),
                                        author = NULL, stylesheet = NULL, logo = NULL, model_versions = NULL,

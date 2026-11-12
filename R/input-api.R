@@ -21,7 +21,7 @@
 #'   without cached values become missing values. Reader warnings are errors.
 #'   No form, reference source, or domain-specific configuration is required.
 #' @export
-read_validation_workbook <- function(path, timed = function(stage, expression) force(expression), trim_ws = FALSE) {
+read_workbook_data <- function(path, timed = function(stage, expression) force(expression), trim_ws = FALSE) {
   text_value(path, "path")
   if (!is.function(timed)) stop("timed must be a function", call. = FALSE)
   if (!is.logical(trim_ws) || length(trim_ws) != 1L || is.na(trim_ws))
@@ -111,7 +111,7 @@ prepare_validation_data <- function(data, model, na_strings = character(), na_ig
 
 #' Read and validate a workbook without generating reports
 #' @param path Input workbook path, left unchanged.
-#' @param plan A rule plan from [`validation_plan()`][form.validation::validation_plan] or [`read_validation_rules()`][form.validation::read_validation_rules].
+#' @param plan A rule plan from [`create_validation_plan()`][form.validation::create_validation_plan] or [`read_validation_plan_from_rules()`][form.validation::read_validation_plan_from_rules].
 #' @param references Explicit reference snapshots, reusable across inputs.
 #' @param source Diagnostic input label; defaults to `path`.
 #' @param reader Function accepting `path` and `timed`, returning worksheet grids.
@@ -124,7 +124,7 @@ prepare_validation_data <- function(data, model, na_strings = character(), na_ig
 #'   separate timings. Configuration is supplied explicitly by the caller.
 #' @export
 validate_workbook <- function(path, plan, references = list(), source = path, config = list(),
-                              reader = read_validation_workbook,
+                              reader = read_workbook_data,
                               prepare_data = prepare_validation_data, log = message) {
   if (!inherits(plan, "validation_plan")) stop("Supply a validation_plan", call. = FALSE)
   if (!is.function(reader) || !is.function(log) ||

@@ -205,23 +205,13 @@ run_field <- function(rule, context) {
     if (!is.list(snapshot) || is.null(snapshot$values) ||
         !(is.atomic(snapshot$values) || is.list(snapshot$values)))
       stop("Reference snapshot needs values: ", id, call. = FALSE)
-    aliases <- if (is.null(snapshot$aliases)) character() else snapshot$aliases
     index <- if (identical(value$matching, "exact"))
       reference_lookup(id, context, ignore_case) else NULL
-    for (candidate in snapshot$indexes) {
-      if (identical(candidate$matching, value$matching) &&
-          identical(candidate$ignore_case, ignore_case) &&
-          identical(candidate$aliases, aliases)) {
-        index <- candidate
-        break
-      }
-    }
     if (is.null(index)) {
       cache_key <- paste0("reference/", rule$id)
       if (exists(cache_key, context$cache, inherits = FALSE)) index <- context$cache[[cache_key]]
       else {
-        index <- form.references::reference_index(snapshot$values,
-          matching = value$matching, aliases = aliases, ignore_case = ignore_case)
+        index <- snapshot_index(id, snapshot, ignore_case, value$matching)
         context$cache[[cache_key]] <- index
       }
     }
@@ -331,15 +321,22 @@ reference_lookup <- function(id, context, ignore_case = TRUE) {
 
 #' Check a reference snapshot and prepare its shared lookup
 #' @param id Reference identifier.
-#' @param snapshot Supplied reference snapshot.
+#' @param snapshot Prepared reference index or supplied reference values.
+#' @param matching Lookup matching policy.
 #' @param ignore_case Compare keys without case distinctions.
 #' @return A shared index; a missing snapshot signals incomplete validation.
 #' @keywords internal
-snapshot_index <- function(id, snapshot, ignore_case = TRUE) {
+snapshot_index <- function(id, snapshot, ignore_case = TRUE, matching = "exact") {
   if (is.null(snapshot)) signal_validation_incomplete(paste("Missing reference snapshot:", id))
+  if (inherits(snapshot, "reference_index")) {
+    if (identical(snapshot$matching, matching) &&
+        identical(snapshot$ignore_case, ignore_case)) return(snapshot)
+    return(form.references::reference_index(snapshot$data, snapshot$column,
+      matching = matching, ignore_case = ignore_case))
+  }
   if (!is.list(snapshot) || is.null(names(snapshot)) || anyDuplicated(names(snapshot)) ||
-      any(!names(snapshot) %in% c("values", "version", "aliases", "data", "column", "lookup", "indexes")) || !"values" %in% names(snapshot)) {
-    stop("Reference ", id, " must contain values and optional version, aliases, data, column, lookup and indexes", call. = FALSE)
+      any(!names(snapshot) %in% c("values", "version")) || !"values" %in% names(snapshot)) {
+    stop("Reference ", id, " must be a prepared reference index or contain values and optional version", call. = FALSE)
   }
   values <- snapshot$values
   if (!(is.atomic(values) || is.list(values)) || is.data.frame(values) || !is.null(dim(values))) {
@@ -349,20 +346,7 @@ snapshot_index <- function(id, snapshot, ignore_case = TRUE) {
   if (any(!vapply(keys, value_type, logical(1), type = "string"))) {
     stop("Reference keys must be strings: ", id, call. = FALSE)
   }
-  keys <- vapply(keys, identity, character(1))
-  aliases <- snapshot$aliases
-  if (!is.null(aliases)) {
-    if (!(is.character(aliases) || is.list(aliases)) || !is.null(dim(aliases)) ||
-        (length(aliases) && (is.null(names(aliases)) || anyNA(names(aliases)) || any(!nzchar(names(aliases))))) ||
-        any(!vapply(aliases, value_type, logical(1), type = "string"))) {
-      stop("Reference aliases must map non-empty names to string codes: ", id, call. = FALSE)
-    }
-    targets <- vapply(as.list(aliases), identity, character(1))
-    if (any(!targets %in% keys)) stop("Reference alias target is absent from values: ", id, call. = FALSE)
-  }
-  form.references::reference_index(values, aliases = if (is.null(aliases)) character() else aliases,
-    matching = if (is.null(snapshot$lookup$matching)) "exact" else snapshot$lookup$matching,
-    ignore_case = ignore_case)
+  form.references::reference_index(values, matching = matching, ignore_case = ignore_case)
 }
 
 # Keys, row constraints and sequences ---------------------------------------------------------

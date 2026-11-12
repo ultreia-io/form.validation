@@ -18,7 +18,7 @@
 #' @examples
 #' # Prepare refs.
 #' reference_values <- prepare_validation_reference_indexes(list(stations = list(
-#'   values = c("001", "002"), aliases = c(old = "001"))))
+#'   values = c("001", "002"))))
 #' # Display the returned values.
 #' reference_values$stations$values
 #' @export
@@ -53,10 +53,10 @@ prepare_validation_reference_indexes <- function(references, ids = names(referen
 #'   exact workbook sheet names. Retain all physical preamble rows.
 #'   Column names and row names have no validation meaning. Use list columns or
 #'   list matrices when a column contains mixed types; no implicit coercion is performed.
-#' @param references Named list of snapshots. Each snapshot has `values` (a vector
-#'   or list of string codes) and may include a caller-owned `version` label.
-#'   Optional `aliases` map alternate codes to canonical `values`; both are accepted.
-#'   Alias targets must exist in `values`; submitted values are not rewritten.
+#' @param references Named list of prepared indexes from
+#'   `form.references::prepare_model_references()`, or lists containing `values`
+#'   (string codes) and an optional `version` label. Catalogue-owned aliases
+#'   are applied automatically by prepared indexes; submitted values are not rewritten.
 #'   Missing snapshots make affected rules incomplete; malformed snapshot values
 #'   make them fail execution. Use [`prepare_validation_reference_indexes()`][form.validation::prepare_validation_reference_indexes] to reuse
 #'   checked reference keys across submissions.

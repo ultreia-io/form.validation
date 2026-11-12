@@ -22,10 +22,10 @@ exact workbook sheet names. Retain all physical preamble rows.
 Column names and row names have no validation meaning. Use list columns or
 list matrices when a column contains mixed types; no implicit coercion is performed.}
 
-\item{references}{Named list of snapshots. Each snapshot has \code{values} (a vector
-or list of string codes) and may include a caller-owned \code{version} label.
-Optional \code{aliases} map alternate codes to canonical \code{values}; both are accepted.
-Alias targets must exist in \code{values}; submitted values are not rewritten.
+\item{references}{Named list of prepared indexes from
+\code{form.references::prepare_model_references()}, or lists containing \code{values}
+(string codes) and an optional \code{version} label. Catalogue-owned aliases
+are applied automatically by prepared indexes; submitted values are not rewritten.
 Missing snapshots make affected rules incomplete; malformed snapshot values
 make them fail execution. Use \code{\link[=prepare_validation_reference_indexes]{prepare_validation_reference_indexes()}} to reuse
 checked reference keys across submissions.}

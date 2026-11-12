@@ -31,7 +31,7 @@ by the engine; call this function again to share the updated preparation.
 \examples{
 # Prepare refs.
 reference_values <- prepare_validation_reference_indexes(list(stations = list(
-  values = c("001", "002"), aliases = c(old = "001"))))
+  values = c("001", "002"))))
 # Display the returned values.
 reference_values$stations$values
 }

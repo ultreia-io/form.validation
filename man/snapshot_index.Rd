@@ -4,14 +4,16 @@
 \alias{snapshot_index}
 \title{Check a reference snapshot and prepare its shared lookup}
 \usage{
-snapshot_index(id, snapshot, ignore_case = TRUE)
+snapshot_index(id, snapshot, ignore_case = TRUE, matching = "exact")
 }
 \arguments{
 \item{id}{Reference identifier.}
 
-\item{snapshot}{Supplied reference snapshot.}
+\item{snapshot}{Prepared reference index or supplied reference values.}
 
 \item{ignore_case}{Compare keys without case distinctions.}
+
+\item{matching}{Lookup matching policy.}
 }
 \value{
 A shared index; a missing snapshot signals incomplete validation.

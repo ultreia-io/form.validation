@@ -76,7 +76,7 @@ Omitting `ignore_case` defaults to `true`. This changes comparison only; submitt
 
 A field's `reference` binding generates a reference check with a catalogue/table/lookup ID and matching mode.
 
-Each submitted value must match exactly one reference row. Supply aliases to accept alternative spellings.
+Each submitted value must match exactly one reference row. Catalogue-owned aliases accept alternative spellings automatically.
 
 For custom R callbacks, follow [Authoring validation rules](rules-authoring.html).
 
@@ -158,12 +158,8 @@ Accept a submission only when `result$complete` and `isTRUE(result$valid)` are b
 
 ## Accept alternate reference codes
 
-Supply aliases when more than one spelling is explicitly accepted for a code:
-
-```r
-# Prepare reference values.
-reference_values <- list("code_lists/units/code" = list(values = c("cm", "kg"), aliases = c(CM = "cm")))
-```
+Declare alternate spellings in the catalogue’s alias table.
+Prepared references apply these aliases automatically during validation.
 
 Reference rules ignore case by default, including aliases. Submitted and reference values remain unchanged.
 
@@ -193,8 +189,7 @@ Enable name matching when accents or word order may differ:
 
 ```r
 # Prepare reference index.
-reference_index <- form.references::reference_index(c("MARTIN Emile", "Jane Smith"), matching = "name",
-  aliases = c("J. Smith" = "Jane Smith"))
+reference_index <- form.references::reference_index(c("MARTIN Emile", "Jane Smith"), matching = "name")
 # Display the number of matching rows for each submitted value.
 lengths(form.references::reference_match_rows(reference_index, c("Emile Martin", "J. Smith", "Unknown")))
 # 1 1 0

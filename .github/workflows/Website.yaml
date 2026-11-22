@@ -130,4 +130,4 @@ jobs:
       # Publish the uploaded site artifact and expose its URL to the environment above.
       - name: Deploy GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5.0.0
+        uses: actions/deploy-pages@v5.0.1

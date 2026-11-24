@@ -71,7 +71,7 @@ jobs:
       # Configure the image's R installation and prefer package binaries where supported.
       - name: Set up R
         id: setup-r
-        uses: r-lib/actions/setup-r@v2.12.1
+        uses: r-lib/actions/setup-r@v2.14.0
         with:
           r-version: ${{ steps.apt-cache.outputs.r-version }}
           install-r: false
@@ -85,7 +85,7 @@ jobs:
 
       # Render the Markdown and vignette content used by pkgdown.
       - name: Set up Pandoc
-        uses: r-lib/actions/setup-pandoc@v2.12.1
+        uses: r-lib/actions/setup-pandoc@v2.14.0
 
       # Restore the last metadata snapshot before dependency resolution on every platform.
       # A new key saves any refreshed metadata; pak still decides when it needs an update.
@@ -96,7 +96,7 @@ jobs:
 
       # Install pkgdown, roxygen and the dependencies declared for website generation.
       - name: Install site dependencies
-        uses: r-lib/actions/setup-r-dependencies@v2.12.1
+        uses: r-lib/actions/setup-r-dependencies@v2.14.0
         with:
           extra-packages: |
             any::roxygen2

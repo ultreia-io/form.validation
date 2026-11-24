@@ -74,7 +74,7 @@ jobs:
       # Configure the image's R installation and use package binaries where supported.
       - name: Set up R
         id: setup-r
-        uses: r-lib/actions/setup-r@v2.12.1
+        uses: r-lib/actions/setup-r@v2.14.0
         with:
           r-version: ${{ steps.apt-cache.outputs.r-version }}
           install-r: false
@@ -107,7 +107,7 @@ jobs:
           cat(paste0("tag=", version, "\n"), file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
       # Pandoc renders package vignettes during the build.
       - name: Set up Pandoc
-        uses: r-lib/actions/setup-pandoc@v2.12.1
+        uses: r-lib/actions/setup-pandoc@v2.14.0
       # Reuse the complete manual toolchain used by Build.
       - name: Set up cached TinyTeX
         uses: ./.github/actions/setup-tinytex
@@ -120,7 +120,7 @@ jobs:
 
       # This job installs its own dependencies and the documentation/check tools.
       - name: Install package and check dependencies
-        uses: r-lib/actions/setup-r-dependencies@v2.12.1
+        uses: r-lib/actions/setup-r-dependencies@v2.14.0
         with:
           extra-packages: |
             any::rcmdcheck
@@ -133,7 +133,7 @@ jobs:
       # This job has its own workspace: build and check the archive that will be uploaded.
       # Fail on warnings and errors; retain CRAN notes for review.
       - name: Build and check publication archive
-        uses: r-lib/actions/check-r-package@v2.12.1
+        uses: r-lib/actions/check-r-package@v2.14.0
         with:
           args: '"--as-cran"'
           build_args: 'character()'
@@ -193,12 +193,12 @@ jobs:
           ref: ${{ needs.publish.outputs.commit }}
       - name: Set up R
         if: steps.submission.outputs.skip != 'true'
-        uses: r-lib/actions/setup-r@v2.12.1
+        uses: r-lib/actions/setup-r@v2.14.0
         with:
           use-public-rspm: true
       - name: Install submission tools
         if: steps.submission.outputs.skip != 'true'
-        uses: r-lib/actions/setup-r-dependencies@v2.12.1
+        uses: r-lib/actions/setup-r-dependencies@v2.14.0
         with:
           packages: |
             any::xfun

@@ -144,10 +144,24 @@ jobs:
         with:
           r-version: ${{ (steps.setup-r.outputs.installed-r-version || steps.setup-r-devel.outputs.installed-r-version) }}
 
+      # Ubuntu's sudo may drop R_LIB_FOR_PAK; install pak in the writable R-devel user library.
+      - name: Install pak for R-devel without sudo
+        if: matrix.config.r == 'devel'
+        shell: Rscript {0}
+        run: |
+          pak_library <- Sys.getenv("R_LIBS_USER")
+          dir.create(pak_library, recursive = TRUE, showWarnings = FALSE)
+          install.packages("pak", lib = pak_library, repos = sprintf(
+            "https://r-lib.github.io/p/pak/stable/%s/%s/%s",
+            .Platform$pkgType, R.Version()$os, R.Version()$arch))
+          cat(paste0("R_LIB_FOR_PAK=", pak_library, "\n"),
+            file = Sys.getenv("GITHUB_ENV"), append = TRUE)
+
       # Install package dependencies plus the tools used to generate documentation and run R CMD check.
       - name: Install R dependencies
-        uses: r-lib/actions/setup-r-dependencies@v2.12.1
+        uses: r-lib/actions/setup-r-dependencies@v2.14.0
         with:
+          pak-version: ${{ matrix.config.r == 'devel' && 'none' || 'stable' }}
           # Preserve installed packages even if a later check fails.
           cache: always
           extra-packages: |
